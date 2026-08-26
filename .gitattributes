@@ -1,0 +1,11 @@
+# The recorded checks compare bytes, and the expected render is read from the working tree. If a
+# developer's core.autocrlf handed them a CRLF copy, `--golden check` would fail for a reason that
+# has nothing to do with the change under review. Pinning the whole package to LF removes that.
+#
+# The fixture journal is line-ending independent when parsed (the reader splits on /\r?\n/), but it
+# is pinned too so a fresh clone on any platform gets byte-identical input.
+* text=auto eol=lf
+
+# Generated, and large: keep them out of diffs and out of language statistics.
+test/fixtures/golden/golden-session.expected.md linguist-generated=true -diff
+test/fixtures/golden/golden-session.digest.json linguist-generated=true -diff

@@ -1,0 +1,61 @@
+{
+  "name": "copilot-chat-exporter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Export a VS Code Copilot chat session to a rich, human-readable Markdown archive: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.",
+  "license": "MIT",
+  "author": "rrabbani",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "copilot-chat-export": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist",
+    "ci",
+    "docs",
+    "skill",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "export": "node src/cli.ts",
+    "list": "node src/cli.ts --list",
+    "golden": "node src/cli.ts --golden check",
+    "golden:update": "node src/cli.ts --golden update",
+    "snapshot": "node src/cli.ts --snapshot",
+    "baseline": "node test/baseline.ts",
+    "baseline:update": "node test/baseline.ts --update",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "verify": "npm run typecheck && npm run typecheck:test && npm run test && npm run golden",
+    "verify:local": "npm run verify && npm run baseline",
+    "build": "node scripts/build.mjs",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "vscode",
+    "copilot",
+    "chat",
+    "export",
+    "markdown",
+    "transcript"
+  ],
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "esbuild": "^0.27.7",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,13 @@
+dist/
+*.tsbuildinfo
+
+# Local regression fixture for the TS refactor: a ~30 MB verbatim copy of a real VS Code
+# workspace-storage session plus its ~2.4 MB expected render. Machine-local by design; the
+# committed one is the small made-up fixture under test/fixtures/golden. The capture
+# command that recreates both lives in test/baseline.ts.
+test/fixtures/live-session/
+test/baseline/
+
+# Machine-local digests of your own sessions, taken with --snapshot update. They name a session
+# that only exists in your VS Code storage, so they are meaningless in anyone else's checkout.
+test/snapshots/

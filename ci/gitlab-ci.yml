@@ -1,0 +1,28 @@
+# CI job for while the exporter is a workspace member of this GitLab-hosted monorepo.
+# Once the package is extracted to its own GitHub repository, use `ci/github-workflow.yml` instead.
+#
+# It runs only what a fresh clone can run: both type checks, unit tests, the committed golden
+# fixture, the distribution build, and a package dry run. The live-session baseline is excluded.
+#
+# Rules are `changes:`-scoped so this does not run on commits that never touched the tool.
+
+.copilot-chat-exporter-rules: &copilot-chat-exporter-rules
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    changes: &copilot-chat-exporter-paths
+      - CPE/WebApps/cpe-exb/tools/copilot-chat-exporter/**/*
+  - if: $CI_COMMIT_BRANCH
+    changes: *copilot-chat-exporter-paths
+
+copilot_chat_exporter_verify:
+  stage: test
+  # Node 22 is the published floor: it is the current LTS and the line where running .ts
+  # directly (type stripping) landed, which is what lets this package ship without a build.
+  image: node:22
+  rules: *copilot-chat-exporter-rules
+  script:
+    - node --version
+    - cd CPE/WebApps/cpe-exb
+    - npm ci --ignore-scripts
+    - npm run verify -w copilot-chat-exporter
+    - npm run build -w copilot-chat-exporter
+    - npm pack --dry-run -w copilot-chat-exporter

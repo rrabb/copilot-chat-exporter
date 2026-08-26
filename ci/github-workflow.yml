@@ -1,0 +1,42 @@
+# CI job for the exporter once it lives in its own GitHub repository, where this package is the
+# repo root. NOT active where you found it: GitHub only reads workflows from `.github/workflows/`
+# at the root of a repository, so a copy sitting under `tools/` does nothing.
+#
+# To enable after extraction:
+#
+#   cp ci/github-workflow.yml .github/workflows/verify.yml
+#
+# While the package is still a workspace member of another repo, use `ci/gitlab-ci.yml` instead,
+# or change the two `npm` lines below to `npm ci` and `npm run verify -w copilot-chat-exporter`.
+#
+# It runs only what a fresh clone can run. The live-session baseline is excluded on purpose: that
+# fixture is a ~30 MB verbatim copy of a real session, gitignored and machine-local.
+
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    # Both platforms, because the recorded checks compare bytes and had only ever been produced on
+    # Windows. Paths and line endings are the two things that would diverge, and this is what
+    # proves they do not.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # 22.18 is the floor: the release where running .ts directly stopped needing a flag.
+        node: ['22.18', '24']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm pack --dry-run
+      - run: npm run verify

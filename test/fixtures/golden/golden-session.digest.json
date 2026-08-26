@@ -1,0 +1,212 @@
+{
+  "schema": 2,
+  "turns": 10,
+  "toolCalls": {
+    "total": 8,
+    "distinct": 6
+  },
+  "thoughts": 3,
+  "perTurn": [
+    {
+      "n": 1,
+      "requestId": "golden_req_1",
+      "promptSha": "571fa0ed8cc3ccd5976180d0eda61818403ecd9abff8b79a17186695bd522029",
+      "assistantSha": "a413316ebe796eea63cba8b15bba5324143858d99915dc4f6c12407d8cb48800",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 1,
+      "toolIds": [
+        "golden_call_1"
+      ],
+      "termLines": 2,
+      "files": [
+        "c:/fixture/src/example.ts"
+      ],
+      "compact": false
+    },
+    {
+      "n": 2,
+      "requestId": "golden_req_2",
+      "promptSha": "77eedb5d59fa7fb627ed530225b1085865883b87745dc74fa4ac947b21419057",
+      "assistantSha": "1513262623cb024bafaa5b747addeda33c362bb9862e5d1706b491ad3d81f2a8",
+      "thoughts": 1,
+      "thoughtShas": [
+        "2becf7de8b4a50a9dcd92bc7e2b2256ae4637348a57f4705c6f78aada2d83c0c"
+      ],
+      "tools": 1,
+      "toolIds": [
+        "golden_call_2"
+      ],
+      "termLines": 0,
+      "files": [],
+      "compact": false
+    },
+    {
+      "n": 3,
+      "requestId": "golden_req_3",
+      "promptSha": "c6b9ea09b0769f367fadc8f79247f596c396152077427275a3f1204bd835e1e4",
+      "assistantSha": "2a828fcbbb3e5706765c078a91fe73063ff2f112fe1bdfaab825e31e97d9293b",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 1,
+      "toolIds": [
+        "golden_call_3"
+      ],
+      "termLines": 0,
+      "files": [],
+      "compact": false
+    },
+    {
+      "n": 4,
+      "requestId": "golden_req_4",
+      "promptSha": "52e657bd1470bb75a808df9dbe93b8f82606f0b614db4d82e9a09dd291bf3f74",
+      "assistantSha": "c00803522682199985c6055b85f2db7534b309ba1df2c124f045f90603d49b55",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 0,
+      "toolIds": [],
+      "termLines": 0,
+      "files": [],
+      "compact": true
+    },
+    {
+      "n": 5,
+      "requestId": "golden_req_5",
+      "promptSha": "95a76e567aea4730e72abd10321a08a9510c76cfeabd247d572fa549edc0a095",
+      "assistantSha": "56b49ed904857dad45c59ef84735788be17b944aa7352380b14164354c4e8a7e",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 1,
+      "toolIds": [
+        "golden_call_5"
+      ],
+      "termLines": 0,
+      "files": [],
+      "compact": false
+    },
+    {
+      "n": 6,
+      "requestId": "golden_req_6",
+      "promptSha": "fd4ab61a5934bd5b4b6b643ccd3b063e6729308d743dd4c9991cbb233cabc300",
+      "assistantSha": "b90b4659b970e1fdcaaf69c77bc146ee600624bfb4ceb458f3d04661a3150db5",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 0,
+      "toolIds": [],
+      "termLines": 0,
+      "files": [],
+      "compact": false
+    },
+    {
+      "n": 7,
+      "requestId": "golden_req_7",
+      "promptSha": "52e657bd1470bb75a808df9dbe93b8f82606f0b614db4d82e9a09dd291bf3f74",
+      "assistantSha": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 0,
+      "toolIds": [],
+      "termLines": 0,
+      "files": [],
+      "compact": true
+    },
+    {
+      "n": 8,
+      "requestId": "golden_req_8",
+      "promptSha": "27684cd1df05bad044e56d019518715cf7ea0de6f26e1eeb725521faec0a70ce",
+      "assistantSha": "882c4212ecb4c754f5106f06761386e166f042109865d6f18096af1930299dbe",
+      "thoughts": 2,
+      "thoughtShas": [
+        "3c4a31b4b76d8a265933cecdf77fb73b094f6bdc05ceab3ed9136c2b8ac122fd",
+        "76004eceb70c4cce7d477ea421e5240428ecd35a8a3c96e9194f80d555329ed8"
+      ],
+      "tools": 2,
+      "toolIds": [
+        "golden_reused_call",
+        "golden_reused_call"
+      ],
+      "termLines": 2,
+      "files": [],
+      "compact": false
+    },
+    {
+      "n": 9,
+      "requestId": "golden_req_9",
+      "promptSha": "e55a3ff8e2c113c698b5f7a4ff9830f5873ba3bbc92553b87278e194e6fc2b31",
+      "assistantSha": "06270cb6271c8d554f4c50d6de703201ad8f8771a65047996e1f0017ef01002b",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 1,
+      "toolIds": [
+        "golden_reused_call"
+      ],
+      "termLines": 1,
+      "files": [],
+      "compact": false
+    },
+    {
+      "n": 10,
+      "requestId": "golden_req_10",
+      "promptSha": "081b5c0e521d4df29b2ebcf7ab56522c5d5e8201cc74fa196f7f925dfba5ba99",
+      "assistantSha": "79182fe7cc4637a6c9e359182eb4e2824a03978ae8ad7515e23ad86c331d4c73",
+      "thoughts": 0,
+      "thoughtShas": [],
+      "tools": 1,
+      "toolIds": [
+        "golden_call_input"
+      ],
+      "termLines": 0,
+      "files": [
+        "c:/fixture/src/new-name.ts",
+        "c:/fixture/src/removed.ts",
+        "c:/fixture/src/added.ts"
+      ],
+      "compact": false
+    }
+  ],
+  "render": {
+    "anchors": 10,
+    "toc": 10,
+    "headers": 10,
+    "assistant": 10,
+    "badges": 8,
+    "detailsBalanced": true
+  },
+  "census": {
+    "seen": {
+      "(implicit text)": 12,
+      "codeblockUri": 1,
+      "confirmation": 1,
+      "inlineReference": 1,
+      "progressMessage": 1,
+      "progressTaskSerialized": 1,
+      "questionCarousel": 1,
+      "textEditGroup": 1,
+      "thinking": 5,
+      "toolInvocationSerialized": 10,
+      "undoStop": 1,
+      "workspaceEdit": 1
+    },
+    "dropped": {
+      "codeblockUri": 1,
+      "confirmation": 1,
+      "progressMessage": 1,
+      "progressTaskSerialized": 1,
+      "questionCarousel": 1,
+      "thinking": 1,
+      "undoStop": 1
+    },
+    "toolData": {
+      "input": 1,
+      "subagent": 2,
+      "terminal": 5,
+      "todoList": 1
+    },
+    "unhandled": [],
+    "unrecognizedToolData": []
+  },
+  "notes": [
+    "numeric-keyed splice-object response delta (turn 5) - not observed in any of 45 surveyed local sessions",
+    "isCanceled: true (turn 6) - not observed in any of 45 surveyed local sessions"
+  ]
+}
