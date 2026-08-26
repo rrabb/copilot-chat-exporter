@@ -5,13 +5,16 @@
 // different format entirely, so a filename that is not a session UUID is rejected rather than
 // parsed into an empty export.
 
-import { promises as fs } from 'node:fs';
+import { createReadStream, promises as fs } from 'node:fs';
 import path from 'node:path';
+import { createInterface } from 'node:readline';
+import { DatabaseSync } from 'node:sqlite';
 import type { SessionLocation } from '../types.ts';
 import { workspaceStorageRoots } from '../host.ts';
 import { parseJson } from '../text.ts';
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CHAT_INDEX_KEY = 'chat.ChatSessionStore.index';
 
 // A journal's first record is a full state snapshot, so it can be megabytes on a long session,
 // but the rest of the file is always larger. Reading to the first newline avoids materializing
@@ -56,8 +59,63 @@ export function currentSessionFromEnv () {
   return { sessionId, hashRoot: path.dirname(path.dirname(path.dirname(target))) };
 }
 
-// Titles cost one header read per session, so only `--list` asks for them; resolving a session
-// needs nothing but the path and mtime.
+export async function readSessionTitle (sessionPath: string) {
+  let title = '';
+  let lineNumber = 0;
+  const lines = createInterface({
+    input: createReadStream(sessionPath, { encoding: 'utf8' }),
+    crlfDelay: Infinity,
+  });
+
+  for await (const line of lines) {
+    lineNumber += 1;
+    if (lineNumber > 1 && !line.includes('"customTitle"'))
+      continue;
+    const record = parseJson(line);
+    if (record?.kind === 0) {
+      title = typeof record.v?.customTitle === 'string' ? record.v.customTitle : '';
+      continue;
+    }
+    if (
+      record?.kind === 1
+      && Array.isArray(record.k)
+      && record.k.length === 1
+      && record.k[0] === 'customTitle'
+    )
+      title = typeof record.v === 'string' ? record.v : '';
+  }
+
+  return title;
+}
+
+function readIndexedTitles (hashRoot: string) {
+  const titles = new Map<string, string>();
+  let database: DatabaseSync | undefined;
+  try {
+    database = new DatabaseSync(path.join(hashRoot, 'state.vscdb'), { readOnly: true });
+    const row = database.prepare('SELECT value FROM ItemTable WHERE key = ?').get(CHAT_INDEX_KEY) as { value?: unknown } | undefined;
+    const entries = parseJson(typeof row?.value === 'string' ? row.value : '')?.entries;
+    if (!entries || typeof entries !== 'object')
+      return titles;
+    for (const [sessionId, entry] of Object.entries(entries)) {
+      const title = (entry as { title?: unknown })?.title;
+      if (SESSION_ID_PATTERN.test(sessionId) && typeof title === 'string' && title)
+        titles.set(sessionId, title);
+    }
+  } catch {
+    // The index is optional and can be absent, locked, or from an older VS Code version.
+  } finally {
+    try {
+      database?.close();
+    } catch {
+      // Closing optional title metadata must not prevent journal fallback.
+    }
+  }
+  return titles;
+}
+
+// The workspace index holds the current GUI title, including manual renames that VS Code does not
+// write back to the journal. When the index has no entry, `--list` replays journal title changes.
 export async function listSessions ({ withTitles = false } = {}) {
   const sessions = [];
   for (const storageRoot of workspaceStorageRoots()) {
@@ -71,6 +129,7 @@ export async function listSessions ({ withTitles = false } = {}) {
       if (!hash.isDirectory())
         continue;
       const hashRoot = path.join(storageRoot, hash.name);
+      const indexedTitles = readIndexedTitles(hashRoot);
       const chatSessionsDir = path.join(hashRoot, 'chatSessions');
       let files = [];
       try {
@@ -84,10 +143,10 @@ export async function listSessions ({ withTitles = false } = {}) {
           continue;
         const sessionPath = path.join(chatSessionsDir, file.name);
         const stat = await fs.stat(sessionPath);
-        let title = '';
-        if (withTitles) {
+        let title = indexedTitles.get(sessionId) ?? '';
+        if (withTitles && !title) {
           try {
-            title = parseJson(await readFirstLine(sessionPath))?.v?.customTitle ?? '';
+            title = await readSessionTitle(sessionPath);
           } catch {
             // Title is best-effort.
           }

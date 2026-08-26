@@ -4,8 +4,10 @@ Export a VS Code Copilot chat session to a single, human-readable Markdown archi
 reasoning, tool calls, terminal output, code blocks, edited files, token cost, and timing.
 
 The exporter reads VS Code's native chat journal (`chatSessions/<sessionId>.jsonl`) as the definitive
-source and enriches it, best-effort, from the sibling `chat-session-resources`, `transcripts`,
-`debug-logs`, and `memory-tool` stores. It only ever reads local files.
+conversation source. The current GUI title comes from the workspace chat index in `state.vscdb`,
+because a manual rename is not always written back to the journal. Other details are enriched
+best-effort from the sibling `chat-session-resources`, `transcripts`, `debug-logs`, and `memory-tool`
+stores. It only ever reads local files.
 
 ## Install
 
@@ -168,6 +170,7 @@ workspace, not the session:
 ```
 workspaceStorage/<hash>/
   workspace.json                     names the folder this storage belongs to
+  state.vscdb                        chat index; current GUI title keyed by session id
   chatSessions/<id>.jsonl            THE JOURNAL - definitive, this is what we parse
   GitHub.copilot-chat/
     chat-session-resources/<id>/     large tool-output bodies, keyed by toolCallId
@@ -180,8 +183,10 @@ workspaceStorage/<hash>/
 > not. Passing it yields zero turns and silently overwrites a good export. Everything here parses
 > `chatSessions/`.
 
-Only `chatSessions/` is required. The other four stores are best-effort enrichment: VS Code
-rotates and empties `chat-session-resources/`, so nothing may depend on it being present.
+Only `chatSessions/` is required. When `state.vscdb` or its chat index is unavailable, the title
+falls back to the journal's latest root `customTitle`. The other four stores are best-effort
+enrichment: VS Code rotates and empties `chat-session-resources/`, so nothing may depend on it
+being present.
 
 ### Two terms you will see everywhere
 

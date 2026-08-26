@@ -40,6 +40,7 @@ export async function loadSession (options: {
 
   const raw = await fs.readFile(location.sessionPath, 'utf8');
   const session = parseChatSession(location.sessionPath, raw);
+  location.title && (session.customTitle = location.title);
 
   const resources = await loadResources(location.hashRoot, location.sessionId);
   const versions = await readVersions(location.hashRoot, location.sessionId);

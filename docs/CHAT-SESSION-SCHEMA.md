@@ -67,6 +67,8 @@ VS Code user data
 └── User/workspaceStorage/<workspace-hash>/
     ├── workspace.json
     │   └── folder / workspace identity used by this exporter
+    ├── state.vscdb
+    │   └── chat.ChatSessionStore.index: current GUI title keyed by sessionId
     ├── chatSessions/
     │   └── <sessionId>.jsonl                 definitive journal for this tool
     └── GitHub.copilot-chat/
@@ -90,6 +92,7 @@ The storage root varies by platform and VS Code channel. The owning code is
 
 | File | Used by this exporter? | Why |
 |---|---:|---|
+| `state.vscdb` | Yes, for titles | `chat.ChatSessionStore.index.entries[sessionId].title` holds the current GUI title, including manual renames that may not update the journal |
 | `chatSessions/<id>.jsonl` | Yes | The final persisted chat model, written as mutation records |
 | `transcripts/<id>.jsonl` | Only for optional version labels | A different event/debug format; it does not contain the journal's request tree |
 | `debug-logs/<id>/models.json` | Optional enrichment | Friendly model names |
@@ -98,6 +101,19 @@ The storage root varies by platform and VS Code channel. The owning code is
 
 The rejection of a transcript path is intentional. A transcript can be valid JSONL and still be
 the wrong schema.
+
+### Title precedence
+
+VS Code can leave an older `customTitle` in `chatSessions/<id>.jsonl` after the user renames the
+session in the Chat GUI. The workspace index is therefore authoritative for the current display
+title:
+
+1. `state.vscdb` key `chat.ChatSessionStore.index`, entry keyed by `sessionId`;
+2. latest root-level journal replacement `{ "kind": 1, "k": ["customTitle"], "v": "..." }`;
+3. `customTitle` in the initial journal snapshot.
+
+The index is title metadata only. The journal remains authoritative for prompts, responses, tools,
+edits, and per-turn metadata.
 
 ## The Journal Envelope
 
