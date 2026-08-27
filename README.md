@@ -80,18 +80,87 @@ The command creates or replaces `.github/skills/export-chat/SKILL.md` and
 
 ## Usage
 
+### Running it
+
+List known sessions, then export one by id. Omit the id to export the current session
+(`VSCODE_TARGET_SESSION_LOG`). During development, run the TypeScript source directly with
+`node src/cli.ts`; after `npm run build` the same arguments work against `dist/cli.js`.
+
 ```
-npm run ai:export:chat                                  # current session (VSCODE_TARGET_SESSION_LOG)
-npm run ai:export:chat -- --list                        # list known sessions (id, date, title)
-npm run ai:export:chat -- <sessionId> [outputPath]
-npm run ai:export:chat -- docs/chat-exports/name.md     # current session, explicit output
-npm run ai:export:chat -- --verify <sessionId> [renderedFile]
-npm run ai:export:chat -- --verify --strict <sessionId>
-npm run ai:export:chat -- --golden check|update
-npm run ai:export:chat -- --snapshot update <sessionId>  # record one of your own sessions
-npm run ai:export:chat -- --snapshot check <sessionId>   # and see what a code change did to it
-npm run ai:export:chat -- --workspace-root <path> <sessionId>
-npm run ai:export:chat -- --out-dir <path>
+node src/cli.ts --list
+node src/cli.ts <sessionId> docs/temp/name.md
+```
+> ```
+> node ./dist/cli.js --list   
+> node ./src/cli.ts ef6eb63d-269b-4166-aac8-34df2a71ae49 docs/temp/Migration-vite-svelte5.md
+> ```
+
+
+
+
+Every run re-reads the file it just wrote and self-checks it. A clean run ends with the session
+summary and `Layer C self-check: all 9 render checks pass`:
+
+```
+Exported session ef6eb63d-269b-4166-aac8-34df2a71ae49:
+Title: Migration-vite-svelte5
+Custom Title: Project source file scanning request
+First Prompt: Can u scan this entire project and all source files and update your model?
+Last Prompt: on line 118 add check for other types of json geometry
+Session from 260407 18:01 to 260414 16:49
+Turns: 29; tool calls: 477; reasoning thoughts: 27; resources: 0.
+Output: docs/temp/Migration-vite-svelte5.md (382,354 bytes)
+Layer C self-check: all 9 render checks pass.
+```
+
+### Failed Run:
+```
+node ./src/cli.ts ef6eb63d-269b-4166-aac8-34df2a71ae49 docs/temp/Migration-vite-svelte5.md
+Exported session ef6eb63d-269b-4166-aac8-34df2a71ae49:
+Title: Migration-vite-svelte5
+Custom Title: Project source file scanning request
+First Prompt: Can u scan this entire project and all source files and update your model?
+Last Prompt: on line 118 add check for other types of json geometry
+Session from 260407 18:01 to 260414 16:49
+Turns: 29; tool calls: 477; reasoning thoughts: 27; resources: 0.
+Output: docs/temp/Migration-vite-svelte5.md (382,605 bytes)
+Schema drift: 1 unhandled node kind(s) - mcpServersStarting=29. Run --verify for the full census.
+Layer C self-check: 2 of 9 render checks FAILED.
+  - [FAIL] tool badges == tool nodes (badges=472, nodes=477)
+  - [FAIL] <details> balanced (scaffold-only) (endDepth=1, minDepth=0)
+```
+
+If a journal node kind is unrecognised, or a render check fails, the run reports it rather than
+passing silently - for example `Schema drift: 1 unhandled node kind(s)` or `Layer C self-check:
+2 of 9 render checks FAILED`, with each failed check named. `--strict` turns any of those into a
+non-zero exit code, and `--verify` prints the full schema census.
+
+### Package shortcuts
+
+These are this package's own `package.json` scripts. Run them from the package directory
+(`tools/copilot-chat-exporter`), or from a host repo that lists it as a workspace with
+`-w copilot-chat-exporter`. Anything after `--` is passed straight to the CLI.
+
+| Script | Runs | Purpose |
+|---|---|---|
+| `npm run export -- <sessionId> [out]` | `node src/cli.ts` | export a session; the current session when no id is given |
+| `npm run list` | `node src/cli.ts --list` | list known sessions (id, date, title) |
+| `npm run golden` / `golden:update` | `--golden check` / `update` | the small in-repo recorded check |
+| `npm run snapshot -- update\|check <id>` | `node src/cli.ts --snapshot` | record or compare one of your own sessions |
+| `npm run baseline` / `baseline:update` | `node test/baseline.ts` | the machine-local ~30 MB recorded check |
+| `npm run test` | `node --test "test/*.test.ts"` | unit tests |
+| `npm run typecheck` / `typecheck:test` | `tsc` over src / tests | type check, no emit |
+| `npm run verify` | typecheck + typecheck:test + test + golden | everything a fresh clone can run |
+| `npm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
+| `npm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
+
+Flags without a dedicated script go through `export`:
+
+```
+npm run export -- --verify <sessionId> [renderedFile]
+npm run export -- --verify --strict <sessionId>
+npm run export -- --workspace-root <path> <sessionId>
+npm run export -- --out-dir <path> <sessionId>
 ```
 
 An explicit output path overwrites. With no path, the file is named
@@ -321,7 +390,7 @@ re-saving the recorded exports without destroying them - is in
 One command runs everything a fresh clone can run:
 
 ```
-npm run verify       -w copilot-chat-exporter   # typecheck, syntax, unit tests, golden
+npm run verify       -w copilot-chat-exporter   # typecheck (src + tests), unit tests, golden
 npm run verify:local -w copilot-chat-exporter   # the above plus the machine-local baseline
 ```
 
