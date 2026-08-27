@@ -22,7 +22,10 @@ export interface SessionLocation {
   /** The `workspaceStorage/<hash>` directory the optional stores sit under. */
   hashRoot: string;
   mtimeMs?: number;
+  /** Best available display title, used by `--list`. */
   title?: string;
+  /** Current GUI title read from `chat.ChatSessionStore.index`, if available. */
+  indexedTitle?: string;
 }
 
 /**
@@ -185,7 +188,12 @@ export interface Census {
 }
 
 export interface ParsedSession {
+  /** Effective display title: indexed GUI title, journal custom title, then default title. */
+  title: string;
+  /** Root `customTitle` replayed from the session journal. */
   customTitle: string;
+  /** VS Code-compatible title derived from the first prompt. */
+  defaultTitle: string;
   creationDate: number | null;
   responderUsername: string;
   initialLocation: string;

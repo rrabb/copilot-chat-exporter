@@ -22,7 +22,9 @@ const loadedFixture = (over: Partial<ParsedSession> = {}): LoadedSession => ({
   memory: { session: [], repo: [], user: [] },
   lineCounts: new Map(),
   session: testSession({
+    title: 'A session',
     customTitle: 'A session',
+    defaultTitle: 'do the thing',
     creationDate: 1700000000000,
     editedFiles: ['src/cli.ts'],
     census: {

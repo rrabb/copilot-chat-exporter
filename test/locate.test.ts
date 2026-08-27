@@ -4,15 +4,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { loadSession } from '../src/index.ts';
 import { currentSessionFromEnv, listSessions, looksLikeSessionArgument, resolveSession } from '../src/session/locate.ts';
 import { workspaceStorageRoots } from '../src/host.ts';
-import { messageText } from '../src/session/journal.ts';
+import { defaultSessionTitle, messageText } from '../src/session/journal.ts';
 
 const UUID = '1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d';
 const RENAMED_UUID = '43d9c15d-46b7-4d49-9fd6-f84cd1b265bc';
 
 test('messageText preserves the legacy string message form', () => {
   assert.equal(messageText('an older saved prompt'), 'an older saved prompt');
+});
+
+test('defaultSessionTitle matches VS Code first-line and 200-character behavior', () => {
+  assert.equal(defaultSessionTitle('First line\nSecond line'), 'First line');
+  assert.equal(defaultSessionTitle('x'.repeat(250)), 'x'.repeat(200));
+  assert.equal(defaultSessionTitle(''), '');
 });
 
 test('looksLikeSessionArgument separates a session from an output path', () => {
@@ -101,6 +108,12 @@ test('--list uses later journal titles and GUI-only indexed renames', async (t) 
 
   const resolved = await resolveSession(RENAMED_UUID);
   assert.equal(resolved.title, 'GUI renamed title');
+  assert.equal(resolved.indexedTitle, 'GUI renamed title');
+
+  const loaded = await loadSession({ source: RENAMED_UUID, workspaceRoot: tempRoot });
+  assert.equal(loaded.session.title, 'GUI renamed title');
+  assert.equal(loaded.session.customTitle, 'Old journal title');
+  assert.equal(loaded.session.defaultTitle, '');
 });
 
 test('--list falls back to journal titles when the state database is missing or invalid', async (t) => {

@@ -98,6 +98,31 @@ export function neutralizeStructuralHtml (value: unknown) {
   }).join('\n');
 }
 
+// A model's raw reasoning (and, rarely, a truncated response) can contain an ODD number of
+// ``` fence lines. Embedded live inside a <div>, that dangling open fence swallows the closing
+// </div>/</details> and every section after it, so the page stops rendering. Append a matching
+// close so the fence cannot escape its block. Detection mirrors stripFencedRegions in
+// verify/layers.ts, so the render self-check and the renderer agree on where fences end.
+export function closeUnbalancedFences (value: unknown) {
+  const text = String(value);
+  let fenceLen = 0;
+  let ticks = '';
+  for (const line of text.split('\n')) {
+    if (fenceLen === 0) {
+      const open = /^\s*(`{3,})/.exec(line);
+      if (open) {
+        fenceLen = open[1].length;
+        ticks = open[1];
+      }
+    } else {
+      const close = /^\s*(`{3,})\s*$/.exec(line);
+      if (close && close[1].length >= fenceLen)
+        fenceLen = 0;
+    }
+  }
+  return fenceLen > 0 ? `${text}\n${ticks}` : text;
+}
+
 // --- parsing and cleaning ---
 
 // Returns `any`: the input is arbitrary JSON from an undocumented store, and pretending
@@ -228,5 +253,5 @@ export function mutedSummary (html: string) {
 
 // Assistant prose is the payload of a turn, so it gets the accent bar and the larger type.
 export function assistantBlock (markdown: string) {
-  return [`<div style="${ASSISTANT_BOX}">`, '', neutralizeStructuralHtml(markdown), '', '</div>', ''];
+  return [`<div style="${ASSISTANT_BOX}">`, '', closeUnbalancedFences(neutralizeStructuralHtml(markdown)), '', '</div>', ''];
 }

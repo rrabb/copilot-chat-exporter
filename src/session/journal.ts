@@ -39,6 +39,12 @@ export function messageText (message: any) {
   return '';
 }
 
+// Mirrors ChatModel.getDefaultTitle in VS Code: first request, first line, at most 200
+// characters. Keep this rule source-linked in docs/CHAT-SESSION-TITLES.md when it changes.
+export function defaultSessionTitle (prompt: string) {
+  return prompt.split('\n')[0].substring(0, 200);
+}
+
 // A splice arrives as an object with numeric string keys rather than an array.
 function spliceValues (value: any) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -363,8 +369,13 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
     compactReattached += 1;
   }
 
+  const customTitle = header.customTitle || '';
+  const defaultTitle = defaultSessionTitle(turns[0]?.prompt ?? '');
+
   return {
-    customTitle: header.customTitle || '',
+    title: customTitle || defaultTitle,
+    customTitle,
+    defaultTitle,
     creationDate: header.creationDate ?? null,
     responderUsername: header.responderUsername || '',
     initialLocation: header.initialLocation || '',

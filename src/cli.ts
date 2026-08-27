@@ -5,6 +5,7 @@ import type { Census } from './types.ts';
 import { parseArgs } from './args.ts';
 import { installAgentFiles } from './install.ts';
 import { loadSession, renderSession } from './index.ts';
+import { formatExportSummary } from './export-summary.ts';
 import { getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
 import { listSessions, looksLikeSessionArgument } from './session/locate.ts';
 import {
@@ -264,11 +265,14 @@ const rendered = renderSession(loaded, {
 await fs.mkdir(path.dirname(outputPath), { recursive: true });
 await fs.writeFile(outputPath, rendered, 'utf8');
 const output = await fs.stat(outputPath);
-const toolCallCount = session.turns.reduce((sum, turn) => sum + turn.toolNodes.length, 0);
-const thoughtCount = session.turns.reduce((sum, turn) => sum + turn.reasoning.length, 0);
-console.log(`Exported session ${location.sessionId} (${session.customTitle || 'untitled'}).`);
-console.log(`Turns: ${session.turns.length}; tool calls: ${toolCallCount}; reasoning thoughts: ${thoughtCount}; resources: ${loaded.resources.resources.length}.`);
-console.log(`Output: ${workspacePath(outputPath)} (${thousands(output.size)} bytes)`);
+for (const line of formatExportSummary({
+  sessionId: location.sessionId,
+  session,
+  resourceCount: loaded.resources.resources.length,
+  outputPath: workspacePath(outputPath),
+  outputSize: output.size,
+}))
+  console.log(line);
 if (session.census.unhandled.length) {
   console.log(`Schema drift: ${session.census.unhandled.length} unhandled node kind(s) - ${session.census.unhandled.map(([kind, count]) => `${kind}=${count}`).join(', ')}. Run --verify for the full census.`);
   if (strictMode)

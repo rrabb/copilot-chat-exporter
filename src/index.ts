@@ -40,7 +40,9 @@ export async function loadSession (options: {
 
   const raw = await fs.readFile(location.sessionPath, 'utf8');
   const session = parseChatSession(location.sessionPath, raw);
-  location.title && (session.customTitle = location.title);
+  // Manual GUI renames can update only the workspace index. Preserve the journal customTitle
+  // for provenance while letting the indexed title control current display output.
+  location.indexedTitle && (session.title = location.indexedTitle);
 
   const resources = await loadResources(location.hashRoot, location.sessionId);
   const versions = await readVersions(location.hashRoot, location.sessionId);
@@ -77,7 +79,9 @@ export function sessionToJson (loaded: LoadedSession) {
     session: {
       id: location.sessionId,
       path: location.sessionPath,
+      title: session.title,
       customTitle: session.customTitle,
+      defaultTitle: session.defaultTitle,
       creationDate: session.creationDate,
       responderUsername: session.responderUsername,
       initialLocation: session.initialLocation,

@@ -104,6 +104,9 @@ the wrong schema.
 
 ### Title precedence
 
+Getting the title for a chat session is not straightforward - the vscode copilot chat schema is confusing with multiple entries for title scattered across various files/locations/dbs and then user can rename the chat session which changes it in a very non-intuitive place. So it's important to read this before making changes to title related code. For the complete title vocabulary, storage map, source links, and code-change guidance, see
+[CHAT-SESSION-TITLES.md](CHAT-SESSION-TITLES.md).
+
 VS Code can leave an older `customTitle` in `chatSessions/<id>.jsonl` after the user renames the
 session in the Chat GUI. The workspace index is therefore authoritative for the current display
 title:

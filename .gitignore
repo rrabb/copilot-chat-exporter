@@ -11,3 +11,4 @@ test/baseline/
 # Machine-local digests of your own sessions, taken with --snapshot update. They name a session
 # that only exists in your VS Code storage, so they are meaningless in anyone else's checkout.
 test/snapshots/
+node_modules/

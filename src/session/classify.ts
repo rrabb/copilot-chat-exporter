@@ -39,6 +39,7 @@ export const IGNORED_RESPONSE_KINDS = new Set([
   'progressTaskSerialized',
   'confirmation',
   'questionCarousel',
+  'mcpServersStarting',
 ]);
 
 // Documented in VS Code's response-content union but never seen in any journal parsed here.

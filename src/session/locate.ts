@@ -76,6 +76,8 @@ export async function readSessionTitle (sessionPath: string) {
       title = typeof record.v?.customTitle === 'string' ? record.v.customTitle : '';
       continue;
     }
+    // Only a root replacement changes the session title. Response objects can contain fields
+    // with the same name, so accepting a nested path would misidentify the whole conversation.
     if (
       record?.kind === 1
       && Array.isArray(record.k)
@@ -88,6 +90,8 @@ export async function readSessionTitle (sessionPath: string) {
   return title;
 }
 
+// VS Code's setSessionTitle() writes the current GUI rename to this index without necessarily
+// updating the journal. Read it once per workspace and keep the database strictly read-only.
 function readIndexedTitles (hashRoot: string) {
   const titles = new Map<string, string>();
   let database: DatabaseSync | undefined;
@@ -143,7 +147,8 @@ export async function listSessions ({ withTitles = false } = {}) {
           continue;
         const sessionPath = path.join(chatSessionsDir, file.name);
         const stat = await fs.stat(sessionPath);
-        let title = indexedTitles.get(sessionId) ?? '';
+        const indexedTitle = indexedTitles.get(sessionId) ?? '';
+        let title = indexedTitle;
         if (withTitles && !title) {
           try {
             title = await readSessionTitle(sessionPath);
@@ -151,7 +156,7 @@ export async function listSessions ({ withTitles = false } = {}) {
             // Title is best-effort.
           }
         }
-        sessions.push({ sessionId, hashRoot, sessionPath, mtimeMs: stat.mtimeMs, title });
+        sessions.push({ sessionId, hashRoot, sessionPath, mtimeMs: stat.mtimeMs, title, indexedTitle });
       }
     }
   }

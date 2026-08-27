@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  assistantBlock, blockquote, clip, clipText, esc, extractUri, fenceFor, fmtCredits,
-  headerTimestamp, humanDuration, indentBlock, isoTimestamp, mutedSummary,
+  assistantBlock, blockquote, clip, clipText, closeUnbalancedFences, esc, extractUri, fenceFor,
+  fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp, mutedSummary,
   neutralizeStructuralHtml, parseJson, reEscape, redact, stripAnsi, stripMarkdown, thousands,
 } from '../src/text.ts';
 
@@ -83,6 +83,18 @@ test('neutralizeStructuralHtml escapes markup only outside fences', () => {
   assert.equal(lines[3], '&lt;details>', 'outside a fence it would swallow the document');
   assert.equal(neutralizeStructuralHtml('</div>'), '&lt;/div>');
   assert.equal(neutralizeStructuralHtml('<detailed>'), '<detailed>', 'word boundary, not a prefix');
+});
+
+test('closeUnbalancedFences appends a matching close only when one is missing', () => {
+  // Balanced content is returned untouched.
+  const balanced = ['prose', '```js', 'code', '```', 'more'].join('\n');
+  assert.equal(closeUnbalancedFences(balanced), balanced);
+  // An odd fence left open in a model's raw reasoning gets a matching close appended,
+  // so it cannot swallow the </div>/</details> that follow it.
+  assert.equal(closeUnbalancedFences('open\n```js\ncode'), 'open\n```js\ncode\n```');
+  // The appended close matches the opener's length so a 4-backtick block still closes.
+  assert.equal(closeUnbalancedFences('````\ninner ``` run'), '````\ninner ``` run\n````');
+  assert.equal(closeUnbalancedFences('no fences here'), 'no fences here');
 });
 
 test('extractUri decodes a file URI or yields nothing', () => {

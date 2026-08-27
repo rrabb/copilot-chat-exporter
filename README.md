@@ -7,7 +7,8 @@ The exporter reads VS Code's native chat journal (`chatSessions/<sessionId>.json
 conversation source. The current GUI title comes from the workspace chat index in `state.vscdb`,
 because a manual rename is not always written back to the journal. Other details are enriched
 best-effort from the sibling `chat-session-resources`, `transcripts`, `debug-logs`, and `memory-tool`
-stores. It only ever reads local files.
+stores. It only ever reads local files. See [docs/CHAT-SESSION-TITLES.md](docs/CHAT-SESSION-TITLES.md)
+for the title fields, storage locations, precedence, and VS Code source references.
 
 ## Install
 

@@ -20,6 +20,7 @@ export interface HostContext {
 }
 
 interface SessionNamingInput {
+  title?: string;
   customTitle: string;
   creationDate: number | null;
   turns: Array<{ ts?: number | null; prompt?: string }>;
@@ -187,7 +188,7 @@ export function sessionDateStamp (session: SessionNamingInput, location: Session
 export function resolveOutputPath (outputArgument: string | null | undefined, session: SessionNamingInput, location: SessionLocation, outDir: string) {
   if (outputArgument)
     return path.resolve(outputArgument);
-  const slug = slugify(session.customTitle) || slugify(clip(session.turns[0]?.prompt, 40)) || 'copilot-chat';
+  const slug = slugify(session.title || session.customTitle) || slugify(clip(session.turns[0]?.prompt, 40)) || 'copilot-chat';
   const name = `${sessionDateStamp(session, location)}_${slug}_${location.sessionId.slice(0, 8)}.md`;
   return path.join(outDir, name);
 }

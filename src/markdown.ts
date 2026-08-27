@@ -21,10 +21,10 @@ import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
 import {
   COLLATOR, COMMAND_CODE, FILE_LINK_COLOR, MARK, MUTED, MUTED_CODE, NESTED_INDENT, PROMPT_BADGE,
-  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, clipText, esc, extractUri,
-  fenceFor, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp, mutedSummary,
-  neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands, userMessageAnchor,
-  userMessageHref,
+  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, clipText, closeUnbalancedFences,
+  esc, extractUri, fenceFor, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
+  mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
+  userMessageAnchor, userMessageHref,
 } from './text.ts';
 
 const MAX_EMBEDDED_RESOURCE_BYTES = 96 * 1024;
@@ -379,8 +379,10 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, lin
       '<div style="color:grey;margin-left:2em;margin-top:8px;">',
       '',
       // Joined with <br>, not blank lines: each thought still starts on its own line, but
-      // without the full paragraph gap between them piling up for a multi-thought turn.
-      thoughts.map((thought) => `💡 ${neutralizeStructuralHtml(redact(thought))}`).join('<br>\n'),
+      // without the full paragraph gap between them piling up for a multi-thought turn. Each
+      // thought is fence-closed first so a stray ``` in one cannot swallow the rest, and the
+      // <br> sits on its own line so it never lands on an appended closing fence.
+      thoughts.map((thought) => `💡 ${closeUnbalancedFences(neutralizeStructuralHtml(redact(thought)))}`).join('\n<br>\n'),
       '',
       '</div>',
       '',
@@ -524,7 +526,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     toolCounts.set(key, entry);
   }
 
-  const title = session.customTitle || clip(turns[0]?.prompt, 70) || `session ${location.sessionId}`;
+  const title = session.title || `session ${location.sessionId}`;
   const lines = [
     '<a id="top"></a>',
     '',
@@ -535,7 +537,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '## Session Metadata',
     '',
     `- **Session ID:** \`${location.sessionId}\``,
-    `- **Title:** ${redact(session.customTitle || '(untitled)')}`,
+    `- **Title:** ${redact(session.title || '(untitled)')}`,
     `- **Session started:** ${isoTimestamp(firstTs)}`,
     `- **Export covers through:** ${isoTimestamp(lastTs)}`,
     `- **Export generated:** ${isoTimestamp(generatedAt)}`,

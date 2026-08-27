@@ -42,7 +42,9 @@ export function testTurn (over: Partial<Turn> = {}): Turn {
 
 export function testSession (over: Partial<ParsedSession> = {}): ParsedSession {
   return {
+    title: 'Test session',
     customTitle: 'Test session',
+    defaultTitle: 'do the thing',
     creationDate: 0,
     responderUsername: 'GitHub Copilot',
     initialLocation: 'panel',
