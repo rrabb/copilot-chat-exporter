@@ -10,8 +10,9 @@ import { buildDocument } from './markdown.ts';
 import { resolveSession } from './session/locate.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
 import {
-  lineCountsFor, loadMemoryFiles, loadModelNames, loadResources, readVersions,
+  loadMemoryFiles, loadModelNames, loadResources, readVersions,
 } from './session/enrich.ts';
+import { attachTranscriptPatches, loadTranscriptPatches } from './session/edits.ts';
 import { parseChatSession } from './session/journal.ts';
 
 export type * from './types.ts';
@@ -40,6 +41,7 @@ export async function loadSession (options: {
 
   const raw = await fs.readFile(location.sessionPath, 'utf8');
   const session = parseChatSession(location.sessionPath, raw);
+  attachTranscriptPatches(session, await loadTranscriptPatches(location.hashRoot, location.sessionId));
   // Manual GUI renames can update only the workspace index. Preserve the journal customTitle
   // for provenance while letting the indexed title control current display output.
   location.indexedTitle && (session.title = location.indexedTitle);
@@ -48,11 +50,8 @@ export async function loadSession (options: {
   const versions = await readVersions(location.hashRoot, location.sessionId);
   await loadModelNames(location.hashRoot, location.sessionId);
   const memory = await loadMemoryFiles(location.hashRoot, location.sessionId);
-  const lineCounts = await lineCountsFor([
-    ...new Set(session.turns.flatMap((turn) => turn.filesTouched.map((entry) => entry.file))),
-  ]);
 
-  return { location, host, raw, session, resources, versions, memory, lineCounts };
+  return { location, host, raw, session, resources, versions, memory };
 }
 
 /** Everything a renderer needs, derived from its own producer so it cannot drift from it. */

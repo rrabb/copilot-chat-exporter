@@ -167,6 +167,7 @@ export function classifyNode (item: any) {
       duration: state?.duration ?? null,
       resultText,
       fileUri: extractUri(invocation) || extractUri(pastTense),
+      patchFiles: [],
     };
   }
   if (item.kind === 'textEditGroup') {

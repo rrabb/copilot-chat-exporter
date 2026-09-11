@@ -35,7 +35,7 @@ The native chat journal is definitive. Everything else only enriches it.
 |---|---|---|
 | Chat journal (DEFINITIVE) | `chatSessions/<sessionId>.jsonl` | prompts, reasoning, tool calls, assistant text, edits, per-turn scalars (tokens, credits, timing, model), **terminal output** |
 | Raw tool outputs | `GitHub.copilot-chat/chat-session-resources/<sessionId>/call_*` or `toolu_*` | large tool-output bodies (`content.txt`), correlated by `toolCallId`. VS Code rotates/clears this store, so treat it as a bonus, not a dependency |
-| Tool arguments (optional) | `GitHub.copilot-chat/transcripts/<sessionId>.jsonl` | `session.start`, `user.message`, `assistant.message`, `tool.execution_start` (toolCallId, toolName, **arguments**), `tool.execution_complete` (toolCallId, success). NOT the same schema as the journal and holds NO output bodies |
+| Tool arguments (optional) | `GitHub.copilot-chat/transcripts/<sessionId>.jsonl` | `session.start`, `user.message`, `assistant.message`, `tool.execution_start` (toolCallId, toolName, **arguments**), `tool.execution_complete` (toolCallId, success). Supplies V4A `apply_patch` bodies when retained. NOT the same schema as the journal and holds NO output bodies |
 | Model catalog | `GitHub.copilot-chat/debug-logs/<sessionId>/models.json` | model id -> friendly name (e.g. `claude-opus-4.8` -> "Claude Opus 4.8") |
 | On-disk memory | `memory-tool/memories/<base64(sessionId)>/` and `repo/`, user scope | session/repo/user memory + plan files |
 | Versions | product/version metadata for Copilot + VS Code | metadata block |
@@ -132,7 +132,7 @@ For each turn, in order:
    - File edit marker: `> 📄 Edited \`<relative path>\``. Strip the bare ``` fences VS Code wraps
      around edit previews (a trailing fence on the run before the edit, a leading fence on the run
      after) so the edit note does not render inside an empty code box.
-   - After the body: a `**📄 Files touched (n):**` digest (🆕 created / ✏️ modified, with line counts)
+  - After the body: a `**📄 Files touched (n):**` digest with operation icon, output-relative file link, and transcript-backed `+added` / `-deleted` operation counts. Each recorded patch is available in a collapsible, redacted `~~~diff` block. If patch evidence is absent, show `change details unavailable`; never substitute the current file's total line count.
      and a `🗒️ Todo list at this turn (n)` collapsible when present.
    - If no assistant text was recorded: `_No assistant text was recorded for this turn._`.
 7. `<details><summary>ℹ️ Turn info</summary>` - table of Model, Mode, Agent, Response ID, prompt/
@@ -470,7 +470,7 @@ Every turn must carry each element below whenever the journal holds it.
 | A8 | Persisted output bodies | `chat-session-resources/<toolCallId>/` | `**Persisted output:**` line + one `📦 Output body` collapsible per resource | omitted - the store rotates, so absence is normal and is covered by the Recorded Output Limitation note |
 | A9 | Remaining tool payload | `toolSpecificData` (non-terminal, non-todoList) | `⚙️ Tool details` JSON collapsible | n/a |
 | A10 | Unconsumed tool result structure | complete `resultDetails` envelope after readable input/text output fields are removed | `📦 Tool result details` redacted, clipped JSON collapsible | omitted when no remainder exists |
-| A11 | Files changed | `textEditGroup.uri` + create/edit tool URIs | three places: inline `> 📄 Edited <path>` marker at the point of edit, per-turn `📄 Files touched (n)` digest with 🆕/✏️ and line counts, and the session-level `## Files Modified` roll-up | digest omitted for the turn; section says none recorded |
+| A11 | Files changed | `textEditGroup.uri` + create/edit tool URIs, optionally enriched by transcript V4A patches matched on `toolCallId` | three places: inline `> 📄 Edited <path>` marker at the point of edit, per-turn linked `📄 Files touched (n)` digest with operation counts and collapsible diffs, and the session-level `## Files Modified` roll-up | paths remain visible and counts say unavailable when patch evidence is absent; digest omitted only when no file is known |
 | A12 | Todo state | `toolSpecificData.kind === 'todoList'` | `🗒️ Todo list at this turn (n)` with `[x]` / `[~]` / `[ ]` | omitted |
 | A13 | Cost and timing | `promptTokens`, `completionTokens`, `copilotCredits`, `elapsedMs`, `promptTokenDetails` | `ℹ️ Turn info` table + `<sub>` cost footer; credits always 2dp | zeros or `n/a`, never blank |
 | A14 | Model, mode, agent | `modelId` (friendly via `models.json`), `modeInfo`, `agent` | Turn info table + 🤖 in the footer | `unknown` |
@@ -661,7 +661,7 @@ and cross-turn reuse, and marking the two synthetic cases). It is kept intention
 a PR diff.
 
 **Digest AND a normalized render.** A raw `.md` byte-diff is too brittle on its own: it embeds
-`Export generated: <now>`, a live `git status` snapshot, working-tree line counts, and its own output
+`Export generated: <now>`, a live `git status` snapshot, and its own output
 path, so it would fail on every run regardless of correctness. Both committed artifacts therefore go
 through `src/verify/golden.ts`, which masks exactly those four things:
 

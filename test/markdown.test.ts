@@ -12,7 +12,6 @@ setWorkspaceRoot(ROOT);
 const render = (body: TurnNode[], over: Partial<Turn> = {}) => renderTurnBody(
   testTurn({ body, ...over }),
   new Map(),
-  new Map(),
 ).join('\n');
 
 test('toolFriendly drops the prefixes nobody reads', () => {
@@ -189,13 +188,44 @@ test('todos render with their status marks', () => {
   assert.match(output, /🗒️ Todo list at this turn \(3\)/);
 });
 
-test('files touched show an icon per operation and a line count when known', () => {
+test('files touched link to the source and show patch-operation counts', () => {
   const output = renderTurnBody(
-    testTurn({ body: [{ type: 'text', text: 'x' }], filesTouched: [{ file: 'src/a.ts', op: 'created' }] }),
+    testTurn({ body: [{ type: 'text', text: 'x' }], filesTouched: [{ file: 'src/a.ts', op: 'created', additions: 42, deletions: 3 }] }),
     new Map(),
-    new Map([['src/a.ts', 42]]),
+    '/proj/docs/export.md',
   ).join('\n');
-  assert.match(output, /🆕 created `src\/a\.ts` \(42 lines\)/);
+  assert.match(output, /🆕 created \[`src\/a\.ts`\]\(\.\.\/src\/a\.ts\)/);
+  assert.match(output, /\+42<\/span> <span[^>]*>-3<\/span>/);
+  assert.doesNotMatch(output, /42 lines/);
+});
+
+test('files touched render redacted changes in collapsible tilde diff fences', () => {
+  const output = renderTurnBody(
+    testTurn({
+      body: [{ type: 'text', text: 'x' }],
+      filesTouched: [{
+        file: 'src/a.ts',
+        op: 'modified',
+        additions: 1,
+        deletions: 1,
+        diffs: ['--- a/src/a.ts\n+++ b/src/a.ts\n@@ run @@\n-old();\n+new();'],
+      }],
+    }),
+    new Map(),
+    '/proj/docs/export.md',
+  ).join('\n');
+  assert.match(output, /<details><summary>.*View changes to/);
+  assert.match(output, /~~~diff\n--- a\/src\/a\.ts\n\+\+\+ b\/src\/a\.ts/);
+  assert.match(output, /-old\(\);\n\+new\(\);\n~~~/);
+});
+
+test('files touched label absent transcript evidence without using current file length', () => {
+  const output = renderTurnBody(
+    testTurn({ body: [{ type: 'text', text: 'x' }], filesTouched: [{ file: 'src/a.ts', op: 'modified' }] }),
+    new Map(),
+  ).join('\n');
+  assert.match(output, /change details unavailable/);
+  assert.doesNotMatch(output, /900 lines/);
 });
 
 test('markdownBody renders safe prose but shows risky content as source', () => {

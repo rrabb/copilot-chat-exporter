@@ -10,6 +10,9 @@ best-effort from the sibling `chat-session-resources`, `transcripts`, `debug-log
 stores. It only ever reads local files. See [docs/CHAT-SESSION-TITLES.md](docs/CHAT-SESSION-TITLES.md)
 for the title fields, storage locations, precedence, and VS Code source references.
 
+When a sibling transcript retains an `apply_patch` request, the Markdown links each touched file,shows submitted `+added` and `-deleted` operation counts, and includes the recorded patch in a collapsible `~~~diff` block. The journal remains authoritative for turn order and tool identity. Repeated edits count repeatedly, so these values are not a reconstruction of the final Git diff.
+When patch arguments are unavailable, the export keeps the journal-derived file path and labels the change details unavailable instead of reporting the current file's total line count.
+
 ## Install
 
 Zero runtime dependencies - Node built-ins only. Drop the folder into any repo, or add it as a

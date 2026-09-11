@@ -98,18 +98,18 @@ _No raw tool outputs were persisted by VS Code for this session._
 
 ### Files Edited in This Session
 
-- `c:/fixture/src/added.ts`
-- `c:/fixture/src/example.ts`
-- `c:/fixture/src/new-name.ts`
-- `c:/fixture/src/removed.ts`
+- ✏️ modified [`c:/fixture/src/example.ts`](../../../../fixture/src/example.ts) - <span style="color:#7d8590">change details unavailable</span>
+- 🔀 renamed [`c:/fixture/src/new-name.ts`](../../../../fixture/src/new-name.ts) - <span style="color:#7d8590">change details unavailable</span>
+- 🗑️ deleted [`c:/fixture/src/removed.ts`](../../../../fixture/src/removed.ts) - <span style="color:#7d8590">change details unavailable</span>
+- 🆕 created [`c:/fixture/src/added.ts`](../../../../fixture/src/added.ts) - <span style="color:#7d8590">change details unavailable</span>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">📋 Copy all edited paths</span></sub></summary>
 
 ```text
-c:/fixture/src/added.ts
 c:/fixture/src/example.ts
 c:/fixture/src/new-name.ts
 c:/fixture/src/removed.ts
+c:/fixture/src/added.ts
 ```
 
 </details>
@@ -215,7 +215,7 @@ The script walks each tool call and dedupes by toolCallId.
 
 **📄 Files touched (1):**
 
-- ✏️ modified `c:/fixture/src/example.ts`
+- ✏️ modified [`c:/fixture/src/example.ts`](../../../../fixture/src/example.ts) - <span style="color:#7d8590">change details unavailable</span>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">📋 Copy these paths</span></sub></summary>
 
@@ -925,9 +925,9 @@ Renamed, deleted, and created the three files.
 
 **📄 Files touched (3):**
 
-- 🔀 renamed `c:/fixture/src/new-name.ts`
-- 🗑️ deleted `c:/fixture/src/removed.ts`
-- 🆕 created `c:/fixture/src/added.ts`
+- 🔀 renamed [`c:/fixture/src/new-name.ts`](../../../../fixture/src/new-name.ts) - <span style="color:#7d8590">change details unavailable</span>
+- 🗑️ deleted [`c:/fixture/src/removed.ts`](../../../../fixture/src/removed.ts) - <span style="color:#7d8590">change details unavailable</span>
+- 🆕 created [`c:/fixture/src/added.ts`](../../../../fixture/src/added.ts) - <span style="color:#7d8590">change details unavailable</span>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">📋 Copy these paths</span></sub></summary>
 
@@ -986,7 +986,7 @@ _No memory or plan files were found on disk for this session._
 
 - Source journal (definitive): `test/fixtures/golden/00000000-0000-4000-8000-000000000000.jsonl`
 - Resource root: `test/fixtures/GitHub.copilot-chat/chat-session-resources/00000000-0000-4000-8000-000000000000`
-- Single source: the conversation, reasoning, tool calls, and code blocks come from the native `chatSessions` journal; only raw tool-output bodies come from `chat-session-resources`.
+- Single source: conversation order, reasoning, tool calls, and code blocks come from the native `chatSessions` journal. Optional transcript records enrich matching tool calls with submitted patch arguments; raw tool-output bodies come from `chat-session-resources`.
 - Redaction masks common authorization, token, API-key, password, and client-secret assignment forms.
 - Rendering: colored badges use inline HTML and render in the VS Code Markdown preview; GitHub strips inline styles and shows the text without color.
 - Reasoning shown is the journal's recorded `thinking` text (the agent's own notes); no hidden model chain-of-thought is reconstructed.

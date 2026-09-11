@@ -17,6 +17,7 @@ All notable changes to this project are documented here.
 	agent-host tool IDs without a closed tool-name registry.
 - Complete `resultDetails` retention with generic Markdown rendering for URI/location results,
 	non-text embeds and references, MCP metadata, errors, serialized data, and future fields.
+- Optional transcript-backed `apply_patch` enrichment with linked file paths, submitted addition and deletion counts, and collapsible syntax-highlighted diff fragments.
 
 ### Fixed
 
@@ -24,6 +25,7 @@ All notable changes to this project are documented here.
 	silently discarding them.
 - Merge late `resultDetails` updates and avoid duplicating input or text output already rendered in
 	dedicated sections.
+- Stop presenting current working-tree file lengths as edit statistics when historical patch details are unavailable.
 
 ### Known limitations
 

@@ -75,7 +75,7 @@ VS Code user data
         ├── chat-session-resources/<sessionId>/
         │   └── large persisted tool-result bodies, when present
         ├── transcripts/<sessionId>.jsonl
-        │   └── debug/event transcript, NOT the chat journal
+        │   └── optional tool-argument enrichment, NOT the chat journal
         ├── debug-logs/<sessionId>/models.json
         │   └── model id to friendly display name
         └── memory-tool/memories/
@@ -94,13 +94,26 @@ The storage root varies by platform and VS Code channel. The owning code is
 |---|---:|---|
 | `state.vscdb` | Yes, for titles | `chat.ChatSessionStore.index.entries[sessionId].title` holds the current GUI title, including manual renames that may not update the journal |
 | `chatSessions/<id>.jsonl` | Yes | The final persisted chat model, written as mutation records |
-| `transcripts/<id>.jsonl` | Only for optional version labels | A different event/debug format; it does not contain the journal's request tree |
+| `transcripts/<id>.jsonl` | Yes, optional enrichment | A different event/debug format. It can retain tool arguments, including V4A `apply_patch` bodies, but does not contain the journal's request tree |
 | `debug-logs/<id>/models.json` | Optional enrichment | Friendly model names |
 | `chat-session-resources/<id>/...` | Optional enrichment | Large tool results that are not inline in the journal |
 | `memory-tool/memories/...` | Optional enrichment | Memory and plan files shown in the archive |
 
 The rejection of a transcript path is intentional. A transcript can be valid JSONL and still be
 the wrong schema.
+
+### Transcript patch enrichment
+
+The exporter correlates transcript `assistant.message` tool requests and `tool.execution_start`
+records to journal tool nodes by `toolCallId`. Lifecycle copies are deduplicated, execution-start
+arguments take precedence, and a call with `tool.execution_complete.success: false` is excluded.
+Successful or status-unknown V4A patches provide file operation, added-line count, deleted-line
+count, and exact recorded diff fragments. They do not control turn order or create chat turns.
+
+V4A patch blocks provide changed lines and context, not complete before-and-after snapshots or
+dependable hunk line numbers. Counts therefore represent submitted operations. Editing the same
+line in multiple calls counts each operation, and the totals must not be described as the final
+Git diff. Missing transcripts degrade to journal-derived file paths with change details unavailable.
 
 ### Title precedence
 

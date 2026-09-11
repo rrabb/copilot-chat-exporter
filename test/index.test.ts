@@ -20,7 +20,6 @@ const loadedFixture = (over: Partial<ParsedSession> = {}): LoadedSession => ({
   versions: { copilotVersion: '0.62.0', vscodeVersion: '1.134.0' },
   resources: { resources: [], byCall: new Map(), resourceRoot: path.join(ROOT, 'resources') },
   memory: { session: [], repo: [], user: [] },
-  lineCounts: new Map(),
   session: testSession({
     title: 'A session',
     customTitle: 'A session',

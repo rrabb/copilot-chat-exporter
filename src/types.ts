@@ -61,6 +61,21 @@ export interface TodoItem {
 
 export type EditOperation = 'created' | 'modified' | 'deleted' | 'renamed';
 
+export interface PatchFileChange {
+  file: string;
+  previousFile?: string;
+  op: EditOperation;
+  additions: number;
+  deletions: number;
+  diff: string;
+}
+
+export interface ToolPatch {
+  toolCallId: string;
+  files: PatchFileChange[];
+  succeeded: boolean | null;
+}
+
 /** Assistant prose. Arrives with no `kind` at all and is matched by shape. */
 export interface TextNode {
   type: 'text';
@@ -118,6 +133,8 @@ export interface ToolNode {
   resultText: string;
   /** Recovered from the invocation message, not from a structured field. */
   fileUri: string;
+  /** Optional edit details recovered from the sibling transcript by tool-call identity. */
+  patchFiles: PatchFileChange[];
 }
 
 export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode;
@@ -126,6 +143,10 @@ export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode;
 export interface FileTouch {
   file: string;
   op: EditOperation;
+  additions?: number;
+  deletions?: number;
+  /** One entry per submitted file block, in recorded call order. */
+  diffs?: string[];
 }
 
 /**

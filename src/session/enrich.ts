@@ -1,13 +1,11 @@
 // The optional stores that sit beside the journal: tool output bodies, memory files, model
-// names, and the version header. Also line counts, which come from the working tree rather than
-// from VS Code.
+// names, and the version header.
 //
 // Everything here is best-effort. `chat-session-resources/` in particular is rotated and emptied
 // by VS Code, so a missing store yields empty results rather than an error.
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { getWorkspaceRoot } from '../host.ts';
 import { COLLATOR, parseJson } from '../text.ts';
 import { readFirstLine } from './locate.ts';
 
@@ -60,21 +58,6 @@ export async function loadResources (hashRoot: string, sessionId: string) {
     }
   }
   return { resourceRoot, resources, byCall };
-}
-
-// Read from the working tree, so the number reflects the file now rather than at the time of the
-// edit. A file that has since moved or been deleted simply has no count.
-export async function lineCountsFor (files: string[]) {
-  const counts = new Map<string, number>();
-  for (const file of files) {
-    try {
-      const content = await fs.readFile(path.resolve(getWorkspaceRoot(), file), 'utf8');
-      counts.set(file, content.split(/\r?\n/).length);
-    } catch {
-      // File may not exist on disk (untitled, deleted, or outside the workspace).
-    }
-  }
-  return counts;
 }
 
 export interface MemoryFile {

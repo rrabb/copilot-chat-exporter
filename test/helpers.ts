@@ -22,6 +22,7 @@ export function testTool (over: Partial<ToolNode> = {}): ToolNode {
     duration: null,
     resultText: '',
     fileUri: '',
+    patchFiles: [],
     ...over,
   };
 }

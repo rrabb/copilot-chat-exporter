@@ -3,9 +3,8 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { setWorkspaceRoot } from '../src/host.ts';
 import {
-  lineCountsFor, loadMemoryFiles, loadModelNames, loadResources, modelName, readVersions,
+  loadMemoryFiles, loadModelNames, loadResources, modelName, readVersions,
 } from '../src/session/enrich.ts';
 
 const SESSION = '1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d';
@@ -85,17 +84,6 @@ test('loadMemoryFiles separates the three scopes and sorts within each', async (
   assert.deepEqual(memory.repo.map((file) => file.name), ['conventions.md']);
   assert.deepEqual(memory.user.map((file) => file.name), ['preferences.md'], 'only .md files');
   assert.equal(memory.session[0].content, 'first');
-});
-
-test('lineCountsFor reads the working tree and skips what is not there', async () => {
-  const root = await tempDir();
-  setWorkspaceRoot(root);
-  await fs.writeFile(path.join(root, 'three.txt'), 'a\nb\nc');
-
-  const counts = await lineCountsFor(['three.txt', 'gone.txt']);
-  assert.equal(counts.get('three.txt'), 3);
-  // A file recorded as edited may since have moved, been deleted, or never existed on disk.
-  assert.equal(counts.has('gone.txt'), false);
 });
 
 test('modelName prefers the catalog and degrades to a readable guess', async () => {

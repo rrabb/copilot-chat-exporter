@@ -15,7 +15,7 @@
 import path from 'node:path';
 import type { FileTouch, ParsedSession, SessionLocation, TodoItem, ToolNode, Turn, TurnNode, TurnScalars } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
-import { workspacePath } from './host.ts';
+import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
 import {
@@ -29,6 +29,7 @@ import {
 const MAX_EMBEDDED_RESOURCE_BYTES = 96 * 1024;
 const MAX_TERMINAL_OUTPUT_BYTES = 24 * 1024;
 const MAX_COPY_SOURCE_BYTES = 32 * 1024;
+const MAX_FILE_DIFF_BYTES = 96 * 1024;
 // A summary wraps to the next line rather than truncating, so the cap only exists to stop a
 // pathological one-liner (a multi-KB generated command) from burying the rows around it.
 const MAX_SUMMARY_CHARS = 1000;
@@ -402,21 +403,79 @@ function renderTodos (todos: TodoItem[]) {
   ];
 }
 
-function renderFilesTouched (filesTouched: FileTouch[], lineCounts: Map<string, number>) {
+function fileLink (file: string, outputPath: string) {
+  const target = path.resolve(getWorkspaceRoot(), file);
+  const rawHref = outputPath
+    ? path.relative(path.dirname(path.resolve(outputPath)), target)
+    : workspacePath(target);
+  if (!rawHref || path.isAbsolute(rawHref))
+    return `\`${redact(file)}\``;
+  const relative = rawHref.replaceAll('\\', '/');
+  const href = encodeURI(relative.startsWith('.') ? relative : `./${relative}`).replaceAll('(', '%28').replaceAll(')', '%29');
+  return `[\`${redact(file).replaceAll('[', '\\[').replaceAll(']', '\\]')}\`](${href})`;
+}
+
+function tildeFenceFor (content: string, lang = '') {
+  const runs = content.match(/~+/g) ?? [];
+  const longest = runs.reduce((max, run) => Math.max(max, run.length), 0);
+  const tildes = '~'.repeat(Math.max(3, longest + 1));
+  return { open: `${tildes}${lang}`, close: tildes };
+}
+
+function changeCounts (entry: FileTouch) {
+  if (entry.additions == null || entry.deletions == null)
+    return '<span style="color:#7d8590">change details unavailable</span>';
+  return `<span style="color:#1a7f37;font-weight:600">+${thousands(entry.additions)}</span> <span style="color:#cf222e;font-weight:600">-${thousands(entry.deletions)}</span>`;
+}
+
+function renderFileDiffs (entry: FileTouch) {
+  if (!entry.diffs?.length)
+    return [];
+  const lines = [
+    `<details><summary>${mutedSummary(`📑 View changes to <code>${esc(entry.file)}</code> (${changeCounts(entry)})`)}</summary>`,
+    '',
+  ];
+  for (const [index, rawDiff] of entry.diffs.entries()) {
+    const clipped = clipText(redact(rawDiff), MAX_FILE_DIFF_BYTES);
+    const fence = tildeFenceFor(clipped.text, 'diff');
+    entry.diffs.length > 1 && lines.push(`<sub>Patch ${index + 1} of ${entry.diffs.length}${clipped.clipped ? ' - clipped' : ''}</sub>`, '');
+    entry.diffs.length === 1 && clipped.clipped && lines.push('<sub>Patch clipped to first and last 48 KiB</sub>', '');
+    lines.push(fence.open, clipped.text, fence.close, '');
+  }
+  lines.push('</details>', '');
+  return lines;
+}
+
+function aggregateFileTouches (touches: FileTouch[]) {
+  const aggregate = new Map<string, FileTouch>();
+  for (const touch of touches) {
+    const current = aggregate.get(touch.file);
+    if (!current) {
+      aggregate.set(touch.file, { ...touch, diffs: touch.diffs ? [...touch.diffs] : undefined });
+      continue;
+    }
+    current.op = current.op === 'created' || touch.op === 'created' ? 'created' : touch.op;
+    if (touch.additions != null)
+      current.additions = (current.additions ?? 0) + touch.additions;
+    if (touch.deletions != null)
+      current.deletions = (current.deletions ?? 0) + touch.deletions;
+    touch.diffs?.length && (current.diffs = [...(current.diffs ?? []), ...touch.diffs]);
+  }
+  return [...aggregate.values()];
+}
+
+function renderFilesTouched (filesTouched: FileTouch[], outputPath: string, options: { heading?: string; includeDiffs?: boolean; copyLabel?: string } = {}) {
   if (!filesTouched.length)
     return [];
+  const { heading = `**📄 Files touched (${filesTouched.length}):**`, includeDiffs = true, copyLabel = 'Copy these paths' } = options;
   const icons: Record<string, string> = { created: '🆕', deleted: '🗑️', renamed: '🔀' };
   const icon = (op: string) => icons[op] || '✏️';
   return [
-    `**📄 Files ${filesTouched.length === 1 ? 'touched' : 'touched'} (${filesTouched.length}):**`,
+    ...(heading ? [heading, ''] : []),
+    ...filesTouched.map((entry) => `- ${icon(entry.op)} ${entry.op} ${fileLink(entry.file, outputPath)} - ${changeCounts(entry)}`),
     '',
-    ...filesTouched.map((entry) => {
-      const count = lineCounts.get(entry.file);
-      const size = count != null ? ` (${thousands(count)} lines)` : '';
-      return `- ${icon(entry.op)} ${entry.op} \`${redact(entry.file)}\`${size}`;
-    }),
-    '',
-    ...copySource(filesTouched.map((entry) => entry.file).join('\n'), 'text', 'Copy these paths'),
+    ...(includeDiffs ? filesTouched.flatMap(renderFileDiffs) : []),
+    ...copySource(filesTouched.map((entry) => entry.file).join('\n'), 'text', copyLabel),
   ];
 }
 
@@ -425,7 +484,7 @@ function renderFilesTouched (filesTouched: FileTouch[], lineCounts: Map<string, 
 // Walks `turn.body` in recorded order and interleaves prose runs, reasoning, tool calls, and
 // edit markers exactly as they streamed - never bucketed by type. `flush()`/`flushThoughts()`
 // close out the current run before a different node type starts.
-export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, lineCounts: Map<string, number>) {
+export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '') {
   const lines = [MARK.assistantHeading, ''];
   let run: string[] = [];
   let thoughts: string[] = [];
@@ -502,7 +561,7 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, lin
   flushThoughts();
   if (!turn.body.some((node: TurnNode) => node.type === 'text' || node.type === 'ref'))
     lines.push('_No assistant text was recorded for this turn._', '');
-  lines.push(...renderFilesTouched(turn.filesTouched, lineCounts));
+  lines.push(...renderFilesTouched(turn.filesTouched, outputPath));
   lines.push(...renderTodos(turn.todos));
   turn.todos.length && lines.push('');
   return lines;
@@ -566,14 +625,13 @@ export interface DocumentContext {
   resources: { resources: Resource[]; byCall: Map<string, Resource[]>; resourceRoot: string };
   versions: { copilotVersion: string; vscodeVersion: string };
   memory: { session: MemoryFile[]; repo: MemoryFile[]; user: MemoryFile[] };
-  lineCounts: Map<string, number>;
   outputPath: string;
   gitStatus: string;
   generatedAt: string;
 }
 
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
-  const { location, resources, versions, memory, lineCounts, outputPath, gitStatus, generatedAt } = context;
+  const { location, resources, versions, memory, outputPath, gitStatus, generatedAt } = context;
   const turns = session.turns;
   const toolNodes = turns.flatMap((turn) => turn.toolNodes);
   const reasoningTurns = turns.filter((turn) => turn.reasoning.length).length;
@@ -585,6 +643,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
   const firstTs = turns[0]?.ts ?? session.creationDate;
   const lastTs = turns.reduce((max, turn) => Math.max(max, turn.scalar.responseTimestamp ?? turn.ts ?? 0), 0) || firstTs;
   const modelsUsed = [...new Set(turns.map((turn) => turn.scalar.modelId).filter(Boolean))];
+  const sessionFiles = aggregateFileTouches(turns.flatMap((turn) => turn.filesTouched));
 
   const byModel = new Map();
   for (const turn of turns) {
@@ -702,9 +761,12 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '',
     '### Files Edited in This Session',
     '',
-    ...(session.editedFiles.length ? session.editedFiles.map((file) => `- \`${redact(file)}\``) : ['_No file edits were recorded in the journal._']),
-    '',
-    ...(session.editedFiles.length ? copySource(session.editedFiles.join('\n'), 'text', 'Copy all edited paths') : []),
+    ...(sessionFiles.length
+      ? renderFilesTouched(sessionFiles, outputPath, { heading: '', includeDiffs: false, copyLabel: 'Copy all edited paths' })
+      : ['_No file edits were recorded in the journal._', '']),
+    ...(sessionFiles.some((file) => file.additions != null)
+      ? ['> Addition and deletion totals count submitted patch operations. Repeated edits to the same line count each time; these totals are not the final Git diff.', '']
+      : []),
     '### Chat Export Artifact',
     '',
     `- \`${workspacePath(outputPath)}\``,
@@ -761,7 +823,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
       '</div>',
       '',
     );
-    lines.push(...renderTurnBody(turn, resources.byCall, lineCounts), '');
+    lines.push(...renderTurnBody(turn, resources.byCall, outputPath), '');
     lines.push(...turnInfo(turn), '');
     lines.push(turnCost(turn.scalar), '');
     lines.push('<div align="right"><a href="#user-questions-and-requests">⬆️ Back to questions</a></div>', '');
@@ -799,7 +861,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '',
     `- Source journal (definitive): \`${workspacePath(location.sessionPath)}\``,
     `- Resource root: \`${workspacePath(resources.resourceRoot)}\``,
-    '- Single source: the conversation, reasoning, tool calls, and code blocks come from the native `chatSessions` journal; only raw tool-output bodies come from `chat-session-resources`.',
+    '- Single source: conversation order, reasoning, tool calls, and code blocks come from the native `chatSessions` journal. Optional transcript records enrich matching tool calls with submitted patch arguments; raw tool-output bodies come from `chat-session-resources`.',
     '- Redaction masks common authorization, token, API-key, password, and client-secret assignment forms.',
     '- Rendering: colored badges use inline HTML and render in the VS Code Markdown preview; GitHub strips inline styles and shows the text without color.',
     '- Reasoning shown is the journal\'s recorded `thinking` text (the agent\'s own notes); no hidden model chain-of-thought is reconstructed.',
