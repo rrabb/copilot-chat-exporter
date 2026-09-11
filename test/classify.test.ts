@@ -59,6 +59,56 @@ test('a subagent tool call carries its prompt and its report', () => {
   assert.equal(node.resultText, 'found X');
 });
 
+test('a Playwright tool call carries its submitted code and language', () => {
+  const resultDetails = {
+    input: '  return await page.title();  ',
+    inputLanguage: 'javascript',
+    output: [{ isText: true, value: '"Example"' }],
+  };
+  const node = classifyNode({
+    kind: 'toolInvocationSerialized',
+    toolId: 'run_playwright_code',
+    toolCallId: 'call_playwright',
+    resultDetails,
+  });
+  assert.equal(node.inputText, 'return await page.title();');
+  assert.equal(node.inputLanguage, 'javascript');
+  assert.equal(node.resultText, '"Example"');
+  assert.deepEqual(node.resultDetails, resultDetails, 'the complete result envelope remains available');
+});
+
+test('an unknown tool id retains every official result-details family', () => {
+  const samples = [
+    [
+      { $mid: 1, path: '/proj/a.ts' },
+      { uri: { $mid: 1, path: '/proj/b.ts' }, range: { startLineNumber: 2, endLineNumber: 3 } },
+    ],
+    {
+      input: '{"future":true}',
+      inputLanguage: 'json',
+      output: [
+        { type: 'embed', isText: true, value: 'done' },
+        { type: 'embed', mimeType: 'image/png', value: 'iVBORw0KGgo=' },
+        { type: 'ref', uri: { $mid: 1, path: '/proj/result.bin' } },
+      ],
+      isError: true,
+      futureMetadata: { version: 2 },
+    },
+    { output: { type: 'data', mimeType: 'application/octet-stream', base64Data: 'AAEC' } },
+  ];
+
+  for (const [index, resultDetails] of samples.entries()) {
+    const node = classifyNode({
+      kind: 'toolInvocationSerialized',
+      toolId: `extension_future_tool_${index}`,
+      toolCallId: `future_${index}`,
+      resultDetails,
+    });
+    assert.equal(node.type, 'tool');
+    assert.deepEqual(node.resultDetails, resultDetails);
+  }
+});
+
 test('a todo tool call carries its list', () => {
   const node = classifyNode({
     kind: 'toolInvocationSerialized',

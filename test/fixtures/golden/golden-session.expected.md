@@ -177,6 +177,7 @@ I'll check the export script's terminal handling.
 </div>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">run_in_terminal</code>: <code style="color:#928363;background:transparent;font-size:0.8rem;">node --check export-copilot-chat.mjs</code></span></sub></summary>
+<div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
@@ -345,6 +346,7 @@ See the referenced config for details.
 #### 💬 Assistant Response
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">runSubagent</code>: Ran subagent</span></sub></summary>
+<div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
@@ -670,6 +672,7 @@ _No assistant text was recorded for this turn._
 </details>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">run_in_terminal</code>: <code style="color:#928363;background:transparent;font-size:0.8rem;">Write-Output first</code></span></sub></summary>
+<div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
@@ -713,6 +716,7 @@ The first invocation completed.
 </details>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">run_in_terminal</code>: <code style="color:#928363;background:transparent;font-size:0.8rem;">Write-Output second</code></span></sub></summary>
+<div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
@@ -794,6 +798,7 @@ The second invocation completed.
 #### 💬 Assistant Response
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">run_in_terminal</code>: <code style="color:#928363;background:transparent;font-size:0.8rem;">Write-Output second</code></span></sub></summary>
+<div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
@@ -881,27 +886,25 @@ Applying the three file operations now.
 </div>
 
 <details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">fixture_resolveLibrary</code>: Ran Resolve Library ID</span></sub></summary>
+<div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
-**Output:** not persisted as a separate resource (returned inline).
-
-<details><summary><sub><span style="color:#7d8590;font-weight:400">⚙️ Tool details</span></sub></summary>
+<details><summary><sub><span style="color:#7d8590;font-weight:400">⌨️ Tool input</span></sub></summary>
 
 <div style="margin-left:1em">
 
 ```json
 {
-  "kind": "input",
-  "rawInput": {
-    "libraryName": "example-library"
-  }
+  "libraryName": "example-library"
 }
 ```
 
 </div>
 
 </details>
+
+**Output:** not persisted as a separate resource (returned inline).
 
 
 </div>

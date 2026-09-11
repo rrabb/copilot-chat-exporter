@@ -102,6 +102,12 @@ export interface ToolNode {
   command: string;
   /** Subagent calls only. */
   promptText: string;
+  /** Submitted source or text stored by some tools in `resultDetails.input`. */
+  inputText: string;
+  /** Language hint paired with `resultDetails.input`, when recorded. */
+  inputLanguage: string;
+  /** Complete persisted `resultDetails`, retained so unknown result shapes cannot disappear. */
+  resultDetails: unknown | null;
   /** Present only on `manage_todo_list` calls; `null` elsewhere. */
   todos: TodoItem[] | null;
   /** Terminal output, ANSI already stripped. */

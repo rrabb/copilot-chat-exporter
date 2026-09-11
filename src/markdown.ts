@@ -13,9 +13,8 @@
 // export would stop matching what the chat window showed.
 
 import path from 'node:path';
-import type { FileTouch, ParsedSession, TodoItem, ToolNode, Turn, TurnNode, TurnScalars } from './types.ts';
+import type { FileTouch, ParsedSession, SessionLocation, TodoItem, ToolNode, Turn, TurnNode, TurnScalars } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
-import type { SessionLocation } from './types.ts';
 import { workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
@@ -190,10 +189,10 @@ function renderToolText (raw: unknown) {
         }
       }
       placeholders.push(replacement);
-      return `\u0000${placeholders.length - 1}\u0000`;
+      return `\uE000${placeholders.length - 1}\uE000`;
     },
   );
-  return esc(withPlaceholders).replace(/\u0000(\d+)\u0000/g, (match, index) => placeholders[Number(index)]);
+  return esc(withPlaceholders).replace(/\uE000(\d+)\uE000/g, (match, index) => placeholders[Number(index)]);
 }
 
 // MAX_SUMMARY_CHARS is a pathological-length safety net only, so it is measured against the
@@ -226,8 +225,45 @@ function trimCommandEcho (output: string, command: string) {
   return lines.join('\n').replace(/^\n+/, '');
 }
 
+// Input and text output have dedicated readable blocks. Keep every other persisted field as a
+// generic fallback so new result shapes degrade to JSON instead of disappearing.
+function unrenderedResultDetails (node: ToolNode): unknown | null {
+  const details = node.resultDetails;
+  if (details == null)
+    return null;
+  if (Array.isArray(details))
+    return details.length ? details : null;
+  if (typeof details !== 'object')
+    return details;
+
+  const remainder = { ...(details as Record<string, unknown>) };
+  if (node.inputText) {
+    delete remainder.input;
+    delete remainder.inputLanguage;
+  }
+  if (Array.isArray(remainder.output)) {
+    const unrenderedOutput = remainder.output.filter((part) => {
+      if (!part || typeof part !== 'object')
+        return true;
+      const outputPart = part as Record<string, unknown>;
+      return outputPart.isText !== true || typeof outputPart.value !== 'string';
+    });
+    if (unrenderedOutput.length)
+      remainder.output = unrenderedOutput;
+    else
+      delete remainder.output;
+  }
+  if (remainder.isError === false)
+    delete remainder.isError;
+  return Object.keys(remainder).length ? remainder : null;
+}
+
 function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
   const resources = node.toolCallId ? (byCall.get(node.toolCallId) ?? []) : [];
+  const rawInput = node.toolSpecificData?.kind === 'input' ? node.toolSpecificData.rawInput : null;
+  // Terminal `resultDetails.input` repeats the command, sometimes with minor serialization
+  // differences. Keep it in the parsed model, but render the dedicated Command block only.
+  const inputText = node.command ? '' : node.inputText;
   // A completed call needs no marker; only the exceptions earn one.
   const icon = node.isComplete ? '' : '⏳ ';
   const summaryHtml = node.command
@@ -235,7 +271,8 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
     : toolSummaryHtml(node);
   const head = `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: ${summaryHtml}`;
   const hasDetails = node.toolSpecificData && node.toolSpecificData.kind !== 'terminal' && node.toolSpecificData.kind !== 'todoList';
-  const hasBody = node.command || node.promptText || resources.length || hasDetails || node.output || node.resultText;
+  const resultDetails = unrenderedResultDetails(node);
+  const hasBody = node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || resultDetails != null;
   // Nothing to expand: render a plain line rather than an empty collapsible.
   if (!hasBody)
     return [`- ${mutedSummary(head)}`];
@@ -251,6 +288,29 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
       `<details><summary>${mutedSummary(`📝 Subagent prompt${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
       '',
       ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
+      '',
+      '</details>',
+      '',
+    );
+  }
+  if (inputText) {
+    const clipped = clipText(redact(inputText), MAX_TERMINAL_OUTPUT_BYTES);
+    const fence = fenceFor(clipped.text, node.inputLanguage || 'text');
+    body.push(
+      `<details><summary>${mutedSummary(`⌨️ Tool input${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
+      '',
+      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
+      '',
+      '</details>',
+      '',
+    );
+  } else if (rawInput != null) {
+    const json = redact(JSON.stringify(rawInput, null, 2));
+    const fence = fenceFor(json, 'json');
+    body.push(
+      `<details><summary>${mutedSummary('⌨️ Tool input')}</summary>`,
+      '',
+      ...indentBlock([fence.open, json, fence.close], NESTED_INDENT),
       '',
       '</details>',
       '',
@@ -287,24 +347,45 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
       '',
     );
   }
+  if (resultDetails != null) {
+    const source = redact(JSON.stringify(resultDetails, null, 2));
+    const clipped = clipText(source, MAX_TERMINAL_OUTPUT_BYTES);
+    const fence = fenceFor(clipped.text, 'json');
+    body.push(
+      `<details><summary>${mutedSummary(`📦 Tool result details${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
+      '',
+      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
+      '',
+      '</details>',
+      '',
+    );
+  }
   if (resources.length)
     body.push(`**Persisted output:** ${resources.map((resource) => `${resource.relative} (${thousands(resource.bytes)} bytes)`).join('; ')}.`, '');
   else if (!node.output && !node.resultText)
     body.push('**Output:** not persisted as a separate resource (returned inline).', '');
   for (const resource of resources)
     body.push(`<details><summary>${mutedSummary(`📦 Output body - ${esc(resource.relative)}`)}</summary>`, '', ...indentBlock([`- Resource path: \`${workspacePath(resource.filePath)}\``, '', ...resourceBody(resource)], NESTED_INDENT), '', '</details>', '');
-  if (hasDetails) {
-    const payload = node.toolSpecificData!;
+  if (hasDetails && node.toolSpecificData) {
+    const payload = node.toolSpecificData;
     // The subagent's prompt/result already render above (as text, not escaped JSON), so
     // drop them here rather than showing the same content twice - once readable, once not.
-    const detailsSource = payload.kind === 'subagent'
-      ? Object.fromEntries(Object.entries(payload).filter(([key]) => key !== 'prompt' && key !== 'result'))
-      : payload;
+    const omittedKeys = payload.kind === 'subagent'
+      ? new Set(['prompt', 'result'])
+      : payload.kind === 'input' ? new Set(['kind', 'rawInput']) : new Set<string>();
+    const detailsSource = Object.fromEntries(Object.entries(payload).filter(([key]) => !omittedKeys.has(key)));
     const json = redact(JSON.stringify(detailsSource, null, 2));
     const fence = fenceFor(json, 'json');
-    body.push(`<details><summary>${mutedSummary('⚙️ Tool details')}</summary>`, '', ...indentBlock([fence.open, json, fence.close], NESTED_INDENT), '', '</details>', '');
+    Object.keys(detailsSource).length && body.push(`<details><summary>${mutedSummary('⚙️ Tool details')}</summary>`, '', ...indentBlock([fence.open, json, fence.close], NESTED_INDENT), '', '</details>', '');
   }
-  return [`<details><summary>${mutedSummary(head)}</summary>`, '', ...indentBlock(body), '', '</details>'];
+  return [
+    `<details><summary>${mutedSummary(head)}</summary>`,
+    '<div aria-hidden="true" style="height:0.35rem"></div>',
+    '',
+    ...indentBlock(body),
+    '',
+    '</details>',
+  ];
 }
 
 function renderTodos (todos: TodoItem[]) {

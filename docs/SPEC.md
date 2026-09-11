@@ -164,6 +164,13 @@ For each turn, in order:
   "Output: not persisted...".
 - **Expandable tools** use `<details>` and may contain, in order:
   - `**Command:**` + fenced command (terminal tools).
+  - `📝 Subagent prompt` collapsible from `toolSpecificData.prompt` (the instructions given to the
+    subagent), rendered as a plain text fence directly under the tool header - the readable
+    counterpart to `**Command:**` for a call that delegates instead of executing.
+  - `⌨️ Tool input` before any output. Submitted source from `resultDetails.input` uses the recorded
+    `resultDetails.inputLanguage` as its fence language. Generic `toolSpecificData.rawInput` uses a
+    JSON fence and is removed from the later details block to avoid duplication. Terminal
+    `resultDetails.input` is also suppressed because the dedicated `Command` block already shows it.
   - `📟 Terminal output (exit N · <duration> · N lines)` collapsible with the captured output in a
     ```text fence. Source: `toolSpecificData.terminalCommandOutput.text`, with status from
     `toolSpecificData.terminalCommandState` (`exitCode`, `duration`). Strip ANSI/VT escape sequences
@@ -174,9 +181,11 @@ For each turn, in order:
     tools and some terminal calls carry the model-facing result here). A subagent call has no
     `resultDetails.output`; its report is the plain string `toolSpecificData.result`, so it is routed
     into this same slot instead of being left to the generic JSON dump below.
-  - `📝 Subagent prompt` collapsible from `toolSpecificData.prompt` (the instructions given to the
-    subagent), rendered as a plain text fence directly under the tool header - the readable
-    counterpart to `**Command:**` for a call that delegates instead of executing.
+  - `📦 Tool result details` JSON collapsible for the unconsumed remainder of `resultDetails`.
+    This preserves URI/location arrays, binary or non-text embeds, references, `isError: true`,
+    MCP metadata, serialized `{type: 'data', mimeType, base64Data}` output, malformed values, and
+    future fields. Input and text output already rendered above are removed to avoid duplication.
+    Apply normal redaction and the 24 KiB low-level-details clipping limit.
   - `**Persisted output:**` line plus one `📦 Output body` collapsible per persisted resource.
   - `Tool details` collapsible with pretty-printed `toolSpecificData` JSON for non-terminal,
     non-todoList tools. For a `subagent` call this JSON has `prompt` and `result` removed - they
@@ -184,9 +193,12 @@ For each turn, in order:
     twice, once legible and once as an escaped one-line JSON string.
   - Only when none of the above exist, `**Output:** not persisted as a separate resource (returned
     inline).`
-  - `<details><summary>Tool details</summary>` with pretty-printed `toolSpecificData` JSON for
-    non-terminal, non-todoList tools.
+- Insert a small explicit spacer between an expandable tool's summary and its body so nested input
+  or output sections do not visually collide with the tool title in VS Code's Markdown renderer.
 - Todo-list tools are summarized once per turn as the `🗒️ Todo list` digest, not as raw JSON.
+- `toolId` is open-ended. Any `toolInvocationSerialized` item is rendered as a tool call regardless
+  of whether its built-in, extension, MCP, user, external, or agent-host tool name has been seen
+  before. Specialized presentation is selected by payload shape, not by a closed tool-name list.
 
 ## 6. Formatting and visual design system
 
@@ -457,11 +469,12 @@ Every turn must carry each element below whenever the journal holds it.
 | A7 | Model-facing tool result | `resultDetails.output[]` where `isText`, or `toolSpecificData.result` for a subagent call | `📦 Tool result (N lines)` collapsible | `**Output:** not persisted as a separate resource (returned inline).` |
 | A8 | Persisted output bodies | `chat-session-resources/<toolCallId>/` | `**Persisted output:**` line + one `📦 Output body` collapsible per resource | omitted - the store rotates, so absence is normal and is covered by the Recorded Output Limitation note |
 | A9 | Remaining tool payload | `toolSpecificData` (non-terminal, non-todoList) | `⚙️ Tool details` JSON collapsible | n/a |
-| A10 | Files changed | `textEditGroup.uri` + create/edit tool URIs | three places: inline `> 📄 Edited <path>` marker at the point of edit, per-turn `📄 Files touched (n)` digest with 🆕/✏️ and line counts, and the session-level `## Files Modified` roll-up | digest omitted for the turn; section says none recorded |
-| A11 | Todo state | `toolSpecificData.kind === 'todoList'` | `🗒️ Todo list at this turn (n)` with `[x]` / `[~]` / `[ ]` | omitted |
-| A12 | Cost and timing | `promptTokens`, `completionTokens`, `copilotCredits`, `elapsedMs`, `promptTokenDetails` | `ℹ️ Turn info` table + `<sub>` cost footer; credits always 2dp | zeros or `n/a`, never blank |
-| A13 | Model, mode, agent | `modelId` (friendly via `models.json`), `modeInfo`, `agent` | Turn info table + 🤖 in the footer | `unknown` |
-| A14 | Chat ordering | `response[]` index | A2-A6 and A10 interleaved in recorded order, never bucketed by type | n/a |
+| A10 | Unconsumed tool result structure | complete `resultDetails` envelope after readable input/text output fields are removed | `📦 Tool result details` redacted, clipped JSON collapsible | omitted when no remainder exists |
+| A11 | Files changed | `textEditGroup.uri` + create/edit tool URIs | three places: inline `> 📄 Edited <path>` marker at the point of edit, per-turn `📄 Files touched (n)` digest with 🆕/✏️ and line counts, and the session-level `## Files Modified` roll-up | digest omitted for the turn; section says none recorded |
+| A12 | Todo state | `toolSpecificData.kind === 'todoList'` | `🗒️ Todo list at this turn (n)` with `[x]` / `[~]` / `[ ]` | omitted |
+| A13 | Cost and timing | `promptTokens`, `completionTokens`, `copilotCredits`, `elapsedMs`, `promptTokenDetails` | `ℹ️ Turn info` table + `<sub>` cost footer; credits always 2dp | zeros or `n/a`, never blank |
+| A14 | Model, mode, agent | `modelId` (friendly via `models.json`), `modeInfo`, `agent` | Turn info table + 🤖 in the footer | `unknown` |
+| A15 | Chat ordering | `response[]` index | A2-A7 and A11 interleaved in recorded order, never bucketed by type | n/a |
 
 ### 8.2 Session level
 

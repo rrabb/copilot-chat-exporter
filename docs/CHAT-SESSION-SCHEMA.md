@@ -535,12 +535,22 @@ is intentionally called out because official source names it while the current j
 serializes ordinary Markdown to a kind-less value object. That is an observed persistence detail,
 not a promise that the wrapper can never appear.
 
-### Other kinds in official VS Code source
+### Current persisted kinds not observed here
 
-The current VS Code source declares more kinds than this local corpus has exercised, including
-`systemNotification`, `warning`, `info`, `treeData`, `pullRequest`, `extensions`, `hook`,
-`planReview`, `elicitationSerialized`, `autoModeResolution`, and others. Some are excluded from
-history or only occur in specific agents and tools.
+Current VS Code source permits these additional named kinds in a serialized response:
+
+| Family | Persisted `kind` values not observed in this corpus |
+|---|---|
+| Text and status | `markdownVuln`, `warning`, `info`, `systemNotification`, `command` |
+| Structured views | `treeData`, `multiDiffData`, `extensions`, `pullRequest`, `planReview` |
+| Editing and control | `notebookEditGroup`, `externalEdit`, `clearToPreviousToolInvocation` |
+| Agent and model state | `hook`, `autoModeResolution`, `elicitationSerialized`, `disabledClaudeHooks` |
+
+These names stay in `KNOWN_UNSEEN_KINDS`, not `IGNORED_RESPONSE_KINDS`. If one reaches a real
+journal, the census still reports it and strict mode fails until its archive behavior is reviewed.
+Active-only kinds such as `toolInvocation`, `elicitation2`, `progressTask`, and `voiceProgress` are
+not part of the normal serialized union. `disabledClaudeHooks` is a compatibility exception that
+the serialized response-part type admits explicitly.
 
 That difference is expected. A declaration is not the same as an observed journal example, and an
 observed example is not the same as a promise that the kind will remain unchanged.
@@ -586,8 +596,10 @@ interface IChatToolInvocationSerialized {
   invocationMessage: string | MarkdownString;
   pastTenseMessage?: string | MarkdownString;
   originMessage?: string | MarkdownString;
-  toolSpecificData?: object;
-  resultDetails?: object;
+  toolSpecificData?: SerializedToolSpecificData;
+  resultDetails?: Array<URI | Location>
+    | IToolResultInputOutputDetails
+    | IToolResultOutputDetailsSerialized;
   isConfirmed?: boolean | object;
   isComplete: boolean;
   source?: string;
@@ -627,8 +639,11 @@ interface ToolNode {
   isComplete: boolean;
   isConfirmed?: boolean | Record<string, unknown>;
   toolSpecificData: ToolPayload | null;
+  resultDetails: unknown | null;
   command: string;
   promptText: string;
+  inputText: string;
+  inputLanguage: string;
   todos: TodoItem[] | null;
   output: string;
   resultText: string;
@@ -639,6 +654,11 @@ interface ToolNode {
 ```
 
 This is a project-owned shape, not VS Code's shape. `classifyNode()` is the conversion boundary.
+
+`toolId` is deliberately a string, not an enum. VS Code registers tools dynamically from built-in,
+extension, MCP, user-defined, external, and agent-host sources. A tool name that has never appeared
+in this project still becomes a `ToolNode`; compatibility depends on the serialized invocation,
+payload, and result shapes rather than a hardcoded list of tool names.
 
 ### `toolSpecificData`
 
@@ -730,14 +750,64 @@ result, not an assumed complete child transcript in the parent response item.
 ```
 
 Current VS Code source uses this for tool input when a more specialized payload is not available.
-This project keeps it as a reviewed generic JSON dump. A new `input` shape should not be treated as
-an error merely because it is not a terminal or todo list.
+This project renders `rawInput` as a `Tool input` JSON block before the tool result. It removes
+`rawInput` from the later low-level details block so the same input is not repeated. A new `input`
+shape should not be treated as an error merely because it is not a terminal or todo list.
+
+#### Current serialized payload compatibility
+
+The current serialized `toolSpecificData` union is fully covered by either specialized extraction
+or the generic JSON renderer:
+
+| Payload `kind` | Handling |
+|---|---|
+| `terminal`, `todoList`, `subagent` | Specialized readable fields and sections |
+| `input` | `rawInput` becomes readable Tool input; remaining metadata stays in Tool details |
+| `extensions`, `pullRequest`, `simpleToolInvocation`, `search`, `resources` | Reviewed generic Tool details JSON |
+| `modifiedFilesConfirmation`, `agentFeedbackReviewConfirmation` | Reviewed generic Tool details JSON |
+| `sessionCreated`, `generatedImage`, `automationConfigured` | Reviewed generic Tool details JSON |
+
+`automationConfiguration` exists in the live invocation union but is intentionally omitted when
+VS Code serializes a completed invocation. An unknown future payload kind is still retained as JSON
+and reported by the payload census so it can be reviewed for a better specialized presentation.
 
 ### Result details
 
-A tool can carry result information in `resultDetails`, while terminal output can be nested under
-`toolSpecificData.terminalCommandOutput`. A subagent result can be a plain `toolSpecificData.result`.
-These are not interchangeable.
+A tool can carry submitted input and result information in `resultDetails`, while terminal output
+can be nested under `toolSpecificData.terminalCommandOutput`. A subagent result can be a plain
+`toolSpecificData.result`. These are not interchangeable.
+
+Observed Playwright calls store the submitted program beside their result:
+
+```json
+{
+  "resultDetails": {
+    "input": "return await page.title();",
+    "inputLanguage": "javascript",
+    "output": [{"type":"embed","isText":true,"value":"Example"}],
+    "isError": false
+  }
+}
+```
+
+Current VS Code source defines three serialized result families:
+
+| Result family | Persisted shape | Export behavior |
+|---|---|---|
+| Resource locations | `Array<URI | Location>` | Preserved in `Tool result details` JSON |
+| Input/output details | `input`, optional `inputLanguage`, `output[]`, optional `isError`, optional `mcpOutput` | Text input and text output get readable sections; embeds, refs, errors, MCP metadata, and future fields remain in details JSON |
+| Serialized data | `output: { type: 'data', mimeType, base64Data }` | Preserved in `Tool result details` JSON |
+
+The classifier preserves the complete envelope as `ToolNode.resultDetails`. It also lifts
+`resultDetails.input` into `ToolNode.inputText`, its language hint into `ToolNode.inputLanguage`, and
+text output parts into `ToolNode.resultText`. The renderer emits readable `Tool input` before `Tool
+result`, then emits any unconsumed remainder as `Tool result details` JSON. Fields already shown in
+readable form are removed from the remainder, so the archive does not duplicate them. Terminal
+input is likewise suppressed because the dedicated command block already shows it.
+
+The generic details block uses the same redaction and 24 KiB clipping policy as other low-level
+tool data. This preserves arbitrary current and future result fields without allowing one binary or
+generated payload to dominate the archive.
 
 ```mermaid
 flowchart LR
@@ -745,10 +815,12 @@ flowchart LR
     T --> B[resultDetails]
     A --> C[terminal output]
     A --> D[subagent result]
-    B --> E[generic input/output result]
+    B --> E[submitted input]
+    B --> H[generic output result]
     C --> F[ToolNode.output]
     D --> G[ToolNode.resultText]
-    E --> G
+    E --> I[ToolNode.inputText + inputLanguage]
+    H --> G
 ```
 
 The classifier routes these into project-owned fields so the renderer does not need to understand
@@ -895,6 +967,7 @@ classDiagram
       +toolId
       +toolCallId
       +toolSpecificData
+      +resultDetails
       +output
       +resultText
     }

@@ -13,6 +13,17 @@ All notable changes to this project are documented here.
 - Bundled CLI and importable API with generated TypeScript declarations.
 - `--install-skill <targetRoot>` for installing the Copilot skill and prompt into another repository.
 - MIT license and GitHub/GitLab CI templates.
+- Shape-based compatibility for arbitrary built-in, extension, MCP, user-defined, external, and
+	agent-host tool IDs without a closed tool-name registry.
+- Complete `resultDetails` retention with generic Markdown rendering for URI/location results,
+	non-text embeds and references, MCP metadata, errors, serialized data, and future fields.
+
+### Fixed
+
+- Preserve tool result structures that do not fit the readable text-result path instead of
+	silently discarding them.
+- Merge late `resultDetails` updates and avoid duplicating input or text output already rendered in
+	dedicated sections.
 
 ### Known limitations
 

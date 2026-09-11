@@ -90,6 +90,91 @@ test('a failing command earns a warning badge', () => {
   assert.match(output, /⚠️/);
 });
 
+test('tool input renders before output and leaves vertical space around the tool', () => {
+  const output = render([testTool({
+    toolId: 'run_playwright_code',
+    toolCallId: 'call_playwright',
+    inputText: 'return await page.title();',
+    inputLanguage: 'javascript',
+    resultText: '"Example"',
+  })]);
+  assert.ok(output.indexOf('⌨️ Tool input') < output.indexOf('📦 Tool result'));
+  assert.match(output, /```javascript\n\s*return await page\.title\(\);/);
+  assert.match(output, /<summary>.*run_playwright_code.*<\/summary>\n<div aria-hidden="true" style="height:0\.35rem"><\/div>/);
+});
+
+test('structured MCP input renders before output without duplicating rawInput', () => {
+  const output = render([testTool({
+    toolId: 'mcp_context7_query-docs',
+    toolCallId: 'call_mcp',
+    toolSpecificData: { kind: 'input', rawInput: { libraryId: '/docs/example', query: 'How?' } },
+    resultText: 'The answer',
+  })]);
+  assert.ok(output.indexOf('⌨️ Tool input') < output.indexOf('📦 Tool result'));
+  assert.equal(output.match(/"query": "How\?"/g)?.length, 1);
+  assert.ok(!output.includes('⚙️ Tool details'), 'an input-only payload has no duplicate details block');
+});
+
+test('terminal result input does not duplicate the command block', () => {
+  const output = render([testTool({
+    toolId: 'run_in_terminal',
+    toolCallId: 'call_terminal_input',
+    command: 'npm test',
+    inputText: 'npm test',
+    inputLanguage: 'powershell',
+    output: 'ok',
+  })]);
+  assert.equal(output.match(/npm test/g)?.length, 2, 'once in the title and once in Command');
+  assert.ok(!output.includes('⌨️ Tool input'));
+});
+
+test('an unseen tool renders structured, reference, and binary result output', () => {
+  const output = render([testTool({
+    toolId: 'extension_future_tool',
+    toolCallId: 'call_future',
+    inputText: '{"query":"future"}',
+    inputLanguage: 'json',
+    resultText: 'text result',
+    resultDetails: {
+      input: '{"query":"future"}',
+      inputLanguage: 'json',
+      output: [
+        { type: 'embed', isText: true, value: 'text result' },
+        { type: 'embed', mimeType: 'image/png', value: 'iVBORw0KGgo=' },
+        { type: 'ref', uri: { $mid: 1, path: '/proj/result.bin' } },
+      ],
+      isError: true,
+      futureMetadata: { version: 2 },
+    },
+  })]);
+  assert.ok(output.indexOf('⌨️ Tool input') < output.indexOf('📦 Tool result'));
+  assert.ok(output.indexOf('📦 Tool result') < output.indexOf('📦 Tool result details'));
+  assert.equal(output.match(/text result/g)?.length, 1, 'dedicated text output is not duplicated');
+  assert.match(output, /"mimeType": "image\/png"/);
+  assert.match(output, /"path": "\/proj\/result\.bin"/);
+  assert.match(output, /"isError": true/);
+  assert.match(output, /"futureMetadata"/);
+  assert.ok(!output.includes('"input": "{\\"query\\":\\"future\\"}"'), 'dedicated input is not duplicated');
+});
+
+test('URI arrays and serialized data output render for arbitrary tool ids', () => {
+  const uriOutput = render([testTool({
+    toolId: 'private_location_tool',
+    toolCallId: 'call_locations',
+    resultDetails: [{ $mid: 1, path: '/proj/a.ts' }],
+  })]);
+  assert.match(uriOutput, /📦 Tool result details/);
+  assert.match(uriOutput, /"path": "\/proj\/a\.ts"/);
+
+  const dataOutput = render([testTool({
+    toolId: 'mcp_future_binary',
+    toolCallId: 'call_data',
+    resultDetails: { output: { type: 'data', mimeType: 'application\/octet-stream', base64Data: 'AAEC' } },
+  })]);
+  assert.match(dataOutput, /"mimeType": "application\/octet-stream"/);
+  assert.match(dataOutput, /"base64Data": "AAEC"/);
+});
+
 test('todos render with their status marks', () => {
   const output = render([{ type: 'text', text: 'x' }], {
     todos: [

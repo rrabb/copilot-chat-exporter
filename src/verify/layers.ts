@@ -64,6 +64,9 @@ function summarizeRequestForVerify (request: any): TurnSummary {
     next.invocation && (target.invocation = next.invocation);
     next.command && (target.command = next.command);
     next.promptText && (target.promptText = next.promptText);
+    next.inputText && (target.inputText = next.inputText);
+    next.inputLanguage && (target.inputLanguage = next.inputLanguage);
+    next.resultDetails != null && (target.resultDetails = next.resultDetails);
     next.output && (target.output = next.output);
     next.resultText && (target.resultText = next.resultText);
     next.fileUri && !target.fileUri && (target.fileUri = next.fileUri);

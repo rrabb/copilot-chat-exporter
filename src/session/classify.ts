@@ -46,19 +46,23 @@ export const IGNORED_RESPONSE_KINDS = new Set([
 // If one appears it is reported as unhandled, and only then does it earn a branch below or a
 // place in the ignored list.
 export const KNOWN_UNSEEN_KINDS = new Set([
-  'prepareToolInvocation',
-  'toolInvocation',
   'warning',
+  'info',
   'command',
-  'commandButton',
   'markdownVuln',
-  'notebookEdit',
+  'notebookEditGroup',
   'extensions',
   'pullRequest',
   'multiDiffData',
   'treeData',
-  'elicitation',
+  'systemNotification',
+  'planReview',
+  'hook',
+  'externalEdit',
+  'autoModeResolution',
   'elicitationSerialized',
+  'clearToPreviousToolInvocation',
+  'disabledClaudeHooks',
 ]);
 
 // `toolSpecificData` payload kinds lifted into dedicated fields below. A rename here is the quiet
@@ -75,6 +79,16 @@ export const HANDLED_TOOL_PAYLOAD_KINDS = new Set([
 // nobody has seen before still gets reported.
 export const GENERIC_TOOL_PAYLOAD_KINDS = new Set([
   'input',
+  'extensions',
+  'pullRequest',
+  'simpleToolInvocation',
+  'search',
+  'resources',
+  'modifiedFilesConfirmation',
+  'agentFeedbackReviewConfirmation',
+  'sessionCreated',
+  'generatedImage',
+  'automationConfigured',
 ]);
 
 // Recorded so a reader knows which VS Code the parse was validated against. A census detects a
@@ -144,6 +158,9 @@ export function classifyNode (item: any) {
       toolSpecificData: tsd,
       command: tsd?.kind === 'terminal' ? (tsd.commandLine?.original || tsd.commandLine?.forDisplay || '') : '',
       promptText: tsd?.kind === 'subagent' && typeof tsd.prompt === 'string' ? tsd.prompt.trim() : '',
+      inputText: typeof item.resultDetails?.input === 'string' ? item.resultDetails.input.trim() : '',
+      inputLanguage: typeof item.resultDetails?.inputLanguage === 'string' ? item.resultDetails.inputLanguage : '',
+      resultDetails: item.resultDetails ?? null,
       todos: tsd?.kind === 'todoList' ? (tsd.todoList || []) : null,
       output: stripAnsi(tsd?.terminalCommandOutput?.text ?? '').trim(),
       exitCode: state?.exitCode ?? null,
