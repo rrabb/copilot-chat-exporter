@@ -161,8 +161,8 @@ change?"** Everything else follows from that.
 
 | Check | Input | Compares | Portable? |
 |---|---|---|---|
-| Golden | 9-turn made-up journal | digest + full export (~27 KB) | Yes - kept in the repo, CI-able |
-| Baseline | 73-turn / 1302-tool-call real session | full export, byte-exact | No - ~33 MB, gitignored |
+| Golden | 10-turn made-up journal | digest + full export (~28 KB) | Yes - kept in the repo, CI-able |
+| Baseline | 72-turn / 1042-tool-call real session | full export, byte-exact | No - ~30 MB, gitignored |
 
 Both compare against a saved copy, so they lock in current behavior *including current bugs*.
 They prove "nothing changed", never "this is correct". Do not confuse the two.
@@ -422,7 +422,7 @@ be tested against. The order:
    section 5 proved.
 
    Running it on a real session then made the case against shipping it as `--format json`: a
-   73-turn conversation that renders as 2.4 MB of Markdown is 40 MB of JSON, because every tool
+  72-turn conversation that renders as 2.2 MB of Markdown is 40 MB of JSON, because every tool
    output is embedded whole - terminal transcripts, file reads, prior exports quoted back through
    a subagent result. Those bytes are the least informative part of the file for any correctness
    question, and they make the artifact too large to diff or review. The structural summary that
@@ -539,7 +539,7 @@ journal.
 So the shapes were transcribed from real nodes and the content was invented, which gets the
 coverage a minimizer would have produced without writing a minimizer, without committing content
 derived from someone's real conversations, and without a large generated diff. The fixture grew
-by one turn. Its census now matches a real 73-turn session on every response kind and every tool
+by one turn. Its census now matches a real 72-turn session on every response kind and every tool
 payload kind. Re-recording was reviewed first: seven fields, all of them the new turn and the
 census gaining those kinds, with no movement in `perTurn[0..8]`.
 

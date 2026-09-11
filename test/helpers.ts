@@ -57,7 +57,6 @@ export function testSession (over: Partial<ParsedSession> = {}): ParsedSession {
       unhandled: [],
       unrecognizedToolData: [],
     },
-    normalization: { compactReattached: 0 },
     editedFiles: [],
     errors: [],
     ...over,

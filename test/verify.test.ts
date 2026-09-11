@@ -105,7 +105,6 @@ const rawRequest = (over: Record<string, unknown> = {}) => ({
 test('verification report is clean when the parse matches the replayed journal', () => {
   const session = testSession({
     turns: [turn({ body: [{ type: 'text', text: 'done' }] })],
-    normalization: { compactReattached: 0 },
   });
   const report = buildVerificationReport(session, [rawRequest({ response: [{ value: 'done' }] })]);
   assert.equal(report.rawRequestCount, 1);

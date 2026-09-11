@@ -79,7 +79,7 @@ export const GENERIC_TOOL_PAYLOAD_KINDS = new Set([
 
 // Recorded so a reader knows which VS Code the parse was validated against. A census detects a
 // NEW or renamed kind; it cannot detect an existing kind quietly changing meaning.
-export const VALIDATED_AGAINST = 'VS Code 1.134 / Copilot Chat 0.62 (journal schema kind 0/1/2)';
+export const VALIDATED_AGAINST = 'VS Code 1.134 / Copilot Chat 0.62 (journal schema kinds 0/1/2/3)';
 
 export function thinkingText (value: unknown) {
   if (typeof value === 'string')

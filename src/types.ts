@@ -205,10 +205,6 @@ export interface ParsedSession {
   turns: Turn[];
   rawRequests: RawRequest[];
   census: Census;
-  normalization: {
-    /** Count of compact confirmations moved back onto their own turn. */
-    compactReattached: number;
-  };
   editedFiles: string[];
   /** Non-fatal parse problems, surfaced in the export rather than thrown. */
   errors: string[];

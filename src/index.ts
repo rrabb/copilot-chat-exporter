@@ -96,7 +96,6 @@ export function sessionToJson (loaded: LoadedSession) {
     turns: session.turns,
     editedFiles: session.editedFiles,
     resources: resources.resources,
-    normalization: session.normalization,
     census: {
       seen: countsToObject(session.census.seen),
       dropped: countsToObject(session.census.dropped),

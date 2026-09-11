@@ -48,7 +48,9 @@ A delta journal, one JSON record per line:
 
 - `kind:0` `{ v: {...} }` - full snapshot (usually the first line). `v.requests[]` holds the turns.
 - `kind:1` `{ k: [path...], v }` - SET value at path `k`.
-- `kind:2` `{ k: [path...], v }` - APPEND at path `k`.
+- `kind:2` `{ k: [path...], v?, i? }` - truncate the target array to length `i` when present,
+  then append values from `v` when present. Without `i`, this is an ordinary append.
+- `kind:3` `{ k: [path...] }` - DELETE the property at path `k`.
 
 Turn (request) fields used: `requestId`, `message` (prompt), `response[]` (stream),
 `timestamp`, `modelId`, `promptTokens`, `completionTokens`, `copilotCredits`, `elapsedMs`,
@@ -508,7 +510,7 @@ The export pipeline has three stages where a defect can hide, and three matching
 
 ```
 raw jsonl lines
-   |  (A) delta replay: setAtPath / appendAtPath / remapCompactIndex
+  |  (A) delta replay: setAtPath / pushAtPath / deleteAtPath
    v
 state.requests[]              <- reconstructed final request objects
    |  (B) shared primitives: flattenItems, classifyNode, collectThinking, mergeToolNode
@@ -521,9 +523,9 @@ the .md file
 
 | Bug location | Example | Caught by current `--verify`? | Why |
 |---|---|---|---|
-| A. Delta replay | `appendAtPath` drops an append; `remapCompactIndex` mis-shifts | No | Both sides read the already-replayed `state.requests[]`; the loss is baked in first |
+| A. Delta replay | `pushAtPath` ignores `i` and retains a superseded request | No | Both sides read the already-replayed `state.requests[]`; the loss is baked in first |
 | B. Shared primitive | `flattenItems` skips a nested splice object; `classifyNode` misreads a kind | No | Both sides call the same function, so both lose the same node identically |
-| B'. Normalization only | compact reattachment, empty-prompt turn filtering, dedup application | **Yes** | The turn-builder does this; the raw summary does not, so they diverge |
+| B'. Turn construction only | empty-prompt turn filtering, dedup application | **Yes** | The turn-builder does this; the raw summary does not, so they diverge |
 | C. Rendering | assistant text dropped, wrong escaping, compact placed under wrong heading | No | The verifier never opens the `.md` |
 | Ordering within a turn | tools/thoughts same count but wrong sequence | **Yes** | Per-turn `toolIdSeq`/`thoughtSeq` order compare in `buildVerificationReport`, gated on equal counts |
 | Cross-turn `toolCallId` reuse | same id genuinely invoked again in a later turn | **Yes** (reported, non-failing) | `crossTurnDuplicates` in `buildVerificationReport`; confirmed benign per-turn-scoped case, see the note below |
@@ -547,8 +549,8 @@ prior exports or subagent result blobs are excluded for free. It reports distinc
 parsed tool ids and fails on any `dropped` (in journal, absent from turns) or `invented` (the reverse).
 
 **Layer B - parse-vs-turns (IMPLEMENTED, `buildVerificationReport`).** Compares the replayed-requests
-summary against the final parsed-turns summary. Its scope covers the **normalization layer** (row
-B') - it is where the `/compact` bug lived - plus per-turn tool-call and thought **order** (compares
+summary against the final parsed-turns summary. Its scope covers turn construction (row B') plus
+per-turn tool-call and thought **order** (compares
 `toolIdSeq`/`thoughtSeq` when counts already match) and session-level cross-turn `toolCallId`
 multiplicity. Remaining future upgrade: assert the full response-text sequence rather than only the
 first.
@@ -598,8 +600,8 @@ invocation, when auditing the session that is building the exporter.
 `--verify` prints a deterministic summary that must be reviewed before a release:
 - Layer B: request count from replayed journal and parsed turn count; mismatch counts for prompts,
   first response text, thought counts, tool-call counts, terminal output line totals, tool-call order,
-  and thought order; missing and extra turns by `requestId`; compact diagnostics (reattachment count +
-  per-`/compact` checks); cross-turn `toolCallId` duplicates (reported with per-occurrence turn/tool
+  and thought order; missing and extra turns by `requestId`; per-`/compact` checks; cross-turn
+  `toolCallId` duplicates (reported with per-occurrence turn/tool
   context, non-failing - legitimate when the same command runs again in a later turn).
 - Layer A cross-check: distinct journal tool ids vs parsed tool ids, streamed-thinking count, and any
   `dropped`/`invented` tool ids (a non-empty list fails the run).
@@ -613,10 +615,11 @@ handle are real (not just theoretical) before committing them to a golden fixtur
 
 | Shape | Status | Evidence |
 |---|---|---|
+| Indexed request replacement (`kind: 2` with `i`) | **Real** | A persisted session appended a request, then truncated and replaced that slot; ignoring `i` retained 28 exported turns while VS Code showed 27 |
 | Re-emitted/deduped `toolCallId` (same call appended 2-4x as it progresses) | **Real, common** | 151 in the working session; 3,849 in another - the dominant shape, not an edge case |
 | Same completed `toolCallId` reused for a new invocation within one turn | **Real** | identical terminal commands were invoked twice in the working session; merge must stop after `isComplete: true` |
 | Prefix-duplicate streamed thought (a later thought is a longer version starting with an earlier one's text) | **Real** | e.g. two `thinking` appends both starting `"No screenshot actually came through, just the file, but I ca…"`, one a strict extension of the other |
-| `/compact` turn needing reattachment (standalone `Compacted conversation.` lands on the wrong index) | **Real** | 1 reattachment observed in the working session across 3 `/compact` turns |
+| `/compact` confirmation as a standalone response append | **Real** | Exact replay places all four confirmations in the committed live fixture on their recorded `/compact` requests; no prompt-specific remapping is needed |
 | Response-less `/compact` turn | **Real** | the current chat session contained a final `/compact` request with no recorded assistant response while export ran; Layer C must not invent or require a confirmation |
 | Terminal tool output with raw ANSI escapes + a captured exit code | **Real** | `toolSpecificData.terminalCommandOutput.text` containing `\u001b[...m` sequences alongside `terminalCommandState.exitCode` |
 | `textEditGroup` (file edit marker) | **Real, common** | 54 occurrences in one session |
@@ -640,8 +643,8 @@ input, so a systematic drift shows up even when it is self-consistent.
 
 **Fixture.** A small, hand-assembled journal at
 `tools/copilot-chat-exporter/test/fixtures/golden/00000000-0000-4000-8000-000000000000.jsonl`, covering one of each selected shape in
-the 9.4 catalogue (including completed-ID reuse, response-less compact, and cross-turn reuse, and
-marking the two synthetic cases). It is kept intentionally small (9 turns) so it stays reviewable in
+the 9.4 catalogue (including indexed request replacement, completed-ID reuse, response-less compact,
+and cross-turn reuse, and marking the two synthetic cases). It is kept intentionally small so it stays reviewable in
 a PR diff.
 
 **Digest AND a normalized render.** A raw `.md` byte-diff is too brittle on its own: it embeds
@@ -799,7 +802,9 @@ If you touch `parseChatSession`, `flattenItems`, `spliceValues`, `collectThinkin
 
 - Passing a `transcripts/<id>.jsonl` path -> 0 turns and overwrites the good file. Use the session id.
 - Forgetting recursive flattening -> most tool calls vanish.
-- Assuming `/compact` control turns always keep their own response index -> the journal can drift compaction updates to the neighboring request, so `Compacted conversation.` appears under the wrong turn unless remap + reattachment guards run.
+- Treating kind 2 as append-only -> superseded requests survive, the export gains extra questions,
+  and every later numeric request path can update the wrong turn. Honor `i` before interpreting any
+  request or `/compact` behavior; do not add prompt-specific index remapping.
 - Counting rendered markers on a self-referential export without excluding BOTH fenced regions and blockquote lines -> false positives, because the transcript quotes its own markers in fenced tool results (`🛠️ <code>`, `<details>`) and in blockquoted user pastes (`> ... </details>` copied from a prior verification run). Layer C uses `scaffoldText` (drop fences + blockquotes) and anchors every count to line-start generated markup.
 - Verifying a rendered file written by an earlier export against the current journal -> a badge/anchor deficit equal to the tool calls made since. Use the driftless in-process self-check, not a stale file.
 - Rendering md outputs as raw fences instead of a bordered box -> looks like code, not a document.

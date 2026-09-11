@@ -987,6 +987,6 @@ _No memory or plan files were found on disk for this session._
 - Redaction masks common authorization, token, API-key, password, and client-secret assignment forms.
 - Rendering: colored badges use inline HTML and render in the VS Code Markdown preview; GitHub strips inline styles and shows the text without color.
 - Reasoning shown is the journal's recorded `thinking` text (the agent's own notes); no hidden model chain-of-thought is reconstructed.
-- Parse validated against: VS Code 1.134 / Copilot Chat 0.62 (journal schema kind 0/1/2).
+- Parse validated against: VS Code 1.134 / Copilot Chat 0.62 (journal schema kinds 0/1/2/3).
 
 <div align="right"><a href="#top">⬆️ Back to top</a></div>

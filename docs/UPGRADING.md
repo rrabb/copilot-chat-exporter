@@ -124,7 +124,7 @@ The census block is the part that matters:
 ```
 Schema census (response items vs handled kinds)
 - Response items walked: 1,404 across 10 distinct kind(s)
-- Validated against: VS Code 1.134 / Copilot Chat 0.62 (journal schema kind 0/1/2)
+- Validated against: VS Code 1.134 / Copilot Chat 0.62 (journal schema kinds 0/1/2/3)
 - Handled kinds: toolInvocationSerialized=557, thinking=474, ...
 - Handled but empty (streamed partials): ...
 - Dropped by design: undoStop=155, codeblockUri=155, ...
@@ -301,7 +301,7 @@ Not everything is a new kind. Match the symptom to the owner:
 |---|---|---|
 | A response item kind | `classifyNode` (`session/classify.ts`) | Census reports unhandled |
 | `toolSpecificData` shape for a tool | `classifyNode` | Tool renders with no command or output |
-| Delta encoding - the `kind 0/1/2` snapshot/set/append records | `parseChatSession` (`session/journal.ts`) | Zero turns, or turn count collapses |
+| Delta encoding - kind 0 snapshot, kind 1 set, kind 2 truncate/push, kind 3 delete | `parseChatSession` (`session/journal.ts`) | Extra/missing turns, shifted responses, or zero turns |
 | Where VS Code stores sessions; a new channel or renamed folder | `host.ts` | `--list` finds nothing |
 | Resource file naming under `chat-session-resources/` | `loadResources` (`session/enrich.ts`) | Tool results missing, terminal output intact |
 | Model metadata in `debug-logs/<id>/models.json` | `readModelNames` (`session/enrich.ts`) | Raw model ids appear instead of friendly names |
@@ -321,6 +321,8 @@ Not everything is a new kind. Match the symptom to the owner:
   invocation; the merge must be gated on the tracked entry still being incomplete.
 - **The first record of a journal is a full snapshot and can be 16 MB.** "Just read the first
   line" is not automatically cheap.
+- **Kind 2 is not append-only.** When `i` is present, truncate the target array to that length before
+  pushing `v`. Ignoring `i` retained a superseded request and shifted later responses by one turn.
 - **The golden fixture contains only seven distinct kinds.** If you are writing a drift test by
   renaming a kind, rename one that is actually present, or your test silently does nothing.
 - **Terminal output lives in the journal**, at `toolSpecificData.terminalCommandOutput.text`, not

@@ -1,17 +1,20 @@
 // Reading the journal file into turns.
 //
 // The journal is a log of changes, not a document: the first line is a full snapshot, and every
-// line after it either sets a value at a path or appends to one. Replaying those in order
+// line after it sets, pushes or truncates an array, or deletes a value. Replaying those in order
 // rebuilds the final request objects, which then become the turns in `../types.ts`.
 //
 // Two rules here are easy to get wrong and expensive to lose:
+//   - VS Code's kind 2 `Push` is not append-only. Its optional `i` truncates the target array
+//     before pushing replacement values. Ignoring it retained a superseded request, exported an
+//     extra question, and shifted every later request-index update to the wrong turn.
 //   - `response[]` holds nested arrays and numeric-keyed objects like `{"0": ...}`. Skipping
 //     that flattening makes most tool calls vanish - an early version reported 72 for a session
 //     that had over 400.
 //   - the journal re-emits a tool call each time its status changes, so later copies are merged
 //     into the first, which is the order the chat displayed.
 
-import type { ParsedSession, TurnNode } from '../types.ts';
+import type { ParsedSession } from '../types.ts';
 import { COLLATOR, parseJson } from '../text.ts';
 import { workspacePath } from '../host.ts';
 import {
@@ -79,7 +82,7 @@ export function* flattenItems (item: any): Generator<any> {
 }
 
 export function parseChatSession (sessionPath: string, raw: string): ParsedSession {
-  // Replay the chatSessions journal (set/append deltas) to reconstruct final
+  // Replay the chatSessions journal mutations to reconstruct final
   // request objects before deriving turn-level render nodes.
   const lines = raw.split(/\r?\n/).filter(Boolean);
   const errors = [];
@@ -128,7 +131,9 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
     target[last] = value;
   };
 
-  const appendAtPath = (root: any, pathParts: Array<string | number>, value: any) => {
+  // Matches ObjectMutationLog._applyPush: `i` is the array length to resume from, not an
+  // insertion index. Truncate first, then append `v`; absent `v` means truncation only.
+  const pushAtPath = (root: any, pathParts: Array<string | number>, value: any, startIndex?: number) => {
     if (!root || !pathParts.length)
       return;
     let target = root;
@@ -144,48 +149,34 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
       }
     }
     const last = pathParts[pathParts.length - 1];
-    const values = requestValues(value);
+    const values = value === undefined ? [] : requestValues(value);
     if (typeof last === 'number') {
       if (!Array.isArray(target))
         return;
       const existing = Array.isArray(target[last]) ? target[last] : [];
+      if (startIndex !== undefined)
+        existing.length = startIndex;
       existing.push(...values);
       target[last] = existing;
       return;
     }
     const existing = Array.isArray(target[last]) ? target[last] : [];
+    if (startIndex !== undefined)
+      existing.length = startIndex;
     existing.push(...values);
     target[last] = existing;
   };
-  const isStandaloneCompactResponse = (value: any) => {
-    // Control-turn confirmation can arrive as a standalone text append.
-    // Keep this one on the /compact request instead of remapping forward.
-    const parts = requestValues(value)
-      .filter((item: any) => item && typeof item === 'object' && typeof item.value === 'string')
-      .map((item: any) => item.value.trim());
-    return parts.length === 1 && parts[0] === 'Compacted conversation.';
+  const deleteAtPath = (root: any, pathParts: Array<string | number>) => {
+    if (!root || !pathParts.length)
+      return;
+    let target = root;
+    for (const key of pathParts.slice(0, -1)) {
+      if (target[key] == null)
+        return;
+      target = target[key];
+    }
+    delete target[pathParts[pathParts.length - 1]];
   };
-  const remapCompactIndex = (k: any, value: any) => {
-    if (!Array.isArray(k) || k[0] !== 'requests' || typeof k[1] !== 'number' || k.length < 3 || !Array.isArray(state?.requests))
-      return k;
-    const idx = k[1];
-    const current = state.requests[idx];
-    if (!current || messageText(current.message).trim() !== '/compact')
-      return k;
-    const next = state.requests[idx + 1];
-    if (!next)
-      return k;
-    const field = k[2];
-    // Some compaction updates target the /compact index but semantically belong
-    // to the next real request. Remap those updates to stabilize turn ordering.
-    const keepOnCompact = field === 'response' && isStandaloneCompactResponse(value);
-    if (keepOnCompact)
-      return k;
-    const mapped = [...k];
-    mapped[1] = idx + 1;
-    return mapped;
-  };
-
   for (const [lineIndex, line] of lines.entries()) {
     const record = parseJson(line);
     if (!record) {
@@ -199,23 +190,14 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
     }
     if (!state || !Array.isArray(record.k))
       continue;
-    const mappedKey = remapCompactIndex(record.k, record.v);
+    // Apply the recorded path exactly. Correct kind 2 replay keeps later numeric request paths
+    // aligned, including /compact; prompt-specific index remapping would corrupt valid journals.
     if (record.kind === 1)
-      setAtPath(state, mappedKey, record.v);
-    else if (record.kind === 2) {
-      if (
-        mappedKey.length === 3
-        && mappedKey[0] === 'requests'
-        && mappedKey[2] === 'response'
-        && isStandaloneCompactResponse(record.v)
-        && Array.isArray(state.requests)
-        && state.requests.length
-      ) {
-        appendAtPath(state, mappedKey, record.v);
-      } else {
-        appendAtPath(state, mappedKey, record.v);
-      }
-    }
+      setAtPath(state, record.k, record.v);
+    else if (record.kind === 2)
+      pushAtPath(state, record.k, record.v, record.i);
+    else if (record.kind === 3)
+      deleteAtPath(state, record.k);
   }
 
   const requests = Array.isArray(state?.requests) ? state.requests : [];
@@ -254,7 +236,6 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
     toolData: new Map<string, number>(),
   };
   const tally = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1);
-  let compactReattached = 0;
   let syntheticRequestId = 0;
   const turns = requests
     .map((request: any) => {
@@ -345,30 +326,6 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
     .filter(Boolean)
     .map((turn: any, order: number) => ({ ...turn, number: order + 1 }));
 
-  for (let i = 1; i < turns.length; i += 1) {
-    const compactTurn = turns[i];
-    // Guard for drift where a standalone compact confirmation landed on the
-    // previous turn even after replay; move only the canonical text marker.
-    if (compactTurn.prompt.trim() !== '/compact')
-      continue;
-    const hasCompactResponse = compactTurn.body.some((node: TurnNode) => node.type === 'text' && node.text.trim() === 'Compacted conversation.');
-    if (hasCompactResponse)
-      continue;
-    const hasAnyAssistantBody = compactTurn.body.some((node: TurnNode) => node.type === 'text' || node.type === 'ref' || node.type === 'tool');
-    if (hasAnyAssistantBody)
-      continue;
-    const previous = turns[i - 1];
-    const sourceIndex = [...previous.body].reverse().findIndex((node: TurnNode) => node.type === 'text' && node.text.trim() === 'Compacted conversation.');
-    if (sourceIndex < 0)
-      continue;
-    const absoluteIndex = previous.body.length - 1 - sourceIndex;
-    const [moved] = previous.body.splice(absoluteIndex, 1);
-    previous.prose = previous.body.filter((node: TurnNode) => node.type === 'text' || node.type === 'ref');
-    compactTurn.body.unshift(moved);
-    compactTurn.prose = compactTurn.body.filter((node: TurnNode) => node.type === 'text' || node.type === 'ref');
-    compactReattached += 1;
-  }
-
   const customTitle = header.customTitle || '';
   const defaultTitle = defaultSessionTitle(turns[0]?.prompt ?? '');
 
@@ -401,9 +358,6 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
       unrecognizedToolData: [...census.toolData.entries()]
         .filter(([kind]) => !HANDLED_TOOL_PAYLOAD_KINDS.has(kind) && !GENERIC_TOOL_PAYLOAD_KINDS.has(kind))
         .sort((left, right) => right[1] - left[1]),
-    },
-    normalization: {
-      compactReattached,
     },
     editedFiles: [...editedFiles].sort((left, right) => COLLATOR.compare(left, right)),
     errors,

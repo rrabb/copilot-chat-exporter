@@ -31,7 +31,7 @@ flowchart TD
     C --> D[chatSessions/session-id.jsonl]
     D --> E[This exporter]
     E --> F[Replay kind 0 snapshot]
-    E --> G[Apply kind 1 and kind 2 changes]
+    E --> G[Apply kind 1, kind 2, and kind 3 changes]
     F --> H[Final requests array]
     G --> H
     H --> I[Classify response items]
@@ -127,6 +127,8 @@ outer record has one of these shapes:
 {"kind":0,"v":{...full session state...}}
 {"kind":1,"k":["requests",0,"response"],"v":[...items to set...]}
 {"kind":2,"k":["requests"],"v":[...request objects to append...]}
+{"kind":2,"k":["requests"],"i":10,"v":[...replacement requests...]}
+{"kind":3,"k":["requests",0,"responseId"]}
 ```
 
 The outer `kind` is the **mutation operation**, not the kind of a response item.
@@ -135,7 +137,8 @@ The outer `kind` is the **mutation operation**, not the kind of a response item.
 flowchart LR
     R0["kind 0\nfull state"] --> S[replayed state]
     R1["kind 1\nset at path k"] --> S
-    R2["kind 2\nappend at path k"] --> S
+    R2["kind 2\npush at path k\ntruncate first when i is set"] --> S
+    R3["kind 3\ndelete at path k"] --> S
     S --> Q["state.requests[]"]
 ```
 
@@ -145,9 +148,11 @@ flowchart LR
 |---|---|---|
 | `kind: 0` | Initial full state snapshot | Observed here; matches the replay code |
 | `kind: 1` | Set or replace a value at path `k` | Observed here; matches the replay code |
-| `kind: 2` | Append a value at path `k` | Observed here; matches the replay code |
+| `kind: 2` | Optionally truncate the array at `k` to length `i`, then append values from `v` | Official VS Code source; observed here |
+| `kind: 3` | Delete the value at path `k` | Official VS Code source; handled by the replay code |
 | `k` | Array of property names and array indexes | Observed here |
-| `v` | Value for the operation | Observed here |
+| `v` | Value for kinds 0 and 1; optional array of values for kind 2 | Official VS Code source; observed here |
+| `i` | Optional new array length applied before a kind 2 append | Official VS Code source; observed here |
 
 The first record normally carries the session header and an initial `requests` array. Later records
 add requests, response items, metadata, and streamed updates.
@@ -162,16 +167,18 @@ flowchart TD
     B -- no --> C[Record warning and skip]
     B -- yes --> D{outer kind}
     D -- 0 --> E[Replace state with v]
-    D -- 1 --> F[Append v at k]
-    D -- 2 --> G[Set v at k]
+    D -- 1 --> F[Set v at k]
+    D -- 2 --> G[Truncate to i when present, then append v at k]
+    D -- 3 --> DEL[Delete value at k]
     E --> H[Next line]
     F --> H
     G --> H
+    DEL --> H
     C --> H
     H --> I{More lines?}
     I -- yes --> B
     I -- no --> J[Use final state]
-    J --> K[Build turns from requests]
+    J --> BUILD[Build turns from requests]
 ```
 
 ### Paths
@@ -192,6 +199,85 @@ state
 
 A path can target a nested object or array. The replay helpers create an array when the next path
 component is numeric and an object otherwise.
+
+### Indexed push and replacement
+
+VS Code names `kind: 2` `Push`, but it is not always append-only. When `i` is present, replay first
+sets the target array's length to `i`. It then appends `v` when `v` is present and nonempty.
+
+```json
+{"kind":2,"k":["requests"],"i":10,"v":[{"requestId":"replacement"}]}
+{"kind":2,"k":["requests",10,"response"],"i":2}
+```
+
+The first record removes every request at index 10 and later, then inserts the replacement. The
+second truncates a response array to two items without appending anything.
+
+Ignoring `i` caused a confirmed exporter failure: a superseded request remained in the array, the
+export showed 28 turns while VS Code showed 27, and later updates addressed the wrong exported
+turn. Exact replay removed the stale request and restored the correct prompt and response order.
+
+### Incident record: extra question and shifted responses (2026-08-27)
+
+This section preserves why replay changed. It belongs here rather than in a separate bug log because
+the defect was a misunderstanding of the journal contract, and this guide is the maintenance source
+for that contract.
+
+**Observed failure.** Session `dd0c0407-1d1b-4a0f-8424-a056fdcec2d8` showed 27 requests in the VS
+Code Chat UI but exported 28. A localization question appeared twice instead of the later prompt
+`yes`. Near the end, the package-name question owned response content from the following
+implementation request, while the final exported turn held only an initial fragment.
+
+**Evidence that separated cause from symptoms.** The raw journal later updated
+`requests[26]`, while the exporter associated index 26 with the package-name request. The exporter
+had retained one earlier request that VS Code had replaced, so every later index was off by one.
+The affected session contained no `/compact` prompt or `Compacted conversation.` response, which
+ruled out compact handling as the cause.
+
+**Root cause.** The old replay treated every `kind: 2` record as append-only and ignored `record.i`.
+VS Code's `ObjectMutationLog` defines kind 2 as `Push`, with optional `i` and `v`. Its `_applyPush`
+sets `array.length = i` when `i` is present, then pushes `v` when values are present. In the failing
+session, this truncated the request array at the stale slot and appended its replacement. Skipping
+the truncation preserved both requests.
+
+**Why the symptom appeared much later.** `ChatSessionOperationLog` adapts both the session
+`requests` array and each request's `response` array through the mutation log. Later records use
+numeric paths such as `['requests', 26, 'response']`. Once one stale request remains, those valid
+paths still replay without an exception but mutate the wrong request. This produces plausible but
+incorrect output, so prompt-specific reconciliation would hide the first error rather than fix it.
+
+**Implemented solution.** Replay now follows VS Code semantics for all mutation kinds:
+
+1. kind 0 replaces state with the initial snapshot;
+2. kind 1 sets the value at `k`;
+3. kind 2 truncates the target array to `i` when present, then pushes `v` when present;
+4. kind 3 deletes the property at `k`.
+
+The same rules apply to request arrays and response arrays. Truncation-only kind 2 records, where
+`i` exists and `v` does not, are supported.
+
+**Compaction decision.** The old parser remapped updates away from `/compact` requests and later
+moved `Compacted conversation.` back. Replaying the committed live fixture with correct `i`
+semantics placed all four confirmations on their recorded `/compact` requests without either
+workaround. Both ownership-changing repairs were removed. Replay now trusts the recorded path for
+all prompts; `/compact` remains special only in render verification, which checks that a recorded
+confirmation was not dropped.
+
+**Regression coverage.** Focused tests cover request replacement, response truncation without
+values, property deletion, and compact confirmation ownership. The golden fixture appends a stale
+request and replaces it using `i`, while preserving the same ten-turn digest and 993-line render.
+The corrected live session exports 27 turns, and the large fixture exports 72 turns with four compact
+confirmations correctly placed.
+
+**Source references:**
+
+- [`objectMutationLog.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/objectMutationLog.ts)
+  defines mutation kinds 0 through 3 and implements truncate-then-push behavior in `_applyPush`.
+- [`chatSessionOperationLog.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/chatSessionOperationLog.ts)
+  applies the mutation log to serialized chat sessions, including request and response arrays.
+- [Focused replay tests](../test/journal.test.ts) and the
+  [golden journal](../test/fixtures/golden/00000000-0000-4000-8000-000000000000.jsonl) preserve the
+  local regression cases.
 
 ### Numeric-keyed splice objects
 
@@ -223,13 +309,15 @@ for each nonblank JSON line:
     else if record.kind == 1:
       setAtPath(state, record.k, record.v)
     else if record.kind == 2:
-      appendAtPath(state, record.k, record.v)
+      pushAtPath(state, record.k, record.v, record.i)
+    else if record.kind == 3:
+      deleteAtPath(state, record.k)
 
 requests = state.requests or []
 ```
 
-The real implementation also remaps some compaction updates and records parse warnings. Read
-[session/journal.ts](../src/session/journal.ts) before changing these rules.
+The real implementation also records parse warnings. Read [session/journal.ts](../src/session/journal.ts)
+before changing these rules.
 
 ## The Session Tree
 
@@ -422,7 +510,7 @@ a string `value`.**
 
 ### Response kinds currently observed here
 
-The following census came from the project's real 73-turn session and the extended committed
+The following census came from the project's real 72-turn session and the extended committed
 fixture:
 
 | Response kind | Current handling | Parsed result |
@@ -718,17 +806,17 @@ flowchart LR
 
 ### `/compact`
 
-`/compact` is a real request in observed sessions. Its confirmation can arrive on a neighboring
-request or as a standalone response append. The parser has explicit logic to keep
-`Compacted conversation.` with the `/compact` turn.
+`/compact` is a real request in observed sessions. Its confirmation is a standalone response append
+whose text is `Compacted conversation.`
 
-This is why the parser has both:
+The parser previously remapped updates away from `/compact` requests and then ran a repair pass to
+move the confirmation back. Those workarounds compensated for treating `kind: 2` as append-only.
+After implementing `i`, native replay placed all four confirmations in the committed live fixture
+on their recorded `/compact` requests. The remapping and repair pass were therefore removed.
 
-- index remapping while replaying compaction updates; and
-- a post-parse repair pass that moves the canonical confirmation back to the `/compact` turn.
-
-Do not delete this as duplicate-looking code without running the compact fixture tests and the
-real-session snapshot.
+Do not add prompt-specific ownership rules unless a raw journal, replayed with current VS Code
+semantics, proves that the recorded path does not identify the intended request. The compact render
+check remains in place to catch a missing confirmation.
 
 ## Metadata and Costs
 
@@ -844,7 +932,7 @@ These pairs are easy to confuse:
 
 | Do not confuse | Difference |
 |---|---|
-| outer `kind` and response-item `kind` | Outer `kind` selects snapshot/set/append; inner `kind` identifies response content |
+| outer `kind` and response-item `kind` | Outer `kind` selects snapshot/set/push/delete; inner `kind` identifies response content |
 | `toolId` and `toolCallId` | `toolId` names the tool; `toolCallId` identifies an invocation occurrence and may be reused |
 | `toolInvocation` and `toolInvocationSerialized` | Live model object versus persisted/reloaded invocation; this exporter sees the serialized form |
 | `response[]` and `response.entireResponse` | The journal has the serialized response array; VS Code's live model exposes richer response views |
@@ -971,6 +1059,9 @@ can change:
 - [`chatSessionOperationLog.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/chatSessionOperationLog.ts)
   defines the mutation-log purpose, the storage schema, request fields, response-part persistence,
   and the distinction between dynamic and static response kinds.
+- [`objectMutationLog.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/objectMutationLog.ts)
+  defines kinds 0 through 3 and the exact kind 2 behavior: truncate to `i` when present, then append
+  values from `v` when present.
 - [`chatModel.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/chatModel.ts)
   defines `ISerializableChatData1/2/3`, request and response metadata, `IChatModel`, serialization,
   normalization, and compatibility behavior.

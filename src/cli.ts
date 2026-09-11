@@ -53,7 +53,6 @@ function printVerificationReport (report: ReturnType<typeof buildVerificationRep
   console.log(`- Thought order mismatches: ${report.thoughtOrderMismatches}`);
   console.log(`- Missing turns: ${report.missingTurns}`);
   console.log(`- Extra turns: ${report.extraTurns}`);
-  console.log(`- Compact-response reattachments: ${report.compactReattached}`);
   if (report.crossTurnDuplicates.length) {
     console.log(`- Cross-turn toolCallId duplicates (same id under >1 turn): ${report.crossTurnDuplicates.length}`);
     for (const dup of report.crossTurnDuplicates.slice(0, 10)) {

@@ -304,7 +304,7 @@ Side: `input` = VS Code's format, `parsed` = our own model, `output` = the Markd
 
 ```mermaid
 flowchart LR
-  A["journal<br/>.jsonl"] --> B["replay deltas<br/>kind 0/1/2"]
+  A["journal<br/>.jsonl"] --> B["replay mutations<br/>kind 0/1/2/3"]
   B --> C["requests[]"]
   C --> D["flatten<br/>nested arrays +<br/>numeric splice keys"]
   D --> E["classify<br/>per response item"]
@@ -445,7 +445,7 @@ that recreates it is documented at the top of `test/baseline.ts`.
 
 The golden fixture is hand-authored, but its *shapes* were transcribed from real journal nodes,
 and its coverage is checked rather than assumed: every response kind and tool payload kind that a
-real 73-turn session produces also appears in the fixture. Compare the two census blocks after any
+real 72-turn session produces also appears in the fixture. Compare the two census blocks after any
 change to that claim.
 
 `ci/` holds two ready-to-enable jobs, one per host. Neither is active where you found it.

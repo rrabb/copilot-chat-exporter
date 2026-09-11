@@ -7,7 +7,7 @@ import { normalizeRender } from '../src/verify/golden.ts';
 // Regression check for the TypeScript refactor: replay ONE frozen real session through the
 // exporter and compare the normalized Markdown to a saved copy. The made-up golden
 // digest (`--golden check`) proves structural identity on a tiny hand-built journal; this
-// harness proves byte identity of the full export on a 73-turn, 1302-tool-call session.
+// harness proves byte identity of the full export on a 72-turn, 1042-tool-call session.
 //
 // The fixture is a verbatim copy of a VS Code workspace-storage session laid out in the same
 // shape, so the exporter derives its hashRoot from the fixture instead of AppData. Both the

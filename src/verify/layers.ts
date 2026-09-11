@@ -159,17 +159,6 @@ function summarizeTurnForVerify (turn: Turn): TurnSummary {
 export function buildVerificationReport (session: ParsedSession, rawRequests: any[]) {
   const requests = rawRequests.filter((request: any) => messageText(request?.message).trim());
   const rawSummaries = requests.map((request: any) => summarizeRequestForVerify(request));
-  for (let i = 1; i < rawSummaries.length; i += 1) {
-    const compact = rawSummaries[i];
-    if (compact.prompt !== '/compact' || compact.responseTexts.length)
-      continue;
-    const previous = rawSummaries[i - 1];
-    const sourceIndex = previous.responseTexts.lastIndexOf('Compacted conversation.');
-    if (sourceIndex < 0)
-      continue;
-    previous.responseTexts.splice(sourceIndex, 1);
-    compact.responseTexts.unshift('Compacted conversation.');
-  }
   const rawById = new Map<string, TurnSummary>(rawSummaries.map((summary: TurnSummary) => [summary.requestId || '', summary]));
   const turnSummaries = session.turns.map((turn: Turn) => summarizeTurnForVerify(turn));
   const mismatches: Array<{ requestId: string; kind: string; detail: string }> = [];
@@ -287,7 +276,6 @@ export function buildVerificationReport (session: ParsedSession, rawRequests: an
     thoughtOrderMismatches,
     missingTurns,
     extraTurns,
-    compactReattached: session.normalization?.compactReattached ?? 0,
     compactChecks,
     crossTurnDuplicates,
     mismatches,
