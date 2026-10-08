@@ -4,7 +4,7 @@
   "private": true,
   "description": "Export a VS Code Copilot chat session to a rich, human-readable Markdown archive: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.",
   "license": "MIT",
-  "author": "rrabbani",
+  "author": { "name": "Reiman Rabbani", "email": "rrabbani@esri.com", "url": "https://github.com/rrabb" },
   "type": "module",
   "engines": {
     "node": ">=22.18"

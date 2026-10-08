@@ -59,10 +59,17 @@ test('--audit is an alias for --verify', () => {
   assert.equal(ok([]).verify, false);
 });
 
-test('no arguments is valid: it means the current session', () => {
+test('no arguments is valid: it means listing, never implicit export', () => {
   const options = ok([]);
   assert.deepEqual(options, {
-    list: false,
+    list: true,
+    showIgnored: false,
+    last25: false,
+    fullIds: false,
+    noHtml: false,
+    htmlOutput: null,
+    current: false,
+    overwrite: false,
     verify: false,
     strict: false,
     golden: null,
@@ -70,14 +77,43 @@ test('no arguments is valid: it means the current session', () => {
     installSkill: null,
     workspaceRoot: null,
     outDir: null,
+    userDataRoot: null,
     positionals: [],
   });
+});
+
+test('root selection and current-session intent are explicit', () => {
+  assert.equal(ok(['--user-data-root', 'C:\\Code']).list, true);
+  assert.equal(ok(['--current', '--user-data-root', 'C:\\Code', 'out.md']).current, true);
+  assert.equal(ok(['--current']).list, false);
+  assert.equal(ok(['--current', '--overwrite']).overwrite, true);
+  assert.match(err(['--user-data-root', '--list']), /Usage/);
+  assert.match(err(['--user-data-root', 'one', '--user-data-root', 'two']), /more than once/);
+  assert.match(err(['--list', '--current']), /cannot be combined/);
+  assert.match(err(['--list', 'session']), /does not accept/);
+  assert.match(err(['--verify', '--golden', 'check']), /Choose one action/);
+});
+
+test('listing filters require a listing action and are parsed independently', () => {
+  const options = ok(['--show-ignored', '--last25', '--full-ids', '--html-output', 'report.html']);
+  assert.equal(options.list, true);
+  assert.equal(options.showIgnored, true);
+  assert.equal(options.last25, true);
+  assert.equal(options.fullIds, true);
+  assert.equal(options.htmlOutput, 'report.html');
+  assert.equal(ok(['--list', '--last25']).last25, true);
+  assert.equal(ok(['--list', '--no-html']).noHtml, true);
+  assert.match(err(['--verify', '--last25']), /available only when listing/);
+  assert.match(err(['session-id', '--full-ids']), /available only when listing/);
+  assert.match(err(['--list', '--no-html', '--html-output', 'report.html']), /cannot be combined/);
+  assert.match(err(['session-id', '--html-output', 'report.html']), /only when listing/);
 });
 
 // --- flags that take a value --------------------------------------------------------------------
 
 test('a value flag with nothing after it reports its own usage', () => {
   assert.equal(err(['--out-dir']), 'Usage: --out-dir <path>');
+  assert.equal(err(['--html-output']), 'Usage: --html-output <path>');
   assert.equal(err(['--workspace-root']), 'Usage: --workspace-root <path>');
   assert.equal(err(['--install-skill']), 'Usage: --install-skill <targetRoot>');
   assert.equal(err(['session', '--golden']), 'Usage: --golden check|update');

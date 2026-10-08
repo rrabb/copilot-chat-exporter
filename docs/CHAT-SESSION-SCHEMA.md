@@ -12,6 +12,20 @@ in this project's local sessions. Every section labels which kind of evidence it
 
 ## Start Here
 
+### Provider-backed SDK sources
+
+The inventory now distinguishes Local content version 3, chat index version 1 and SDK event version 1 as independent formats. Agent Host and Copilot CLI backings are verified for listing and scope selection; SDK Markdown rendering and semantic fidelity verification are not yet implemented.
+
+| Source | Evidence used for identity | Missing/ambiguous behavior |
+| --- | --- | --- |
+| Agent Host main/peer | Exact owning `copilotcli:/<id>` and `ahp-chat` URI; central `agent-host.db` chat catalog's JSON `sdkSessionId`; legacy exact-chat/default metadata only when no central entry exists | Keep unresolved. A default-chat provider-ID fallback additionally requires its local database and a matching SDK header; retain explicit warnings. Never guess peer backings. |
+| Copilot CLI | Exact indexed ID, local SDK folder and single matching `session.start`; verify `workspace.yaml` ID when present | Reject placeholders, conflicting IDs, invalid UTF-8 or malformed/incomplete logs. Optional metadata is not a substitute for event-header validation. |
+| Subagent | Persisted `subagent.started` toolCallId-to-agentId mapping; exact parent tool execution for immediate parent links | Main identity can remain verified while affected children stay unresolved. No title/path-based bindings. Peer origin requires a unique match across the exact owning session's persisted catalog; unreadable candidates prevent uniqueness claims. |
+
+**Inferred from pinned source:** [agentPeerChats.ts](https://github.com/microsoft/vscode/blob/07f806f999227108933c2e30515b26eecc1fda74/src/vs/platform/agentHost/node/agentPeerChats.ts) encodes provider backings with `sdkSessionId`; [agentHostPeerChatStore.ts](https://github.com/microsoft/vscode/blob/07f806f999227108933c2e30515b26eecc1fda74/src/vs/platform/agentHost/node/agentHostPeerChatStore.ts) treats the central catalog as authority and legacy metadata as compatibility data. The default provider-ID fallback exists in `CopilotAgent._sdkConversationId`; allowing it offline under stronger checks and warnings is an explicit exporter policy, not proof of a persisted mapping.
+
+**Observed here:** SDK headers and top-level agent attribution in the private read-only corpus. [sdk-events.ts](../src/session/sdk-events.ts) retains every raw event field without text trimming or payload clipping. Schema-envelope verification does not establish that all unknown event semantics are handled by a renderer. SHA-256 records the verified bytes; cached scope evidence detects size/mtime changes but is not an atomic cross-store snapshot.
+
 There are two different things called a chat export:
 
 | Thing | What it is | Stable? |
@@ -87,6 +101,8 @@ VS Code user data
 The storage root varies by platform and VS Code channel. The owning code is
 [src/host.ts](../src/host.ts), especially `workspaceStorageRoots()`, `resolveWorkspaceRoot()`, and
 `createHostContext()`.
+
+The listing inventory also reads optional `workspace.json` once per workspace storage folder and retains its `folder` or `workspace` URI in source provenance. HTML details show the storage-folder ID and explicitly labelled URI-basename workspace/project names; they do not infer names from the hash or inspect multi-root folder membership. Missing metadata does not prevent discovery; malformed/unreadable metadata produces a diagnostic while conversation verification continues independently. Generated Local and provider child rows retain this workspace provenance. File links are navigational hints, not proof that the targets still exist.
 
 ### Do not confuse these files
 

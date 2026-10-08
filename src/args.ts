@@ -6,6 +6,13 @@
 
 export interface CliOptions {
   list: boolean;
+  showIgnored: boolean;
+  last25: boolean;
+  fullIds: boolean;
+  noHtml: boolean;
+  htmlOutput: string | null;
+  current: boolean;
+  overwrite: boolean;
   verify: boolean;
   strict: boolean;
   golden: 'check' | 'update' | null;
@@ -13,6 +20,7 @@ export interface CliOptions {
   installSkill: string | null;
   workspaceRoot: string | null;
   outDir: string | null;
+  userDataRoot: string | null;
   /** Everything that was not a flag: a session id or path, then an output path. */
   positionals: string[];
 }
@@ -21,12 +29,17 @@ export type ParsedArgs =
   | { ok: true; options: CliOptions }
   | { ok: false; error: string };
 
-const BOOLEAN_FLAGS = new Set(['--list', '--verify', '--audit', '--strict']);
+const BOOLEAN_FLAGS = new Set([
+  '--list', '--current', '--overwrite', '--verify', '--audit', '--strict',
+  '--show-ignored', '--last25', '--full-ids', '--no-html',
+]);
 
 // Value is the usage line shown when the flag is wrong, so the message lives next to the flag.
 const VALUE_FLAGS: Record<string, string> = {
   '--workspace-root': '--workspace-root <path>',
   '--out-dir': '--out-dir <path>',
+  '--user-data-root': '--user-data-root <path>',
+  '--html-output': '--html-output <path>',
   '--golden': '--golden check|update',
   '--snapshot': '--snapshot check|update [sessionId]',
   '--install-skill': '--install-skill <targetRoot>',
@@ -48,8 +61,10 @@ export function parseArgs (argv: string[]): ParsedArgs {
     }
     if (Object.hasOwn(VALUE_FLAGS, arg)) {
       const value = argv[i + 1];
-      if (!value)
+      if (!value || value.startsWith('--'))
         return { ok: false, error: `Usage: ${VALUE_FLAGS[arg]}` };
+      if (values.has(arg))
+        return { ok: false, error: `Option '${arg}' was supplied more than once.` };
       values.set(arg, value);
       i += 1;
       continue;
@@ -68,10 +83,37 @@ export function parseArgs (argv: string[]): ParsedArgs {
       return { ok: false, error: `Usage: ${VALUE_FLAGS[flag]}` };
   }
 
+  const modes = [
+    booleans.has('--list'), values.has('--golden'), values.has('--snapshot'), values.has('--install-skill'),
+    booleans.has('--verify') || booleans.has('--audit'),
+  ].filter(Boolean).length;
+  const listRequested = booleans.has('--list')
+    || (modes === 0 && positionals.length === 0 && !booleans.has('--current'));
+  if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
+    || booleans.has('--no-html') || values.has('--html-output')) && !listRequested)
+    return { ok: false, error: 'Listing options are available only when listing sessions.' };
+  if (booleans.has('--no-html') && values.has('--html-output'))
+    return { ok: false, error: '--no-html cannot be combined with --html-output.' };
+  if (modes > 1)
+    return { ok: false, error: 'Choose one action: --list, --verify, --snapshot, --golden or --install-skill.' };
+  if (booleans.has('--current') && (booleans.has('--list') || values.has('--golden') || values.has('--install-skill')))
+    return { ok: false, error: '--current cannot be combined with --list, --golden or --install-skill.' };
+  if (booleans.has('--list') && positionals.length)
+    return { ok: false, error: '--list does not accept a session or output positional argument.' };
+  if (positionals.length > (booleans.has('--current') ? 1 : 2))
+    return { ok: false, error: 'Too many positional arguments.' };
+
   return {
     ok: true,
     options: {
-      list: booleans.has('--list'),
+      list: listRequested,
+      showIgnored: booleans.has('--show-ignored'),
+      last25: booleans.has('--last25'),
+      fullIds: booleans.has('--full-ids'),
+      noHtml: booleans.has('--no-html'),
+      htmlOutput: values.get('--html-output') ?? null,
+      current: booleans.has('--current'),
+      overwrite: booleans.has('--overwrite'),
       verify: booleans.has('--verify') || booleans.has('--audit'),
       strict: booleans.has('--strict'),
       golden: (values.get('--golden') ?? null) as CliOptions['golden'],
@@ -79,6 +121,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       installSkill: values.get('--install-skill') ?? null,
       workspaceRoot: values.get('--workspace-root') ?? null,
       outDir: values.get('--out-dir') ?? null,
+      userDataRoot: values.get('--user-data-root') ?? null,
       positionals,
     },
   };

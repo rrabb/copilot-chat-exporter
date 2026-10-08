@@ -8,6 +8,7 @@ This repository builds a Node.js CLI and library that export VS Code Copilot Cha
 - Follow [.github/instructions/documentation-style.instructions.md](instructions/documentation-style.instructions.md) for Markdown, comments, JSDoc, and user-facing text.
 - Follow established repository patterns when generic guidance conflicts with this project.
 - Keep changes focused. Do not reformat unrelated code or documentation.
+- Save development/review reports, runtime captures, test output logs, and validation logs under the project-root `temp-tool-output/` directory. Use timestamped filenames or run folders and preserve earlier outputs for user review. For listing runs, pass `--html-output` explicitly; do not change the CLI's default working-directory behavior. Automated fixture sandboxes and their normal cleanup remain unchanged. Keep private generated artifacts out of commits.
 
 ## Precise Terminology
 
@@ -15,6 +16,7 @@ This repository builds a Node.js CLI and library that export VS Code Copilot Cha
 - Name a value by its role or contract, not merely by the fact that it has fields. Prefer terms such as type, interface, structure, schema, contract, record, tuple, payload, response, state, model, format, variant, or result.
 - Reserve `shape` for a quoted external API term, array or tensor dimensions, JavaScript engine object layouts, or an established public identifier that cannot be changed within the task.
 - Follow the replacement table in [.github/instructions/documentation-style.instructions.md](instructions/documentation-style.instructions.md) and the naming rules in [.github/instructions/code-style.instructions.md](instructions/code-style.instructions.md).
+- Same thing goes for the usage of 'surface' in names, explanations, and docs; prefer more precise terminology.
 
 ## Runtime And Package Boundaries
 

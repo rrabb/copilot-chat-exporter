@@ -10,10 +10,12 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { DatabaseSync } from 'node:sqlite';
 import type { SessionLocation } from '../types.ts';
-import { workspaceStorageRoots } from '../host.ts';
 import { parseJson } from '../text.ts';
+import { resolveUserDataRoot } from './roots.ts';
+import { assertLocalJournalSnapshot } from './journal-validation.ts';
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SESSION_ID_PREFIX_PATTERN = /^[0-9a-f]{8,32}$/i;
 const CHAT_INDEX_KEY = 'chat.ChatSessionStore.index';
 
 // A journal's first record is a full state snapshot, so it can be megabytes on a long session,
@@ -46,7 +48,9 @@ export async function readFirstLine (filePath: string) {
 // Distinguishes "the first argument names a session" from "the first argument is an output
 // path", so the id pattern stays in one place.
 export function looksLikeSessionArgument (value?: string) {
-  return Boolean(value?.endsWith('.jsonl') || SESSION_ID_PATTERN.test(value ?? ''));
+  return Boolean(value?.endsWith('.jsonl')
+    || SESSION_ID_PATTERN.test(value ?? '')
+    || SESSION_ID_PREFIX_PATTERN.test(value ?? ''));
 }
 
 export function currentSessionFromEnv () {
@@ -54,7 +58,8 @@ export function currentSessionFromEnv () {
   if (!target)
     return null;
   const sessionId = path.basename(target);
-  if (!SESSION_ID_PATTERN.test(sessionId))
+  if (!SESSION_ID_PATTERN.test(sessionId) || path.basename(path.dirname(target)) !== 'debug-logs'
+    || path.basename(path.dirname(path.dirname(target))) !== 'GitHub.copilot-chat')
     return null;
   return { sessionId, hashRoot: path.dirname(path.dirname(path.dirname(target))) };
 }
@@ -120,9 +125,13 @@ function readIndexedTitles (hashRoot: string) {
 
 // The workspace index holds the current GUI title, including manual renames that VS Code does not
 // write back to the journal. When the index has no entry, `--list` replays journal title changes.
-export async function listSessions ({ withTitles = false } = {}) {
+export async function listSessions ({ withTitles = false, userDataRoot }: {
+  withTitles?: boolean;
+  userDataRoot?: string;
+} = {}) {
+  const root = await resolveUserDataRoot({ userDataRoot });
   const sessions = [];
-  for (const storageRoot of workspaceStorageRoots()) {
+  for (const storageRoot of [path.join(root, 'User', 'workspaceStorage')]) {
     let hashes = [];
     try {
       hashes = await fs.readdir(storageRoot, { withFileTypes: true });
@@ -163,30 +172,66 @@ export async function listSessions ({ withTitles = false } = {}) {
   return sessions.sort((left, right) => right.mtimeMs - left.mtimeMs);
 }
 
-export async function resolveSession (sourceArgument?: string): Promise<SessionLocation> {
-  const sessions = await listSessions();
+export interface SessionSelectionOptions {
+  userDataRoot?: string;
+  current?: boolean;
+}
+
+async function validateJournalIdentity (sessionPath: string, sessionId: string) {
+  const header = parseJson(await readFirstLine(sessionPath));
+  assertLocalJournalSnapshot(header, sessionId);
+}
+
+function withinRoot (filePath: string, root: string) {
+  const relative = path.relative(root, filePath);
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+export async function resolveSession (sourceArgument?: string, options: SessionSelectionOptions = {}): Promise<SessionLocation> {
+  if (options.current && sourceArgument)
+    throw new Error('Select either an explicit session or --current, not both.');
+  if (!sourceArgument && !options.current)
+    throw new Error('Choose an explicit session UUID or .jsonl path, or request --current. Use --list to discover sessions.');
   if (sourceArgument?.endsWith('.jsonl')) {
     const sessionPath = path.resolve(sourceArgument);
     const sessionId = path.basename(sessionPath, '.jsonl');
     if (!SESSION_ID_PATTERN.test(sessionId))
       throw new Error(`Transcript filename must be a session UUID: ${sourceArgument}`);
-    return sessions.find((session) => session.sessionPath === sessionPath) ?? { sessionId, sessionPath, hashRoot: path.dirname(path.dirname(sessionPath)) };
+    if (options.userDataRoot !== undefined) {
+      const root = await resolveUserDataRoot({ userDataRoot: options.userDataRoot });
+      if (!withinRoot(sessionPath, root))
+        throw new Error('Explicit journal path conflicts with --user-data-root.');
+    }
+    await validateJournalIdentity(sessionPath, sessionId);
+    const hashRoot = path.dirname(path.dirname(sessionPath));
+    return { sessionId, sessionPath, hashRoot, indexedTitle: readIndexedTitles(hashRoot).get(sessionId) };
   }
+  const root = await resolveUserDataRoot({ userDataRoot: options.userDataRoot });
   if (sourceArgument) {
-    const match = sessions.find((session) => session.sessionId === sourceArgument);
-    if (match)
-      return match;
+    const sessions = await listSessions({ userDataRoot: root });
+    const isPrefix = SESSION_ID_PREFIX_PATTERN.test(sourceArgument);
+    const matches = sessions.filter((session) => isPrefix
+      ? session.sessionId.replaceAll('-', '').toLowerCase().startsWith(sourceArgument.toLowerCase())
+      : session.sessionId.toLowerCase() === sourceArgument.toLowerCase());
+    const matchingIds = [...new Set(matches.map((match) => match.sessionId))];
+    if (isPrefix && matchingIds.length > 1)
+      throw new Error(`Session ID prefix ${sourceArgument} is ambiguous. Matching Local IDs:\n${matchingIds.map((id) => `  ${id}`).join('\n')}\nPass a longer unique prefix or an exact .jsonl path.`);
+    if (matches.length > 1)
+      throw new Error(`Session ${sourceArgument} occurs in multiple workspaces. Pass an exact .jsonl path:\n${matches.map((match) => `  ${match.sessionPath}`).join('\n')}`);
+    if (matches.length === 1) {
+      await validateJournalIdentity(matches[0].sessionPath, matches[0].sessionId);
+      return matches[0];
+    }
     throw new Error(`No chat session found for ${sourceArgument}.`);
   }
   const current = currentSessionFromEnv();
-  if (current) {
-    const match = sessions.find((session) => session.sessionId === current.sessionId);
-    if (match)
-      return match;
-    const sessionPath = path.join(current.hashRoot, 'chatSessions', `${current.sessionId}.jsonl`);
-    return { sessionId: current.sessionId, sessionPath, hashRoot: current.hashRoot };
-  }
-  if (sessions[0])
-    return sessions[0];
-  throw new Error('No VS Code chat session was found. Pass a session UUID or .jsonl path, or use --list.');
+  if (!current)
+    throw new Error('--current requires a verified Local VSCODE_TARGET_SESSION_LOG identity. No current session could be identified; pass an explicit source.');
+  const storageRoot = path.join(root, 'User', 'workspaceStorage');
+  const hashRelative = path.relative(storageRoot, current.hashRoot);
+  if (!withinRoot(current.hashRoot, storageRoot) || !hashRelative || hashRelative.includes(path.sep))
+    throw new Error('Current-session evidence conflicts with the selected VS Code user-data root.');
+  const sessionPath = path.join(current.hashRoot, 'chatSessions', `${current.sessionId}.jsonl`);
+  await validateJournalIdentity(sessionPath, current.sessionId);
+  return { sessionId: current.sessionId, sessionPath, hashRoot: current.hashRoot, indexedTitle: readIndexedTitles(current.hashRoot).get(current.sessionId) };
 }

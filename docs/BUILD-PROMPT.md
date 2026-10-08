@@ -71,11 +71,11 @@ Formatting/visual system (spec section 6):
 
 ## CLI contract (spec section 7)
 
-Support: current session (via `VSCODE_TARGET_SESSION_LOG`), explicit `<sessionId>`, explicit
+Support: default listing, explicitly requested `--current` (via verified `VSCODE_TARGET_SESSION_LOG`), `--user-data-root`, explicit `<sessionId>`, explicit
 `chatSessions/<id>.jsonl` path, optional output path, and `--list`. Print a one-line
 `Turns/tool calls/reasoning thoughts/resources` summary plus the `Output:` path. The source argument
 must be a session id or a `chatSessions` journal path - reject/avoid `transcripts/*.jsonl` (different
-schema, yields 0 turns).
+schema, yields 0 turns). Never export an implicit current/newest session or choose the first ambiguous UUID/root. Preserve unresolved index/provider occurrences visibly. Offline HTML, verified SDK scopes and shared high-fidelity artifacts follow the staged contract in [the work log](../work-log.md).
 
 ## Repo conventions
 

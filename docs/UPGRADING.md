@@ -13,8 +13,13 @@ what-to-do-about-it.
 
 ## The one-sentence version
 
-**When VS Code changes what a chat session looks like, you edit `classifyNode`.** Everything
-after it reads a parsed model this project owns, and is unaffected.
+**Identify the source format before choosing a parser.** Local response-kind changes often start in `classifyNode`; provider identity changes require the exact backing resolver, and SDK event changes require source-aware handling rather than Local journal replay.
+
+### Provider identity and scope regressions
+
+Run `node --test test/provider-sources.test.ts test/inventory.test.ts test/cli.test.ts` when changing SDK/provider resolution. Verify central-versus-legacy precedence against the installed build and pinned public source. Do not use missing metadata, a title, a similar UUID or a tool summary to infer a peer/child backing. Preserve unresolved occurrences and warnings; default-only provider-ID fallback requires an existing session database and matching SDK header. `🟠 ❓` identifies ambiguous child scopes without invalidating an independently verified main.
+
+Re-read the source for export and compare its identity/integrity to the selection evidence. Reject concurrent changes or retry with a fresh resolver; do not reuse cached scope evidence across changed logs. Preserve unrecognized event fields for the fidelity adapter and report unsupported semantics. Current SDK identity verification is not a claim of implemented Markdown export or complete private-schema coverage.
 
 ## Vocabulary you need first
 

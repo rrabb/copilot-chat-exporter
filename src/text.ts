@@ -8,6 +8,7 @@
 // Colours and indents are named once here. Change the constant, never a literal at a call site.
 
 import path from 'node:path';
+import { redactText } from './redaction.ts';
 
 // --- palette ---
 
@@ -67,9 +68,7 @@ export const COLLATOR = new Intl.Collator('en-US');
 // --- string safety ---
 
 export function redact (value: unknown) {
-  return String(value ?? '')
-    .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s"'\\]+/gi, '$1[REDACTED]')
-    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret)\s*["']?\s*[:=]\s*["']?)[^"'\s,}]+/gi, '$1[REDACTED]');
+  return redactText(String(value ?? '')).text;
 }
 
 export function esc (value: unknown) {

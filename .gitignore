@@ -12,3 +12,5 @@ test/baseline/
 # that only exists in your VS Code storage, so they are meaningless in anyone else's checkout.
 test/snapshots/
 node_modules/
+docs/temp/
+temp-tool-output/

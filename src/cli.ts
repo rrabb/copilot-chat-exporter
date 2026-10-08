@@ -1,13 +1,19 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline/promises';
 import type { Census } from './types.ts';
 import { parseArgs } from './args.ts';
 import { installAgentFiles } from './install.ts';
 import { loadSession, renderSession } from './index.ts';
 import { formatExportSummary } from './export-summary.ts';
 import { getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
-import { listSessions, looksLikeSessionArgument } from './session/locate.ts';
+import { looksLikeSessionArgument } from './session/locate.ts';
+import { resolveUserDataRoot } from './session/roots.ts';
+import { inventorySessions } from './session/inventory.ts';
+import { formatSessionListing, formatSessionListingHtml } from './session/listing.ts';
+import { defaultListingHtmlPath, writeListingHtml } from './session/listing-report.ts';
+import { writeArchive } from './archive-writer.ts';
 import {
   GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
   IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS, VALIDATED_AGAINST,
@@ -35,7 +41,7 @@ import { clip, errorLabel, thousands } from './text.ts';
 // the functions below turn those values into console output. `index.ts` holds the pipeline, so a
 // program that wants the same result without the printing imports that instead.
 //
-// Modes: export (default), `--list`, `--verify [--strict]`, and `--golden check|update`.
+// Default is discovery. Exports require an explicit source or --current.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(__dirname, '..');
@@ -150,10 +156,13 @@ if (!parsed.ok) {
   process.exit(1);
 }
 const {
-  list: listMode, verify: verifyMode, strict: strictMode,
+  list: listMode, current: currentMode, verify: verifyMode, strict: strictMode,
+  showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode,
   golden: goldenAction, snapshot: snapshotAction,
   installSkill: installSkillTarget,
-  workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs,
+  workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
+  userDataRoot: userDataRootArg,
+  overwrite: overwriteMode,
 } = parsed.options;
 
 if (installSkillTarget) {
@@ -168,31 +177,87 @@ if (installSkillTarget) {
   }
 }
 
-if (listMode) {
-  const sessions = await listSessions({ withTitles: true });
-  console.log(`Found ${sessions.length} chat session(s):\n`);
-  for (const session of sessions) {
-    const date = new Date(session.mtimeMs).toISOString().slice(0, 16).replace('T', ' ');
-    console.log(`${session.sessionId}  ${date}  ${session.title || '(untitled)'}`);
+async function chooseRoot (roots: readonly string[]) {
+  console.log('Select a VS Code user-data root:');
+  roots.forEach((root, index) => console.log(`  ${index + 1}. ${root}`));
+  const terminal = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await terminal.question('Root number (blank cancels): ')).trim();
+    if (!answer)
+      return null;
+    if (!/^[1-9]\d*$/u.test(answer) || Number(answer) > roots.length)
+      throw new Error('Invalid root selection. Retry or pass --user-data-root <path>.');
+    return roots[Number(answer) - 1];
+  } finally {
+    terminal.close();
   }
-  console.log('\nExport one with: npm run ai:export:chat -- <sessionId> [outputPath]');
-  console.log('Verify one with: npm run ai:export:chat -- --verify <sessionId>');
-  process.exit(0);
 }
 
 const goldenMode = goldenAction != null;
 
 const firstArgument = goldenMode ? GOLDEN_FIXTURE_PATH : positionalArgs[0];
 const firstIsSource = looksLikeSessionArgument(firstArgument);
-const sourceArgument = firstIsSource ? firstArgument : undefined;
+const sourceArgument = firstIsSource && !currentMode ? firstArgument : undefined;
 const outputArgument = goldenMode ? GOLDEN_SCRATCH_OUTPUT : (firstIsSource ? positionalArgs[1] : firstArgument);
+if (!listMode && !goldenMode && ((!currentMode && !firstIsSource) || (currentMode && firstIsSource))) {
+  console.error('Export/verify/snapshot requires an explicit session UUID, unique short UUID prefix, or .jsonl path, or --current [outputPath].');
+  process.exit(1);
+}
+let selectedRoot: string | undefined;
+try {
+  if (listMode || currentMode || userDataRootArg !== null || (firstIsSource && !firstArgument?.endsWith('.jsonl'))) {
+    selectedRoot = await resolveUserDataRoot({
+      userDataRoot: userDataRootArg ?? undefined,
+      choose: process.stdin.isTTY && process.stdout.isTTY ? chooseRoot : undefined,
+    });
+  }
+  if (listMode) {
+    if (selectedRoot === undefined)
+      throw new Error('Listing requires a resolved user-data root.');
+    const inventory = await inventorySessions(selectedRoot);
+    const listingOptions = {
+      showIgnored: showIgnoredMode,
+      last25: last25Mode,
+      fullIds: fullIdsMode,
+      terminalWidth: process.stdout.columns,
+      diagnostics: inventory.diagnostics,
+    };
+    const generatedAt = new Date();
+    let htmlPath: string | null = null;
+    if (!noHtmlMode) {
+      const destination = htmlOutputArg === null
+        ? defaultListingHtmlPath(process.cwd(), generatedAt)
+        : path.resolve(htmlOutputArg);
+      htmlPath = await writeListingHtml(
+        destination,
+        formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString()),
+        overwriteMode,
+      );
+    }
+    console.log(`VS Code user-data root: ${inventory.userDataRoot}\n`);
+    console.log(formatSessionListing(inventory.occurrences, listingOptions));
+    htmlPath && console.log(`HTML report: ${htmlPath}`);
+    process.exit(0);
+  }
+} catch (error) {
+  console.error(errorLabel(error));
+  process.exit(1);
+}
 // The golden fixture's "workspace" is the package itself, so its committed render stays
 // byte-identical no matter where the package lives or which directory it is run from.
-const loaded = await loadSession({
-  source: sourceArgument,
-  workspaceRoot: workspaceRootArg ?? (goldenMode ? PKG : null),
-  outDir: outDirArg,
-});
+let loaded: Awaited<ReturnType<typeof loadSession>>;
+try {
+  loaded = await loadSession({
+    source: sourceArgument,
+    current: currentMode,
+    userDataRoot: selectedRoot,
+    workspaceRoot: workspaceRootArg ?? (goldenMode ? PKG : null),
+    outDir: outDirArg,
+  });
+} catch (error) {
+  console.error(errorLabel(error));
+  process.exit(1);
+}
 const { location, raw, session } = loaded;
 
 if (verifyMode) {
@@ -261,15 +326,26 @@ const rendered = renderSession(loaded, {
   generatedAt: new Date().toISOString(),
 });
 
-await fs.mkdir(path.dirname(outputPath), { recursive: true });
-await fs.writeFile(outputPath, rendered, 'utf8');
-const output = await fs.stat(outputPath);
+let outputSize: number;
+try {
+  const written = await writeArchive({
+    outputPath, generatedAt: new Date().toISOString(), overwrite: goldenMode || overwriteMode,
+    plan: () => ({
+      markdown: rendered, companions: [], diagnostics: [],
+      policy: { highFidelity: false, redact: true },
+    }),
+  });
+  outputSize = written.markdownBytes;
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
 for (const line of formatExportSummary({
   sessionId: location.sessionId,
   session,
   resourceCount: loaded.resources.resources.length,
   outputPath: workspacePath(outputPath),
-  outputSize: output.size,
+  outputSize,
 }))
   console.log(line);
 if (session.census.unhandled.length) {

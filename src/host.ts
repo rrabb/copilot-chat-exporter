@@ -32,7 +32,7 @@ interface SessionNamingInput {
 // ones are skipped by the caller, so listing extra channels costs one failed readdir each.
 const CHANNELS = ['Code', 'Code - Insiders', 'Code - Exploration', 'VSCodium'];
 
-function userDataRoots (): string[] {
+export function userDataRoots (): string[] {
   const home = os.homedir();
   if (process.platform === 'win32') {
     const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');

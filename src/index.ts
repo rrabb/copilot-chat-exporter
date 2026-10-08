@@ -14,11 +14,29 @@ import {
 } from './session/enrich.ts';
 import { attachTranscriptPatches, loadTranscriptPatches } from './session/edits.ts';
 import { parseChatSession } from './session/journal.ts';
+import { validateLocalJournalRecords } from './session/journal-validation.ts';
 
 export type * from './types.ts';
+export type * from './export-policy.ts';
+export { writeArchive } from './archive-writer.ts';
+export type { ArchiveWriteOptions, WrittenArchive } from './archive-writer.ts';
+export { redactContent } from './redaction.ts';
+export type * from './session/sources.ts';
+export { DEFAULT_EXPORT_POLICY, planMetadataText, planToolText, recordedLineCount } from './export-policy.ts';
+export { discoverUserDataRoots, resolveUserDataRoot, UserDataRootError } from './session/roots.ts';
+export type { RootSelectionOptions } from './session/roots.ts';
+export { inventorySessions } from './session/inventory.ts';
+export type { SessionInventory } from './session/inventory.ts';
+export { formatSessionListing } from './session/listing.ts';
+export type { SessionListingOptions } from './session/listing.ts';
+export { createProviderSourceResolver } from './session/provider-sources.ts';
+export type { ProviderResolverOptions, ResolvedProviderSource } from './session/provider-sources.ts';
+export { readSdkEvents, eventsInScope } from './session/sdk-events.ts';
+export type { SdkEvent, SdkEventLog } from './session/sdk-events.ts';
 export { installAgentFiles } from './install.ts';
 export { createHostContext, getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
 export { listSessions, resolveSession } from './session/locate.ts';
+export type { SessionSelectionOptions } from './session/locate.ts';
 export { parseChatSession } from './session/journal.ts';
 export { buildDocument } from './markdown.ts';
 export { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
@@ -33,13 +51,16 @@ export async function loadSession (options: {
   source?: string;
   workspaceRoot?: string | null;
   outDir?: string | null;
+  userDataRoot?: string;
+  current?: boolean;
 } = {}) {
   const { source, workspaceRoot = null, outDir = null } = options;
-  const location = await resolveSession(source);
+  const location = await resolveSession(source, { userDataRoot: options.userDataRoot, current: options.current });
   const host = await createHostContext({ hashRoot: location.hashRoot, workspaceRoot, outDir });
   setWorkspaceRoot(host.workspaceRoot);
 
   const raw = await fs.readFile(location.sessionPath, 'utf8');
+  validateLocalJournalRecords(raw, location.sessionId);
   const session = parseChatSession(location.sessionPath, raw);
   attachTranscriptPatches(session, await loadTranscriptPatches(location.hashRoot, location.sessionId));
   // Manual GUI renames can update only the workspace index. Preserve the journal customTitle

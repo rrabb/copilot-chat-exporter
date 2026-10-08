@@ -27,6 +27,8 @@ test('looksLikeSessionArgument separates a session from an output path', () => {
   // short-circuits before the id test is ever evaluated. It broke once, unnoticed.
   assert.equal(looksLikeSessionArgument(UUID), true);
   assert.equal(looksLikeSessionArgument(UUID.toUpperCase()), true);
+  assert.equal(looksLikeSessionArgument(UUID.slice(0, 8)), true);
+  assert.equal(looksLikeSessionArgument(UUID.slice(0, 7)), false);
   assert.equal(looksLikeSessionArgument(`some/dir/${UUID}.jsonl`), true);
 
   assert.equal(looksLikeSessionArgument('docs/chat-exports/out.md'), false);
@@ -114,6 +116,9 @@ test('--list uses later journal titles and GUI-only indexed renames', async (t) 
   assert.equal(loaded.session.title, 'GUI renamed title');
   assert.equal(loaded.session.customTitle, 'Old journal title');
   assert.equal(loaded.session.defaultTitle, '');
+
+  const prefixResolved = await resolveSession(UUID.slice(0, 8));
+  assert.equal(prefixResolved.sessionId, UUID);
 });
 
 test('--list falls back to journal titles when the state database is missing or invalid', async (t) => {
@@ -152,4 +157,73 @@ test('--list falls back to journal titles when the state database is missing or 
 
   assert.equal(titles.get(UUID), 'Original title without database');
   assert.equal(titles.get(RENAMED_UUID), 'Original title with invalid database');
+});
+
+test('library requires explicit source or explicit current intent', async () => {
+  await assert.rejects(resolveSession(), /Choose an explicit session/);
+  await assert.rejects(loadSession(), /Choose an explicit session/);
+});
+
+test('explicit paths validate format and identity without scanning global roots', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-source-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const file = path.join(root, `${UUID}.jsonl`);
+  await fs.writeFile(file, JSON.stringify({ type: 'session.start', data: { sessionId: UUID } }));
+  await assert.rejects(resolveSession(file), /Not a verified version 3 Local chat journal/);
+  await fs.writeFile(file, JSON.stringify({ kind: 0, v: { version: 3, sessionId: RENAMED_UUID, requests: [] } }));
+  await assert.rejects(resolveSession(file), /identity does not match/);
+  await fs.writeFile(file, JSON.stringify({ kind: 0, v: { version: 3, sessionId: UUID, requests: [] } }));
+  assert.equal((await resolveSession(file)).sessionPath, file);
+  await assert.rejects(resolveSession(file, { current: true }), /not both/);
+});
+
+test('duplicate IDs require a path and explicit current selects the evidenced workspace only', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-duplicate-'));
+  const original = process.env.VSCODE_TARGET_SESSION_LOG;
+  context.after(async () => {
+    if (original === undefined)
+      delete process.env.VSCODE_TARGET_SESSION_LOG;
+    else
+      process.env.VSCODE_TARGET_SESSION_LOG = original;
+    await fs.rm(root, { recursive: true, force: true });
+  });
+  const storage = path.join(root, 'User', 'workspaceStorage');
+  for (const workspace of ['one', 'two']) {
+    const directory = path.join(storage, workspace, 'chatSessions');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, `${UUID}.jsonl`), JSON.stringify({
+      kind: 0, v: { version: 3, sessionId: UUID, requests: [] },
+    }));
+  }
+  await assert.rejects(resolveSession(UUID, { userDataRoot: root }), /multiple workspaces/);
+  await assert.rejects(resolveSession(UUID.slice(0, 8), { userDataRoot: root }), /multiple workspaces/);
+  process.env.VSCODE_TARGET_SESSION_LOG = path.join(storage, 'two', 'GitHub.copilot-chat', 'debug-logs', UUID);
+  const current = await resolveSession(undefined, { current: true, userDataRoot: root });
+  assert.equal(current.hashRoot, path.join(storage, 'two'));
+  const other = path.join(root, 'other-root');
+  await fs.mkdir(other);
+  await assert.rejects(resolveSession(undefined, { current: true, userDataRoot: other }), /conflicts/);
+});
+
+test('short UUID prefixes must uniquely identify a Local journal', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-prefix-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const ids = [
+    'abcdef12-0000-4000-8000-000000000001',
+    'abcdef12-1000-4000-8000-000000000002',
+    'fedcba98-0000-4000-8000-000000000003',
+  ];
+  for (const [index, id] of ids.entries()) {
+    const directory = path.join(root, 'User', 'workspaceStorage', `workspace-${index}`, 'chatSessions');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, `${id}.jsonl`), JSON.stringify({
+      kind: 0, v: { version: 3, sessionId: id, requests: [] },
+    }));
+  }
+
+  await assert.rejects(resolveSession('abcdef12', { userDataRoot: root }), /ambiguous.*longer unique prefix/s);
+  const longer = await resolveSession('abcdef120', { userDataRoot: root });
+  assert.equal(longer.sessionId, ids[0]);
+  const unique = await resolveSession('fedcba98', { userDataRoot: root });
+  assert.equal(unique.sessionId, ids[2]);
 });

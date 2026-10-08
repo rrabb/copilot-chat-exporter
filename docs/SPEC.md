@@ -6,6 +6,24 @@ Copilot chat session into a single human-readable Markdown archive with visual a
 This document is the contract. When you change the script, keep this spec and the on-disk output
 in agreement, then follow the Verification section before considering the change done.
 
+## Approved upgrade: staged implementation
+
+The approved upgrade is tracked in [the work log](../work-log.md). Root-scoped journal/index inventory now supplies CLI listing, with explicit source/current selection and no newest fallback in the library or CLI. Offline HTML listing is implemented and tested; SDK backing identity and child-scope verification are implemented, while SDK Markdown rendering and full fidelity/artifact policy integration remain pending. Existing renderer behavior described below remains the baseline until each surface is wired and tested. Do not claim that fidelity flags or SDK export are available merely because backing identities can be verified.
+
+| Contract | Approved behavior |
+| --- | --- |
+| Sources and scope | Local journal and SDK event formats have independent versions/identities. Keep workspace occurrences separate and verify SDK main/child bindings with persisted evidence. Unknown/unreadable/index-only rows remain explicit, not empty. |
+| Substantive text | In both modes, retain full recorded prompts, answers and readable reasoning. Tool text up to 10 lines is inline, 11-100 lines collapsed, over 100 lines previewed by 10 lines and linked to complete companion text. A terminating CR/LF/CRLF ends a line without creating another empty line. |
+| Extra fields | `--high-fidelity` preserves extra fields as collapsed JSON; over 100 formatted lines uses a 10-line preview and complete JSON companion. Default mode reports omissions with a linked introductory notice and end paragraph/table. |
+| Redaction | Default redaction covers every textual artifact with category/count/location accounting. `--no-redact` disables it everywhere. Diagnostics never reveal secret values; regex detection does not guarantee comprehensive protection. |
+| Images and opaque data | Preserve all available original images in both modes without an exporter size cap or resizing; text redaction does not sanitize images. Other binary/encrypted/opaque payloads are metadata-only with exclusion reasons. Do not fetch remote originals or infer decrypted reasoning. |
+| Planned artifacts | `PlannedArchive` contains Markdown, pending `CompanionArtifact` byte payloads, diagnostics and policy. Render-only callers receive a plan, not proof of persistence. A later writer must ensure relative links target saved files before reporting success. |
+| Companions and collisions | One timestamped sibling assets folder per archive, created only if needed. Existing explicit Markdown/HTML files require `--overwrite`; assets folders never overwrite. Keep archive and assets together. |
+| Staged writer | Save/verify companion bytes and staged Markdown before publication. Exclusive ordinary publication must not overwrite a concurrent destination. `--overwrite` uses replacement without first deleting the old Markdown. If replacement fails, keep the old archive unchanged and clean only attempt-owned artifacts. Filesystem restrictions fail explicitly, with no weaker fallback. This is not an atomic multi-file/power-loss guarantee. |
+| Root resolution API | Explicit valid root wins without prompting; single discovered root auto-selects; multiple roots require a host chooser or explicit error with candidates. Missing candidates skip; other read errors surface. |
+| Agent Host identity | Exact central `session_chats.provider_data` takes precedence; otherwise exact chat/default legacy metadata. Default-only provider-ID fallback requires an existing local session database and matching SDK header, with console warning and retained Markdown notice data. Never fall back from corrupt metadata or guess a peer. |
+| SDK scope | One version 1 header, matching backing ID, stable strict UTF-8 read and preserved raw records. Child tool/agent mapping must be unique. Ambiguous children remain unresolved with `🟠 ❓` UI indicators; an independently verified main remains usable with warnings. Missing/cyclic parent evidence omits the relationship, never invents one. |
+
 - Script: `tools/copilot-chat-exporter/src/cli.ts`
 - npm entry: `npm run ai:export:chat`
 - Run prompt (invoke the exporter): `.github/prompts/export-chat.prompt.md`
@@ -395,12 +413,17 @@ source - it must stay verbatim and copyable.
 
 ## 7. CLI contract
 
-- `npm run ai:export:chat` - export the current session (auto-detected via
-  `VSCODE_TARGET_SESSION_LOG`, else the most recently modified session).
-- `npm run ai:export:chat -- <outputPath.md>` - current session to a chosen path.
+HTML source details expand in a dedicated row spanning all seven table columns, not inside the status cell. Responsive cards separate conversation identity, workspace/project, and files/locations; each grouped occurrence retains its own cards and source issues. Session/detail row pairs move together when sorted and hide together when filtered. Buttons expose expanded state and panel identity; closing returns focus to the originating button. Main-table filtering does not alter ignored-table panels. Without JavaScript, native full-width `details` disclosures remain available.
+
+HTML listing dates use the generator's local timezone in `YYMMDD_HH:MM` format, with smaller Arial Narrow dates/selectors and bold prompt counts. Date sorting uses numeric timestamps rather than displayed two-digit years. Row details include full session and occurrence IDs, backing IDs and JSONL links when verified, workspace storage hashes and path links, index provenance, diagnostics, and folder/workspace identities read from `workspace.json`. Workspace/project display labels are explicitly URI basenames, not reconstructed custom names; multi-root folder names remain unknown. Links to expected metadata/index locations do not imply file existence. A collapsed bottom section retains every ignored grouped session even without `--show-ignored` and regardless of `--last25`; `--show-ignored` additionally includes ignored rows in the main table and console. The main-table search/filter controls do not hide rows in that bottom section.
+
+- `npm run ai:export:chat` - list occurrences from one resolved VS Code user-data root; never implicitly export.
+- `npm run ai:export:chat -- --current [outputPath.md]` - explicitly request the Local session identified by `VSCODE_TARGET_SESSION_LOG`; validate its workspace/root/journal identity, with no fallback.
+- `npm run ai:export:chat -- --user-data-root <path>` - explicitly select the root for listing or UUID/current selection. Multiple discovered roots require interactive selection or fail non-interactively with candidates.
 - `npm run ai:export:chat -- <sessionId> [outputPath]` - a specific session by id.
 - `npm run ai:export:chat -- <chatSessions/...jsonl> [outputPath]` - a specific journal file.
-- `npm run ai:export:chat -- --list` - list sessions (id, date, title).
+- `npm run ai:export:chat -- <source> [outputPath] --overwrite` - deliberately replace an existing Markdown archive after staged content is saved and verified. Without this flag, existing destinations are refused. Golden scratch output has a dedicated internal overwrite allowance so regression checking remains repeatable.
+- `npm run ai:export:chat -- --list` - show grouped conversations with creation/activity dates, scoped prompt counts, chat type, selector ID/prefix, backing status and an `X of Y` summary. `/fix`, confirmed-empty, ambiguous, and exact `New Chat` + unknown-created-date + unknown-prompt-count entries are hidden by default; `--show-ignored` restores them and `--last25` limits output to the newest 25. Other unresolved/index-only entries remain visible. UUIDs are shown as copyable unique hexadecimal prefixes (at least 8 characters, no ellipsis); listing-only `--full-ids` prints complete IDs. A prefix selects a Local journal only when exactly one journal matches in the selected root; duplicate IDs across workspaces require an exact `.jsonl` path. `verified` means backing identity was checked, `unresolved` means no backing was verified, and `ambiguous` means identity/scope could not be safely resolved. A verified SDK backing does not by itself imply Markdown export support. By default, listing also creates a self-contained offline HTML report in the invoking directory; `--no-html` disables it, `--html-output <path>` chooses a destination, and `--overwrite` is required to replace an existing report. It is never opened automatically and stays readable without JavaScript. SDK Markdown rendering and complete sister-filter parity remain pending.
 - `npm run ai:export:chat -- --verify <sessionId|chatSessions/...jsonl>` - run source-side machine verification (Layers A + B) without writing an export file.
 - `npm run ai:export:chat -- --verify <sessionId> <outputFile>` - additionally run Layer C against an existing rendered file.
 - `npm run ai:export:chat -- --audit ...` - alias for `--verify`.

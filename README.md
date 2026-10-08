@@ -62,7 +62,8 @@ should not have.
 
 ```
 node dist/cli.js <sessionId> out.md      # direct
-node dist/cli.js                         # current session, default output
+node dist/cli.js                         # list sessions; never implicitly export
+node dist/cli.js --current               # explicit current Local session
 copilot-chat-export <sessionId> out.md   # via the bin name, once installed or linked
 ```
 
@@ -83,16 +84,56 @@ The command creates or replaces `.github/skills/export-chat/SKILL.md` and
 
 ## Usage
 
+### Incremental discovery and export-policy APIs
+
+The library now exposes `resolveUserDataRoot`, `discoverUserDataRoots` and `inventorySessions`. Root resolution accepts an explicit `userDataRoot`, auto-selects a single discovered root, and throws `UserDataRootError` with candidates when selection is ambiguous. An optional injected `choose` callback supports a host-owned chooser; the library itself never prompts.
+
+`inventorySessions(userDataRoot, { copilotHome? })` returns workspace journal/index occurrences plus diagnostics and supplies both listing views. It retains index-only, provider and unknown entries even without an exportable backing; unreadable is not empty. It verifies Agent Host and Copilot CLI SDK backings and expands exact child scopes. The console groups only verified identities (and Local journals with matching session IDs and byte digests), reports prompt counts and evidence-based creation/activity dates, and keeps each displayed record on one line. It hides `/fix`, confirmed-empty and ambiguous entries by default; `--show-ignored` restores them and `--last25` limits output to the newest 25 after grouping/filtering. Main prompt counts exclude delegated prompts; a subagent row counts one verified delegation plus any separately recorded child-scope human `user.message` records. Workspace discovery currently covers `User/workspaceStorage` under the selected root; it does not claim profile/remote/cloud discovery completeness. The legacy `listSessions` API returns journal-only entries from one resolved root; use `inventorySessions` for the expanded inventory.
+
+SDK files are read from explicit library `copilotHome`, otherwise `COPILOT_HOME`, otherwise `~/.copilot`. No provider is started and no storage is repaired. Agent Host central chat-catalog records take precedence over compatibility metadata; SDK IDs must match a single version 1 `session.start` header. Default-chat provider-ID fallback is allowed only when its local session database exists and the header matches, with a console warning and retained `identityWarnings` for the future Markdown renderer. This fallback is never used for peer chats or corrupt recorded mappings. `🟠 ❓` marks ambiguous scopes: an independently verified main chat stays available while affected children remain unresolved. Nested parent links require unique persisted tool-start evidence.
+
+`createProviderSourceResolver({ copilotHome })` resolves an exact provider index key into `SdkEventSource` plus child scopes and evidence. Its per-inventory cache retains only scope/integrity metadata and rejects size/mtime changes; use a fresh resolver for a later inventory. `readSdkEvents(path, sdkSessionId)` retains complete event fields plus original `recordedLine` JSON text, including values JavaScript numbers cannot represent exactly. `eventsInScope(events, scope)` selects the verified main/child scope without moving or clipping records. These APIs verify backing identity, not semantic fidelity or complete Markdown support; later loaders must revalidate identity and SHA-256.
+
+`planToolText` and `planMetadataText` implement the approved presentation thresholds without writing files or changing the existing renderer. Tool text up to 10 recorded lines stays inline, 11-100 lines collapses, and over 100 lines provides a 10-line preview and complete companion text. A terminating newline does not add an extra line. Extra metadata always collapses. `PlannedArchive` separates pending companion bytes and diagnostics from Markdown; callers must not treat a planned link as a persisted file.
+
+These additive contracts support the staged implementation; fidelity flags and companion-producing renderers are not yet wired into the CLI. Existing Local Markdown exports now use the staged writer for safe publication. See [work-log.md](work-log.md) for current phase and validation.
+
+`writeArchive({ outputPath, generatedAt, overwrite, plan })` persists a planned archive. Its pure `plan(assetsDirectory)` callback may run again after a folder-name collision; construct companion paths and relative Markdown links using that assigned name. It creates a timestamped sibling folder only when companions exist, saves/verifies their bytes, then stages/verifies/publishes Markdown. Ordinary publication refuses an existing file; explicit overwrite replaces it only after staging succeeds. Previous companions are never deleted. On failure it cleans only files created by that attempt and reports cleanup failures. Filesystems without hard-link support fail ordinary publication explicitly; there is no unsafe overwrite fallback. This is not a power-loss-proof multi-file transaction.
+
+`redactContent(text, policy, location)` shares the legacy best-effort credential rules and returns replacement category/count/location diagnostics without matched values. Apply it before preview planning so inline text and complete companions use identical redaction. It does not sanitize image content. The writer preserves supplied bytes; it does not infer redaction from `archive.policy` or independently rewrite content. Consistent policy must be applied by the archive planner; the complete fidelity renderer and `--no-redact` CLI are still pending.
+
 ### Running it
 
-List known sessions, then export one by id. Omit the id to export the current session
-(`VSCODE_TARGET_SESSION_LOG`). During development, run the TypeScript source directly with
+List known sessions, then export one by id or exact journal path. No arguments means listing, even when `VSCODE_TARGET_SESSION_LOG` is set. Use `--current` to request a verified current Local session explicitly; missing/conflicting identity never falls back to newest. An output path alone is no longer an export selector. During development, run the TypeScript source directly with
 `node src/cli.ts`; after `npm run build` the same arguments work against `dist/cli.js`.
 
 ```
 node src/cli.ts --list
-node src/cli.ts <sessionId> docs/temp/name.md
+node src/cli.ts --list --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --last25 --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --show-ignored --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --full-ids --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --no-html --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --html-output docs/temp/chat-list.html --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --current docs/temp/current.md --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts <sessionId-or-unique-prefix> docs/temp/name.md
 ```
+
+Listing writes a self-contained offline HTML report in the invoking directory by default and prints its path. Use `--no-html` to suppress it or `--html-output <path>` to choose a destination. Existing reports are preserved unless `--overwrite` is explicit; no browser opens automatically. The report includes searchable, sortable and filterable rows, inventory charts, copyable selectors, row-level source explanations, and a linked collapsible guide to storage paths, unknown values, statuses, ambiguities and coverage limits. Its table remains readable without JavaScript.
+
+For development and review in this repository, put generated reports, runtime captures, test output and validation logs in the Git-ignored `temp-tool-output/` directory. Pass `--html-output temp-tool-output/<report-name>.html` for listing reports and use timestamped log names to preserve earlier runs. This is a development convention, not a change to the CLI default. Automated test fixture sandboxes still use their existing temporary locations and cleanup.
+
+HTML dates use the generator's local time in `YYMMDD_HH:MM` format, with smaller Arial Narrow styling for dates and selectors and bold prompt counts. Each “Why / source” section includes full IDs, workspace storage hash, recorded folder/workspace URI, URI-basename labels, provenance, diagnostics and local path/JSONL links. Missing metadata stays unknown; multi-root project folders are not inferred. Links do not guarantee that a file still exists, and browsers may restrict opening them. All ignored sessions are retained in a separate collapsed section at the bottom, independently of `--last25` and the main-table filters. `--show-ignored` also includes them in the main table and console.
+
+“Why / source” opens a full-width panel directly below its session, with separate conversation identity, workspace/project, and files/locations cards. Panels remain attached to their session while sorting and hide with their session while filtering. Each has a close control that returns keyboard focus to its toggle. Without JavaScript, native disclosure controls below each row keep all details accessible.
+
+The listing summary says how many grouped conversations are shown out of the eligible total; ignored entries and duplicate source occurrences are counted separately. Unknown creation dates remain `unknown` rather than using filesystem modification times.
+
+The listing has a `TYPE` column (`local`, `agent`, `sub-agent`, or `CLI agent`) and an `ID/PREFIX` column. UUIDs display as the shortest unique hexadecimal prefix of at least eight characters, without an ellipsis, so the value can be copied directly as the export selector. `--full-ids` displays complete UUIDs; the ID column expands as needed. Prefix lookup succeeds only when exactly one Local journal matches in the selected user-data root. An ambiguous prefix reports the matching IDs; the same UUID in multiple workspaces is marked `path required` and needs an exact `.jsonl` path, even with `--full-ids`.
+
+`verified` means the corresponding journal/event backing was found and its identity checked; it does not necessarily mean that Markdown export is implemented for that provider. `unresolved` means the listing has an index/reference but no verified conversation backing. `ambiguous` / `🟠 ❓` means the inventory could not safely identify one backing or child scope. Unknown creation dates or prompt counts mean no trustworthy source value was available, not zero. To reduce placeholders, `New Chat` rows with both creation date and prompt count unknown are hidden by default and restored by `--show-ignored`.
+
+Multiple discovered roots prompt for a numbered selection only in an interactive terminal. Non-interactive use fails with candidate paths and `--user-data-root` remediation; it never picks the first root. Explicit journal paths validate Local format/identity without scanning unrelated roots. Current Agent Host/SDK selection and SDK Markdown export remain pending; listing distinguishes verified backing identity from unresolved sources and does not export guessed conversations.
 > ```
 > node ./dist/cli.js --list   
 > node ./src/cli.ts ef6eb63d-269b-4166-aac8-34df2a71ae49 docs/temp/Migration-vite-svelte5.md
@@ -101,7 +142,7 @@ node src/cli.ts <sessionId> docs/temp/name.md
 
 
 
-Every run re-reads the file it just wrote and self-checks it. A clean run ends with the session
+Every Markdown export re-reads the file it just wrote and self-checks it. A clean export ends with the session
 summary and `Layer C self-check: all 9 render checks pass`:
 
 ```
@@ -146,7 +187,7 @@ These are this package's own `package.json` scripts. Run them from the package d
 
 | Script | Runs | Purpose |
 |---|---|---|
-| `npm run export -- <sessionId> [out]` | `node src/cli.ts` | export a session; the current session when no id is given |
+| `npm run export -- <sessionId> [out]` | `node src/cli.ts` | export an explicit session; no arguments lists; `--current [out]` requests current Local |
 | `npm run list` | `node src/cli.ts --list` | list known sessions (id, date, title) |
 | `npm run golden` / `golden:update` | `--golden check` / `update` | the small in-repo recorded check |
 | `npm run snapshot -- update\|check <id>` | `node src/cli.ts --snapshot` | record or compare one of your own sessions |
@@ -166,9 +207,9 @@ npm run export -- --workspace-root <path> <sessionId>
 npm run export -- --out-dir <path> <sessionId>
 ```
 
-An explicit output path overwrites. With no path, the file is named
+An existing archive destination is refused unless `--overwrite` is supplied. With no path, the file is named
 `YYMMDD_slug_<idPrefix>.md` - dated by the session's first turn, not by the export - so
-re-exporting a growing conversation refreshes the same archive instead of creating copies.
+re-exporting a growing conversation targets the same archive; pass `--overwrite` to refresh it deliberately.
 
 Markdown is the only output format. There is no `--format` flag: see `sessionToJson` below if you
 want the parsed model as data.
@@ -186,6 +227,8 @@ const loaded = await loadSession({ source: sessionId });
 const markdown = renderSession(loaded, { outputPath, gitStatus, generatedAt });
 const data = sessionToJson(loaded);
 ```
+
+`loadSession()` and `resolveSession()` no longer select an implicit current/newest session. Pass `source`, or explicitly pass `{ current: true, userDataRoot }`. UUID-based library calls and `listSessions({ userDataRoot })` resolve one root without prompting; ambiguity is an error. An exact Local journal path can be read independently of discovered installations.
 
 Nothing under `src/` prints or exits except `cli.ts`, so every step above is callable in-process.
 `outputPath`, `gitStatus` and `generatedAt` are passed in rather than read, which is what makes
