@@ -2,7 +2,9 @@ import type { SessionOccurrence } from '../src/session/sources.ts';
 import type { ListingEvidence } from '../src/session/listing-evidence-types.ts';
 import { detailedListingStyles } from '../src/session/detailed-listing-styles.ts';
 
-export const detailedStylesForTest = () => detailedListingStyles;
+/** Normalizes whitespace so assertions survive an editor/Prettier reformat of the stylesheet. */
+export const compactCss = (css: string) => css.replace(/\s+/gu, ' ').replace(/\s*([{}:;,>])\s*/gu, '$1').replaceAll(';}', '}');
+export const detailedStylesForTest = () => compactCss(detailedListingStyles);
 
 export function detailedOccurrence (id: string, overrides: Partial<SessionOccurrence> = {}): SessionOccurrence {
   const provenance = { userDataRoot: 'C:\\Code', workspaceStoragePath: `C:\\Code\\User\\workspaceStorage\\${id}` };

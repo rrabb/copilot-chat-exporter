@@ -1,3 +1,5 @@
+import type { StorageArtifact } from './listing-storage.ts';
+
 export interface ListingTitleEvidence { source: string; value: string }
 export interface ListingDateEvidence { source: string; timestamp: number; recordedValue: string }
 export interface ListingFileChange {
@@ -36,6 +38,7 @@ export interface ListingArtifactLocation {
   files: number | null;
 }
 export interface ListingEvidence {
+  storage?: StorageArtifact[];
   state: 'read' | 'unavailable' | 'changed';
   titles: ListingTitleEvidence[];
   dates: ListingDateEvidence[];

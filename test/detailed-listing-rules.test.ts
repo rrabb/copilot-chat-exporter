@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { formatDetailedSessionListingHtml } from '../src/session/detailed-listing.ts';
-import { detailedEvidence, detailedOccurrence, detailedStylesForTest } from './detailed-listing-fixture.ts';
+import { compactCss, detailedEvidence, detailedOccurrence, detailedStylesForTest } from './detailed-listing-fixture.ts';
 
 const render = (rows = [detailedOccurrence('one')], data = detailedEvidence(), options = {}) =>
   formatDetailedSessionListingHtml(rows, new Map(rows.map((row) => [row.occurrenceId, data])), options, '2026-10-08T19:00:00Z');
@@ -28,27 +28,85 @@ test('detail values use a single question mark with an explanatory title instead
   assert.ok(html.includes('Question marks mean unknown, never zero'));
 });
 
+test('the table of contents uses a narrow title font and a bold, orange, monospaced project name', () => {
+  const css = compactCss(render());
+  assert.ok(css.includes('.index-list .toc-main>a{min-width:0;font:0.9375rem "Arial Narrow",Arial,sans-serif}'));
+  assert.ok(css.includes('.workspace-name{color:var(--orange);font-family:monospace;font-weight:700}'));
+  assert.ok(css.includes('.toc-number{font-weight:700}'));
+});
+
 test('an unresolved card marks unknown payload once and the missing model timeline with three marks', () => {
   const html = render([detailedOccurrence('one', { backing: { status: 'unresolved', reason: 'x' } })],
     detailedEvidence({ state: 'unavailable', turns: [], bytes: null, byteScope: 'unknown', models: [] }));
-  assert.match(html, /Scoped payload: <strong><span class="unknown"[^>]*>\?<\/span><\/strong><\/p>/u);
+  assert.match(html, /Scoped payload: <span class="unknown" title="Size not measured">\?<\/span>\. Scope not measured\./u);
   assert.match(html, /Model-switch timeline:<\/strong> <span class="unknown"[^>]*>\?\?\?<\/span>/u);
 });
 
-test('the table of contents abbreviates references, uses singular forms and a narrow title font', () => {
-  const a = detailedOccurrence('a');
-  const reference = { ...a, occurrenceId: 'a2', provenance: { ...a.provenance, workspaceStoragePath: 'C:\\other' } };
-  const html = render([a, reference]);
-  assert.ok(html.includes('· 2 refs</span>'));
-  assert.ok(!html.includes('references</span>'));
-  assert.ok(html.includes('.index-list li>a{min-width:0;font:0.9375rem "Arial Narrow",Arial,sans-serif}'));
+test('the table of contents has a project/date/chip second line and bold numbers', () => {
+  const a = detailedOccurrence('a', { createdTimestamp: 1700000000000, activityTimestamp: 1700003600000 });
+  const reference = { ...a, occurrenceId: 'a2', provenance: { ...a.provenance, workspaceStoragePath: 'C:\\other',
+    workspaceIdentity: { kind: 'workspace' as const, uri: 'file:///c%3A/w/team.code-workspace' } } };
+  const first = { ...a, provenance: { ...a.provenance, workspaceIdentity: { kind: 'folder' as const, uri: 'file:///c%3A/p/cpe-exb' } } };
+  const data = detailedEvidence();
+  data.files = [{ file: 'a.ts', operation: 'modified', added: 2, removed: 1, estimated: false, source: 'tool' }];
+  const html = render([first, reference], data);
+  const toc = html.match(/<ol class="index-list">([\s\S]*?)<\/ol>/u)![1];
+  assert.ok(toc.includes('<strong class="toc-number">#1</strong>'));
+  assert.match(toc, /<span class="toc-main">[\s\S]*?<span class="index-meta"><strong>1 turn<\/strong><\/span><\/span>/u);
+  assert.match(toc, /<span class="toc-sub"><span class="workspace-name" title="cpe-exb, team.code-workspace">📁 cpe-exb \+1<\/span>/u);
+  assert.match(toc, /title="Last updated \(MMDD-HH:mm, generator-local time\)">🔄 \d{4}-\d{2}:\d{2}<\/span>/u);
+  assert.ok(toc.includes('>2 w/s refs</span>'));
+  assert.ok(toc.includes('✏️ 1 file'));
+  assert.ok(!toc.includes('references') && !/· \d+ refs?/u.test(toc));
+});
+
+test('the table of contents marks an unknown project and date with question marks and omits the refs chip for one reference', () => {
+  const html = render([detailedOccurrence('x', { activityTimestamp: null })], detailedEvidence({ dates: [] }));
+  const toc = html.match(/<ol class="index-list">([\s\S]*?)<\/ol>/u)![1];
+  assert.match(toc, /📁 <span class="unknown"[^>]*>\?\?<\/span>/u);
+  assert.match(toc, /🔄 <span class="unknown"[^>]*>\?\?<\/span>/u);
+  assert.ok(!toc.includes('w/s refs'));
+});
+
+test('project filter lists projects with counts plus multiple and unknown, and the chart counts inclusively', () => {
+  const at = (id: string, uri: string | undefined, hash = id) => detailedOccurrence(id, {
+    provenance: { userDataRoot: 'C:\\Code', workspaceStoragePath: `C:\\Code\\User\\workspaceStorage\\${hash}`,
+      ...(uri ? { workspaceIdentity: { kind: 'folder' as const, uri } } : {}) },
+  });
+  const solo = at('11111111-1111-4111-8111-111111111111', 'file:///c%3A/p/alpha');
+  const shared = at('22222222-2222-4222-8222-222222222222', 'file:///c%3A/p/alpha', 'h1');
+  const sharedTwo = { ...at('22222222-2222-4222-8222-222222222222', 'file:///c%3A/p/beta', 'h2'), occurrenceId: 'shared-two' };
+  const none = at('33333333-3333-4333-8333-333333333333', undefined);
+  const html = render([solo, shared, sharedTwo, none]);
+  const select = html.match(/<select id="project"[\s\S]*?<\/select>/u)![0];
+  assert.ok(select.includes('<option value="">All projects</option>'));
+  assert.ok(select.includes('<option value="__multi">Multiple projects (1)</option>'));
+  assert.ok(select.includes('<option value="__unknown">No recorded project (1)</option>'));
+  assert.ok(select.includes('<option value="file:///c%3A/p/alpha">alpha (2)</option>'), 'multi-project chat counts under alpha too');
+  assert.ok(select.includes('<option value="file:///c%3A/p/beta">beta (1)</option>'));
+  assert.ok(html.includes('data-projects="[&quot;file:///c%3A/p/alpha&quot;,&quot;file:///c%3A/p/beta&quot;]"'));
+  assert.ok(html.includes('data-projects="[]"'));
+  const chart = html.match(/<section class="panel" id="project-chart">[\s\S]*?<\/section>/u)![0];
+  assert.ok(chart.includes('data-project-pick="__multi"') && chart.includes('data-project-pick="__unknown"'));
+  assert.ok(chart.includes('data-project-pick="file:///c%3A/p/alpha"'));
+  assert.ok(chart.includes('class="bar-project"') && chart.includes('class="bar-multi"') && chart.includes('class="bar-unknown"'));
+  assert.ok(chart.includes('bars are not additive'));
+});
+
+test('equal folder names at different locations are disambiguated by their parent folder', () => {
+  const at = (id: string, uri: string) => detailedOccurrence(id, {
+    provenance: { userDataRoot: 'C:\\Code', workspaceStoragePath: `C:\\Code\\User\\workspaceStorage\\${id}`,
+      workspaceIdentity: { kind: 'folder' as const, uri } },
+  });
+  const html = render([at('44444444-4444-4444-8444-444444444444', 'file:///c%3A/one/src'), at('55555555-5555-4555-8555-555555555555', 'file:///c%3A/two/src')]);
+  assert.ok(html.includes('>src (one) (1)</option>') && html.includes('>src (two) (1)</option>'));
 });
 
 test('font sizes are rem-based on a single 125% root, with no pixel font sizes left', () => {
   const html = render();
-  assert.ok(html.includes('html{font-size:125%}'));
+  assert.ok(compactCss(html).includes('html{font-size:125%}'));
   assert.equal(/font(?:-size)?:[^;}]*\d+px/u.test(detailedStylesForTest()), false);
-  assert.ok(html.includes('body{margin:0;background:var(--bg);color:var(--ink);font:0.875rem Arial,sans-serif'));
+  assert.ok(compactCss(html).includes('font:0.875rem Arial,sans-serif'));
 });
 
 test('buttons and filter chips have themed backgrounds in light and dark schemes', () => {
@@ -80,13 +138,14 @@ test('the last-updated date is omitted when it matches created to the minute', (
 
 test('sections with nothing or one line to show become field lines with the same icon and label', () => {
   const html = card(render());
-  assert.ok(html.includes('<div class="field-line" title="No additional flags and no enrichment/source diagnostics."><strong>🔎 Audit flags / diagnostics:</strong> none</div>'));
-  assert.ok(html.includes('<strong>🌳 Family / forks / copies:</strong> none recorded</div>'));
+  assert.ok(html.includes('<strong>🩺 Health checks · 🔎 Audit flags / diagnostics:</strong> none detected in the checks performed.</div>'));
+  assert.ok(html.includes('<strong>🌳 Family / relationships:</strong> none recorded</div>'));
   assert.ok(!html.includes('<summary>🔎 Audit flags / diagnostics'));
-  assert.ok(!html.includes('<summary>🌳 Family / forks / copies'));
+  assert.ok(!html.includes('<summary>🌳 Family / relationships'));
   assert.ok(html.includes('<strong>📋 Export selector / command:</strong> <code class="selector">'));
   assert.ok(!html.includes('<summary>📋 Export selector / command'));
-  assert.equal((html.match(/data-copy=/gu) ?? []).length, 2, 'selector and command copy buttons stay on the single line');
+  const exportLine = html.match(/<strong>📋 Export selector \/ command:[\s\S]*?<\/div>/u)![0];
+  assert.equal((exportLine.match(/data-copy=/gu) ?? []).length, 2, 'selector and command copy buttons stay on the single line');
   // One recorded model state means there was no switch: one line holding the link.
   assert.match(html, /<strong>🤖 Model-switch timeline:<\/strong> <a href="#session-1-turn-1">Turn 1: answer-model · Auto · effort high<\/a>/u);
   assert.ok(!html.includes('<summary>🤖 Model-switch timeline'));
@@ -96,7 +155,7 @@ test('sections with several lines stay expandable', () => {
   const data = detailedEvidence({ flags: ['pending-work'], diagnostics: [{ path: 'C:\\x', description: 'Problem' }] });
   data.turns.push({ ...data.turns[0]!, id: 'two', models: ['other-model'], selectedModel: 'other-model', auto: false });
   const html = render([detailedOccurrence('one')], data);
-  assert.ok(html.includes('<summary>🔎 Audit flags / diagnostics (2)</summary>'), 'flags and diagnostics are both counted');
+  assert.ok(html.includes('class="health-cards"') && html.includes('Audit note: pending-work') && html.includes('C:\\x: Problem'), 'health cards consolidate flags and diagnostics above evidence');
   assert.ok(html.includes('<summary>🤖 Model-switch timeline</summary>'));
 });
 
@@ -133,16 +192,19 @@ test('derived SDK overviews keep one full-text disclosure with an explanation', 
   assert.ok(html.includes('<details class="full-prompt"'));
 });
 
-test('card links use the top icon and artifact locations are collapsed', () => {
+test('card links use the top icon and the unified artifact evidence is collapsed', () => {
   const data = detailedEvidence({
     artifactLocations: [{ kind: 'journal', path: 'C:\\j.jsonl', form: 'file', state: 'present', bytes: 10, files: 1 }],
     auditedBytes: 10,
+    storage: [{ kind: 'journal', path: 'C:\\j.jsonl', state: 'present', bytes: 10, files: 1, modified: null, parts: [], measurement: 'Physical file length.' }],
   });
   const html = render([detailedOccurrence('one')], data);
   assert.ok(html.includes('🔝 TOC</a>'));
   assert.ok(!html.includes('📚 TOC</a>'));
   assert.ok(html.includes('📚 Session TOC</a>'), 'page navigation keeps its own icon');
-  assert.ok(html.includes('<summary>Artifact locations (1 present of 1 checked)</summary>'));
+  assert.ok(html.includes('<details><summary>🧰 Unified evidence table</summary>'));
+  assert.ok(html.includes('class="source-path">C:\\j.jsonl</span>'));
+  assert.ok(!html.includes('<summary>Artifact locations'), 'no duplicate artifact inventory');
   assert.ok(!html.includes('<details open'));
 });
 
@@ -154,4 +216,25 @@ test('a single prompt timestamp is a field line while several stay in a disclosu
     { source: 'request.2.timestamp', timestamp: 1700000100000, recordedValue: 'b' },
   ] });
   assert.ok(render([detailedOccurrence('one')], several).includes('<summary>Prompt / request timestamps (2)</summary>'));
+});
+
+test('SDK event timestamps are collapsed with prompt dates and not repeated in technical identity', () => {
+  const data = detailedEvidence({ dates: [
+    { source: 'events.line:1.timestamp', timestamp: 1700000000000, recordedValue: '2023-11-14T22:13:20Z' },
+    { source: 'events.line:2.timestamp', timestamp: 1700000001000, recordedValue: '2023-11-14T22:13:21Z' },
+    { source: 'index.lastMessageDate', timestamp: 1700000001000, recordedValue: '1700000001000' },
+  ] });
+  const html = render([detailedOccurrence('one')], data);
+  assert.ok(html.includes('<summary>Event / prompt timestamps (2)</summary>'));
+  assert.ok(!html.includes('Date: events.line:'), 'event-by-event dates have one location, not another identity-table copy');
+  assert.ok(html.includes('Date: index.lastMessageDate'), 'per-reference index date evidence is preserved');
+});
+
+test('folder names that still collide after adding the parent get a longer path and an ordinal', () => {
+  const at = (id: string, uri: string) => detailedOccurrence(id, {
+    provenance: { userDataRoot: 'C:\\Code', workspaceStoragePath: `C:\\Code\\User\\workspaceStorage\\${id}`,
+      workspaceIdentity: { kind: 'folder' as const, uri } },
+  });
+  const html = render([at('66666666-6666-4666-8666-666666666666', 'file:///c%3A/a/same/src'), at('77777777-7777-4777-8777-777777777777', 'file:///d%3A/b/same/src')]);
+  assert.ok(html.includes('>src (a/same) #1 (1)</option>') && html.includes('>src (b/same) #2 (1)</option>'));
 });

@@ -5,7 +5,7 @@ export const detailedListingController = String.raw`
   const cards = [...document.querySelectorAll('.session-card[data-main="true"]')];
   const occurrences = [...document.querySelectorAll('#occurrence-table tbody tr[data-search]')];
   const input = id => document.getElementById(id);
-  const search = input('search'), type = input('type'), status = input('status'), model = input('model');
+  const search = input('search'), type = input('type'), status = input('status'), model = input('model'), project = input('project');
   const quick = [...document.querySelectorAll('[data-chip]')];
   const pins = new Map();
   let view = 'grouped', direction = -1;
@@ -25,6 +25,10 @@ export const detailedListingController = String.raw`
     if(status.value && row.dataset.status!==status.value) return false;
     const models = JSON.parse(row.dataset.models || '[]');
     if(model.value && (model.value === '?' ? models.length>0 : !models.includes(model.value))) return false;
+    if(project && project.value) {
+      const projects = JSON.parse(row.dataset.projects || '[]');
+      if(project.value === '__multi' ? projects.length<2 : project.value === '__unknown' ? projects.length>0 : !projects.includes(project.value)) return false;
+    }
     const flags = (row.dataset.chips || '').split(' ');
     if(!quick.filter(button=>button.getAttribute('aria-pressed')==='true').every(button=>flags.includes(button.dataset.chip))) return false;
     if(!numeric(row,'prompts','prompts-min','prompts-max','prompts-known')) return false;
@@ -56,6 +60,13 @@ export const detailedListingController = String.raw`
     button.setAttribute('aria-pressed',button.getAttribute('aria-pressed')==='true'?'false':'true'); apply();
   });
   input('reset').addEventListener('click',reset);
+  for(const button of document.querySelectorAll('[data-project-pick]')) button.addEventListener('click',()=>{
+    if(!project) return;
+    project.value = button.dataset.projectPick;
+    apply();
+    input('search').scrollIntoView({block:'center'});
+    input('action-status').textContent='Filtered to the chosen project. Use Reset filters to clear it.';
+  });
   input('show-all').addEventListener('click',()=>{
     for(const row of [...cards,...occurrences]) row.dataset.limited='false';
     input('action-status').textContent='Newest-25 limit removed for this page; ignored sessions remain in their own section.';apply();

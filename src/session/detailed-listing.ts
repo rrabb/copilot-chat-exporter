@@ -4,7 +4,8 @@ import { redactText } from '../redaction.ts';
 import type { SessionOccurrence } from './sources.ts';
 import { groupOccurrences, localWorkspaceCounts, sessionType, shortIds } from './listing-model.ts';
 import type { ConversationGroup, SessionListingOptions } from './listing-model.ts';
-import { escapeHtml as html, pathLink, sourceDetails, chartRows, storageGuideHtml } from './listing-html.ts';
+import { escapeHtml as html, pathLink, chartRows, storageGuideHtml } from './listing-html.ts';
+import { renderDetailedSource, storageBytes } from './detailed-source.ts';
 import { formatLocalListingDate as date, formatListingTurnDate, previewListingPrompt, listingModelLabel, sdkListingPromptOverview } from './listing-preview.ts';
 import type { ListingEvidence, ListingFileChange } from './listing-evidence-types.ts';
 import { listingRelationships } from './listing-relationships.ts';
@@ -12,7 +13,7 @@ import type { ListingRelationship } from './listing-relationships.ts';
 import { detailedListingStyles } from './detailed-listing-styles.ts';
 import { detailedListingController } from './detailed-listing-controller.ts';
 import { listingFileIdentity } from './listing-edits.ts';
-import { detailedChatType, detailedTypeOf, detailedTitle, detailedTitles, detailedWorkspace, detailedBytes, detailedHeaderId, detailedMetrics } from './detailed-listing-presentation.ts';
+import { detailedChatType, detailedTypeOf, detailedTitle, detailedTitles, detailedWorkspace, detailedProjects, detailedHeaderId, detailedMetrics } from './detailed-listing-presentation.ts';
 import { compactTokenCount, listingUsage } from './listing-usage.ts';
 import type { ListingUsageMetric } from './listing-usage.ts';
 
@@ -25,7 +26,7 @@ const unknownReasons = {
 /** One mark for a minor detail, two for a headline value, three when the whole source is unavailable. */
 const unk = (level: 1 | 2 | 3, reason: string = unknownReasons[level]) => `<span class="unknown" title="${safe(`Unknown: ${reason}`)}" aria-label="unknown">${'?'.repeat(level)}</span>`;
 const known = (value: number | null | undefined, level: 1 | 2 | 3 = 1) => value == null ? unk(level) : value.toLocaleString('en-US');
-const bytes = (value: number | null | undefined, level: 1 | 2 | 3 = 1) => value == null ? unk(level) : detailedBytes(value);
+const bytes = (value: number | null | undefined, level: 1 | 2 | 3 = 1) => value == null ? unk(level) : storageBytes(value);
 const when = (timestamp: number | null | undefined, level: 1 | 2 | 3, reason: string) => date(timestamp) === 'unknown' ? unk(level, reason) : date(timestamp);
 // Symbol glyphs render tiny in Arial Narrow; the glyph class selects a symbol font.
 const withGlyphs = (markup: string) => markup.replace(/↳|⑂\?/gu, (mark) => `<span class="glyph">${mark}</span>`);
@@ -139,7 +140,44 @@ export function formatDetailedSessionListingHtml (
     return detailedTitle(group, titlesByGroup.get(group.key)!, parentTitle === '(untitled)' ? undefined : parentTitle);
   };
   const groupByOccurrence = new Map(groups.flatMap((group) => group.occurrences.map((row) => [row.occurrenceId, group] as const)));
+  const projectsByGroup = new Map(groups.map((group) => [group.key, detailedProjects(group, parentOf(group))]));
+  // Disambiguate equal folder names that point at different URIs by adding the parent folder.
+  const projectLabels = new Map<string, string>();
+  {
+    const byLabel = new Map<string, Set<string>>();
+    for (const list of projectsByGroup.values())
+      for (const project of list)
+        byLabel.set(project.label, (byLabel.get(project.label) ?? new Set()).add(project.key));
+    for (const list of projectsByGroup.values()) {
+      for (const project of list) {
+        const parts = project.key.replace(/[\\/]+$/u, '').split('/');
+        projectLabels.set(project.key, (byLabel.get(project.label)?.size ?? 0) > 1 && parts.length > 1 ? `${project.label} (${parts.at(-2)})` : project.label);
+      }
+    }
+    // Parent folders can still collide (for example two ".../WebApps/cpe-exb"): add one more segment, then an ordinal.
+    const keysByLabel = new Map<string, string[]>();
+    for (const [key, label] of projectLabels) keysByLabel.set(label, [...(keysByLabel.get(label) ?? []), key]);
+    for (const keys of keysByLabel.values()) {
+      if (keys.length < 2) continue;
+      keys.forEach((key, index) => {
+        const parts = key.replace(/[\\/]+$/u, '').split('/');
+        projectLabels.set(key, `${projectLabels.get(key)!.replace(/ \(.*\)$/u, '')} (${parts.slice(-3, -1).join('/')}) #${index + 1}`);
+      });
+    }
+  }
+  const projectLabel = (key: string) => projectLabels.get(key) ?? key;
   const mainGroups = options.showIgnored ? groups : groups.filter((group) => group.visibility.status === 'included');
+  // Inclusive: a conversation counts under every project it is referenced from, so totals are not additive.
+  const projectCounts = new Map<string, number>();
+  let multiProjectCount = 0;
+  let unknownProjectCount = 0;
+  for (const group of mainGroups) {
+    const list = projectsByGroup.get(group.key)!;
+    list.length > 1 && (multiProjectCount += 1);
+    !list.length && (unknownProjectCount += 1);
+    for (const project of list)
+      projectCounts.set(project.key, (projectCounts.get(project.key) ?? 0) + 1);
+  }
   const selected = new Set((options.last25 ? mainGroups.slice(0, 25) : mainGroups).map((group) => group.key));
   const ignored = groups.filter((group) => group.visibility.status === 'hidden');
   const allModels = new Map<string, number>();
@@ -208,7 +246,8 @@ export function formatDetailedSessionListingHtml (
   ].join(' ').toLowerCase();
   const attributes = (group: ConversationGroup, data: ListingEvidence | undefined) => {
     const metrics = detailedMetrics(group, data);
-    return `data-search="${safe(searchFor(group, data))}" data-title="${safe(titleFor(group))}" data-type="${safe(sessionType(group.representative))}" data-status="${group.representative.backing.status}" data-models="${html(JSON.stringify(data?.models ?? []))}" data-chips="${chipsFor(group, data)}" data-prompts="${metrics.turns ?? ''}" data-bytes="${data?.bytes ?? ''}" data-created="${metrics.created ?? ''}" data-updated="${metrics.updated ?? ''}" data-created-day="${day(metrics.created)}" data-updated-day="${day(metrics.updated)}" data-limited="${options.last25 && !selected.has(group.key)}"`;
+    const projectKeys = (projectsByGroup.get(group.key) ?? []).map((project) => project.key);
+    return `data-search="${safe(searchFor(group, data))}" data-title="${safe(titleFor(group))}" data-type="${safe(sessionType(group.representative))}" data-status="${group.representative.backing.status}" data-projects="${html(JSON.stringify(projectKeys))}" data-models="${html(JSON.stringify(data?.models ?? []))}" data-chips="${chipsFor(group, data)}" data-prompts="${metrics.turns ?? ''}" data-bytes="${data?.bytes ?? ''}" data-created="${metrics.created ?? ''}" data-updated="${metrics.updated ?? ''}" data-created-day="${day(metrics.created)}" data-updated-day="${day(metrics.updated)}" data-limited="${options.last25 && !selected.has(group.key)}"`;
   };
   const renderCard = (group: ConversationGroup, main: boolean): string => {
     const row = group.representative;
@@ -265,8 +304,8 @@ export function formatDetailedSessionListingHtml (
         : edge.kind === 'parent' ? 'Parent' : edge.kind === 'fork' ? 'Recorded fork from' : edge.kind;
       return `<li>${tag(name)} ${edgeLink(edge, reverse)}<div class="caption">${safe(edge.evidence)}</div></li>`;
     }).join('')}</ul>`;
-    const familySection = edges.length ? disclosure('🌳 Family / forks / copies', familyList)
-      : fieldLine('🌳 Family / forks / copies', 'none recorded', 'No recorded family relationship or qualifying best-effort hint found. Similar titles alone do not establish a relationship.');
+    const familySection = edges.length ? disclosure('🌳 Family / relationships', familyList)
+      : fieldLine('🌳 Family / relationships', 'none recorded', 'No recorded family relationship or qualifying best-effort hint found. Similar titles alone do not establish a relationship.');
     const timeline: string[] = [];
     let previous = '';
     for (const [index, turn] of (data?.turns ?? []).entries()) {
@@ -291,37 +330,21 @@ export function formatDetailedSessionListingHtml (
 <p class="prompt-preview${needsFull ? ' clipped-preview' : ''}">${safe(preview.text)}</p>${!sameWords ? '<p class="caption">Derived SDK overview omits recognized context/reminder wrappers; full recorded text is preserved below.</p>' : ''}${needsFull ? disclosure(`Full ${turn.role === 'delegated' ? 'delegated task' : 'prompt'} · ${fullWords} words${preview.clipped ? ' · middle clipped in preview' : ''}`, `<pre>${safe(turn.prompt)}</pre>`, 'full-prompt') : ''}
 ${turn.files.length ? disclosure('✏️ Files changed by this turn', fileTable(turn.files)) : ''}</li>`;
     }).join('')}</ol>` : `<p class="warning">Conversation evidence is ${safe(data?.state ?? 'unavailable')}. Unknown is not empty. Source diagnostics below explain what could not be read.</p>`;
-    const audit = [...new Set([...(data?.flags ?? []), ...group.occurrences.flatMap((item) => item.diagnostics.map((diagnostic) => diagnostic.category))])];
-    const diagnostics = [...(data?.diagnostics ?? []), ...group.occurrences.flatMap((item) =>
-      item.diagnostics.map((diagnostic) => ({ path: diagnostic.path, description: diagnostic.description })))];
-    const verification = group.occurrences.map((item) => {
-      if (item.backing.status !== 'verified')
-        return '';
-      const source = item.backing.source;
-      return `<section class="evidence-card"><h3>Verified source integrity / scope</h3><dl>${field('Occurrence', `<code>${safe(item.occurrenceId)}</code>`)}${field('Schema version', String(source.schemaVersion))}${field('Inventory SHA-256', `<code>${html(source.sha256)}</code>`)}${source.kind === 'sdk-events' ? field('Exact chat identity', `<code>${safe(source.chatIdentity)}</code>`)
-        + field('Scope', `<code>${safe(JSON.stringify(source.scope))}</code>`)
-        + field('Identity evidence', source.identityEvidence.map((value) => safe(value)).join('<br>') || 'none')
-        + field('Identity warnings', source.identityWarnings.map((value) => safe(value)).join('<br>') || 'none')
-        + field('Scope warnings', source.scopeWarnings.map((value) => safe(value)).join('<br>') || 'none') : ''}</dl></section>`;
-    }).join('');
     const titles = titlesByGroup.get(group.key)!;
     const titleValues = [...new Set(titles.map((title) => title.value))];
     const actions = `<div class="card-actions enhanced-only"><button type="button" title="Pin this conversation for a two-chat comparison" data-pin="${anchor}" aria-pressed="false">📌 Compare</button><a href="#${anchor}" title="Permanent link within this report">🔗 Link</a><a href="#conversation-index" title="Open all-session table of contents">🔝 TOC</a></div>`;
     const titleList = `<section class="title-provenance"><div class="titles-head"><h3>🏷️ Titles at each storage level</h3>${actions}</div><ul>${titleValues.map((value) => `<li><code class="evidence-label">${safe(titles.filter((title) => title.value === value).map((title) => title.source).join(' · '))}</code><span>${safe(value)}</span></li>`).join('') || '<li>Unknown / not recorded.</li>'}</ul></section>`;
     const notes = [hasUsage(usage) ? '' : usageUnavailableTag(), data?.models.length ? '' : '<span class="note" title="No recorded answering-model evidence; model selection is shown separately when recorded.">🤖 No recorded answering-model evidence</span>'].join('');
     const dates = data?.dates ?? [];
-    const promptDates = dates.filter((item) => /^(?:request|prompt)\.\d+\./u.test(item.source));
+    const promptDates = dates.filter((item) => /^(?:(?:request|prompt)\.\d+\.|events\.line:\d+\.)/u.test(item.source));
+    const timestampLabel = promptDates.some((item) => item.source.startsWith('events.')) ? 'Event / prompt timestamps' : 'Prompt / request timestamps';
     const dateRows = (items: typeof dates) => `<dl class="date-provenance">${items.map((item) => field(item.source, `<span class="datetime" title="${safe(item.recordedValue)}">${date(item.timestamp)}</span>`)).join('')}</dl>`;
-    const dateSection = `<section class="evidence-card dates-card"><h3>🕒 Dates and provenance</h3>${dateRows(dates.filter((item) => !promptDates.includes(item)))}${promptDates.length > 1 ? disclosure(`Prompt / request timestamps (${promptDates.length})`, dateRows(promptDates)) : promptDates.length === 1 ? fieldLine('Prompt / request timestamp', `<span class="datetime" title="${safe(promptDates[0]!.recordedValue)}">${date(promptDates[0]!.timestamp)}</span>`, promptDates[0]!.source, 'compact') : ''}</section>`;
-    const artifactTable = data?.artifactLocations.length ? disclosure(`Artifact locations (${data.artifactLocations.filter((item) => item.state === 'present').length} present of ${data.artifactLocations.length} checked)`, table(['Artifact location', 'State', 'Bytes / files'], data.artifactLocations.map((item) => [`${safe(item.kind)}<br>${pathLink(item.path)}`, item.state, item.bytes === null ? '-' : `${detailedBytes(item.bytes)} / ${plural(item.files ?? 0, 'file')}`]))) : `<p>Artifact inventory: ${data?.artifactState ?? unk(1, 'artifact locations were not checked')}.</p>`;
-    const payload = `<section class="evidence-card"><h3>📦 Payload / artifacts / history</h3><p>Scoped payload: <strong>${bytes(data?.bytes)}</strong>${data?.byteScope && data.byteScope !== 'unknown' ? `. ${safe(data.byteScope)}` : ''}</p><p>${data?.artifactLocations.length ? `Audited Local bytes: ${bytes(data.auditedBytes)} across the five checked journal/sibling locations. This per-occurrence total includes the journal; it is not additional to journal bytes or unique disk usage.` : 'Audited Local bytes: not applicable (journal and sibling artifacts exist only for Local chats).'}</p><p>Injected/non-user SDK prompts: ${known(data?.injectedPrompts)}. These are not added to main human prompt counts.</p>${data?.history.path ? `<p>History state: ${pathLink(data.history.path)}</p>` : ''}${artifactTable}${data?.artifacts.length ? disclosure(`Resource files (${data.artifacts.length})`, table(['Resource file', 'Bytes'], data.artifacts.map((item) => [pathLink(item.path), detailedBytes(item.bytes)]))) : ''}</section>`;
+    const dateSection = `<section class="evidence-card dates-card"><h3>🕒 Dates and provenance</h3>${dateRows(dates.filter((item) => !promptDates.includes(item)))}${promptDates.length > 1 ? disclosure(    `${timestampLabel} (${promptDates.length})`, dateRows(promptDates)) : promptDates.length === 1 ? fieldLine('Prompt / request timestamp', `<span class="datetime" title="${safe(promptDates[0]!.recordedValue)}">${date(promptDates[0]!.timestamp)}</span>`, promptDates[0]!.source, 'compact') : ''}</section>`;
+    const payload = `<section class="evidence-card"><h3>📝 Editing history / injected prompts</h3><p>Injected/non-user SDK prompts: ${known(data?.injectedPrompts)}. These are not added to main human prompt counts.</p><p>Editing history: ${safe(data?.history.state ?? 'unknown')}${data?.history.turns != null ? ` · ${data.history.turns} turns` : ''}.</p>${data?.history.path ? `<p>History state: ${pathLink(data.history.path)}</p>` : ''}</section>`;
     const timelineCaption = 'Only recorded answering evidence is called an answering model. Auto and selected model are separate. Changes apply at prompt boundaries, not every assistant iteration.';
     const timelineSection = timeline.length > 1
       ? disclosure('🤖 Model-switch timeline', `<p class="caption">${timelineCaption}</p><div class="timeline">${timeline.join('')}</div>`)
       : fieldLine('🤖 Model-switch timeline', timeline[0] ?? unk(headline, 'no recorded model evidence'), timeline.length ? `No model switch recorded. ${timelineCaption}` : timelineCaption);
-    const auditSection = audit.length || diagnostics.length
-      ? disclosure(`🔎 Audit flags / diagnostics (${audit.length + diagnostics.length})`, `<p>${audit.map((flag) => tag(flag, flag, 'warning')).join(' ') || 'No additional flags.'}</p>${diagnostics.length ? table(['Path', 'Issue'], diagnostics.map((item) => [pathLink(item.path), safe(item.description)])) : '<p>No enrichment/source diagnostics.</p>'}`)
-      : fieldLine('🔎 Audit flags / diagnostics', 'none', 'No additional flags and no enrichment/source diagnostics.');
     const copyable = local && data?.state !== 'changed';
     const exportSection = fieldLine('📋 Export selector / command',
       `<code class="selector">${safe(selector)}</code>${copyable ? ` <button type="button" title="Copy the exact supported export selector" class="enhanced-only" data-copy="${html(selector)}">📋 Copy selector</button> <button type="button" title="Copy quoted PowerShell export command" class="enhanced-only" data-copy="${html(command)}">💻 Copy command</button>` : ''}`,
@@ -334,8 +357,7 @@ ${familySection}
 ${timelineSection}
 ${disclosure('📊 Conversation / workspace / outcomes and first / last previews', summary)}
 <div class="evidence-grid supplemental">${dateSection}${payload}</div>
-${disclosure(`🗂️ Why / source · ${group.occurrences.length} occurrence(s)`, sourceDetails(group) + `<div class="evidence-grid">${verification}</div>`)}
-${auditSection}
+${disclosure(`🗂️ Why / source · ${group.occurrences.length} ref${group.occurrences.length === 1 ? '' : 's'}`, renderDetailedSource(group, evidence, anchor), 'why-source')}
 ${exportSection}
 </div></details>`;
   };
@@ -356,11 +378,34 @@ ${exportSection}
   ];
   const scriptHash = createHash('sha256').update(detailedListingController).digest('base64');
   const numberFilter = (key: string, title: string) => `<label>${title} min <input type="number" min="0" id="${key}-min" data-filter></label><label>max <input type="number" min="0" id="${key}-max" data-filter></label><select id="${key}-known" data-filter aria-label="${title} evidence"><option value="">Known or unknown</option><option value="known">Known only</option><option value="unknown">Unknown only</option></select>`;
+  const stamp = (timestamp: number | null | undefined) => {
+    if (timestamp == null || !Number.isFinite(new Date(timestamp).getTime()))
+      return '';
+    const local = new Date(timestamp);
+    const two = (value: number) => String(value).padStart(2, '0');
+    return `${two(local.getMonth() + 1)}${two(local.getDate())}-${two(local.getHours())}:${two(local.getMinutes())}`;
+  };
   const indexLinks = groups.map((group) => {
-    const turns = detailedMetrics(group, metadata(group)).turns;
-    const level: 2 | 3 = group.representative.backing.status === 'verified' && metadata(group)?.state === 'read' ? 2 : 3;
-    return `<li><a href="#${anchors.get(group.key)}">#${groups.indexOf(group) + 1} ${safe(titleFor(group))}</a>${typeTag(group.representative)}<span class="index-meta">${turns === null ? `${unk(level)} turns` : `<strong>${plural(turns, 'turn')}</strong>`} · ${plural(group.occurrences.length, 'ref')}</span></li>`;
+    const data = metadata(group);
+    const metrics = detailedMetrics(group, data);
+    const level: 2 | 3 = group.representative.backing.status === 'verified' && data?.state === 'read' ? 2 : 3;
+    const projects = projectsByGroup.get(group.key)!;
+    const workspace = detailedWorkspace(group, parentOf(group), data);
+    const refs = new Set(group.occurrences.map((row) => path.basename(row.provenance.workspaceStoragePath))).size;
+    const projectName = workspace.known
+      ? `<span class="workspace-name" title="${safe(projects.length ? projects.map((project) => projectLabel(project.key)).join(', ') : workspace.uri)}">📁 ${safe(workspace.name)}${projects.length > 1 ? ` +${projects.length - 1}` : ''}</span>`
+      : `<span class="workspace-name">📁 ${unk(2, 'workspace/project not recorded')}</span>`;
+    const updated = stamp(metrics.updated);
+    return `<li><span class="toc-main"><a href="#${anchors.get(group.key)}"><strong class="toc-number">#${groups.indexOf(group) + 1}</strong> ${safe(titleFor(group))}</a>${typeTag(group.representative)}<span class="index-meta">${metrics.turns === null ? `${unk(level)} turns` : `<strong>${plural(metrics.turns, 'turn')}</strong>`}</span></span><span class="toc-sub">${projectName}<span class="datetime" title="Last updated (MMDD-HH:mm, generator-local time)">🔄 ${updated ? updated : unk(level, 'no recorded activity evidence')}</span>${refs > 1 ? tag(`${refs} w/s refs`, 'One verified conversation referenced from distinct workspace stores', 'refs') : ''}${data?.files.length ? editTag(data.files) : ''}</span></li>`;
   }).join('');
+  const projectRows = [...projectCounts].sort((left, right) => right[1] - left[1] || projectLabel(left[0]).localeCompare(projectLabel(right[0])));
+  const projectRow = (name: string, count: number, tone: string, pick: string, title: string) => `<div class="chart-row"><span><button type="button" class="link-button" data-project-pick="${html(pick)}" title="${safe(title)}">${safe(name)}</button></span><span class="bar" aria-label="${mainGroups.length ? Math.round(count * 100 / mainGroups.length) : 0}%"><i class="${tone}" style="width:${mainGroups.length ? Math.round(count * 100 / mainGroups.length) : 0}%"></i></span><strong>${count}</strong></div>`;
+  const projectChartRows = [
+    ...projectRows.map(([key, count]) => projectRow(projectLabel(key), count, 'bar-project', key, `Filter to ${key}`)),
+  ];
+  const projectChart = `<section class="panel" id="project-chart"><h2>Chats per project</h2><p class="caption">Conversations referenced from each workspace or folder (${options.showIgnored ? 'all' : 'main candidates'}). A conversation referenced from several projects counts under each of them, so bars are not additive. Click a name to filter.</p>${projectRow('multiple projects', multiProjectCount, 'bar-multi', '__multi', 'Chats referenced from two or more projects')}${projectRow('no recorded project', unknownProjectCount, 'bar-unknown', '__unknown', 'Chats with no recorded workspace or folder')}${projectChartRows.slice(0, 12).join('')}${projectChartRows.length > 12 ? disclosure(`All ${projectChartRows.length} projects`, projectChartRows.slice(12).join('')) : ''}</section>`;
+  const projectOptions = [...projectCounts].sort((left, right) => projectLabel(left[0]).localeCompare(projectLabel(right[0]), undefined, { sensitivity: 'base' }))
+    .map(([key, count]) => `<option value="${html(key)}">${safe(projectLabel(key))} (${count})</option>`).join('');
   const ignoredCards = ignored.map((group) => mainGroups.includes(group)
     ? `<p><a href="#${anchors.get(group.key)}">${safe(titleFor(group))}</a> ${tag(`Ignored: ${group.visibility.status === 'hidden' ? group.visibility.reason : ''}`, 'Already shown in the main listing with --show-ignored', 'warning')}</p>`
     : renderCard(group, false)).join('');
@@ -371,9 +416,10 @@ ${exportSection}
 <p class="warning">This report contains private prompt text and local paths. Best-effort credential redaction is applied to newly collected prompt/title text, not a guarantee of sanitization. Keep the report private. Verified SDK backing does not mean SDK Markdown export is available.</p></header>
 <section class="metrics">${[[groups.length, 'grouped conversations'], [occurrences.length, 'workspace occurrences'], [mainGroups.length, 'main candidates'], [selected.size, 'initially shown'], [ignored.length, 'ignored groups'], [allModels.size, 'answering model IDs']].map(([value, label]) => `<div class="metric"><strong>${value}</strong>${label}</div>`).join('')}</section>
 <section class="grid"><div class="panel"><h2>Backing status</h2>${chartRows(statuses, groups.length, (value) => value, (value) => `bar-${value}`)}</div><div class="panel"><h2>Chat types</h2>${chartRows(types, groups.length, (value) => detailedTypeOf(value).label, (value) => `bar-${detailedTypeOf(value).key}`)}</div><div class="panel"><h2>Answering models</h2><p class="caption">Top eight raw IDs by conversation count. Mixed-model conversations appear more than once; totals are not additive.</p>${chartRows(new Map([...allModels].sort((a, b) => b[1] - a[1]).slice(0, 8)), groups.length, listingModelLabel)}<a href="#models-used">All ${allModels.size} answering model IDs ↓</a></div></section>
+${projectChart}
 <details class="guide" id="conversation-index"><summary>📚 Session TOC / grouped conversation index (${groups.length})</summary><p class="caption">All conversations, including ignored and newest-25-limited entries. Follow a title to reveal and open its card.</p><ol class="index-list">${indexLinks}</ol></details>
 <section class="panel"><h2>Find the chat you remember</h2><div class="controls"><input id="search" data-filter type="search" aria-label="Search titles, full prompts, IDs, workspace, model and files" placeholder="Search titles, full prompts, IDs, models, files or projects…">
-<label>Type <select id="type" data-filter><option value="">All</option>${[...types.keys()].map((type) => `<option>${safe(type)}</option>`).join('')}</select></label><label>Backing <select id="status" data-filter><option value="">All</option>${[...statuses.keys()].map((status) => `<option>${status}</option>`).join('')}</select></label>
+<label>Type <select id="type" data-filter><option value="">All</option>${[...types.keys()].map((type) => `<option>${safe(type)}</option>`).join('')}</select></label><label>Backing <select id="status" data-filter><option value="">All</option>${[...statuses.keys()].map((status) => `<option>${status}</option>`).join('')}</select></label><label>Project <select id="project" data-filter title="Projects are the recorded workspaces/folders a chat is referenced from"><option value="">All projects</option><option value="__multi">Multiple projects (${multiProjectCount})</option><option value="__unknown">No recorded project (${unknownProjectCount})</option>${projectOptions}</select></label>
 <label>Model <select id="model" data-filter><option value="">All answering models</option><option value="?">Unknown answering model</option>${[...allModels.keys()].sort().map((model) => `<option value="${html(model)}">${safe(listingModelLabel(model))} (${safe(model)})</option>`).join('')}</select></label></div><p class="caption">Detailed turns include recorded child delegated tasks and follow-ups. SDK dates use first/last scoped event activity. The compact console retains its narrower prompt-count policy.</p>
 <div class="chips">${chipLabels.map(([key, label]) => `<button type="button" title="Filter: ${html(label)}. All active chips must match." data-chip="${key}" aria-pressed="false">${withGlyphs(label)}</button>`).join('')}</div>
 ${disclosure('Date / numeric ranges', `<div class="controls"><label>Date field <select id="date-kind" data-filter data-default="updated"><option value="updated">Updated</option><option value="created">Created</option></select></label><label>From <input type="date" id="date-from" data-filter></label><label>Through <input type="date" id="date-to" data-filter></label>${numberFilter('prompts', 'Turns/tasks')}${numberFilter('bytes', 'Scoped bytes')}</div><p class="caption">Date ranges use generator-local calendar days, regardless of the browser's timezone. Unknown values sort last and never satisfy a numeric/date range.</p>`)}

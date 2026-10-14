@@ -58,7 +58,7 @@ function controllerFixture () {
     ids.set(id, value);
     return value;
   };
-  const controlNames = ['search', 'type', 'status', 'model', 'prompts-min', 'prompts-max', 'prompts-known',
+  const controlNames = ['search', 'type', 'status', 'model', 'project', 'prompts-min', 'prompts-max', 'prompts-known',
     'bytes-min', 'bytes-max', 'bytes-known', 'date-kind', 'date-from', 'date-to'];
   const filters = controlNames.map(element);
   for (const id of ['row-count', 'grouped-view', 'occurrence-view', 'reset', 'show-all', 'action-status',
@@ -79,6 +79,7 @@ function controllerFixture () {
       created: index === 2 ? '' : String(index + 1), updated: String(index + 1),
       createdDay: index === 2 ? '' : '2026-10-08', updatedDay: '2026-10-08',
       limited: index === 1 ? 'true' : 'false',
+      projects: ['["P1"]', '["P1","P2"]', '[]'][index]!,
     };
     const summary = new Element();
     summary.classes.add('comparison-summary');
@@ -118,12 +119,13 @@ function controllerFixture () {
     card.append(button);
     return button;
   });
+  const projectButtons = ['P2', '__multi'].map((value) => { const button = new Element(); button.dataset.projectPick = value; return button; });
   const copy = new Element();
   copy.dataset.copy = 'selector';
   const selectors = new Map<string, Element[]>([
     ['.session-card[data-main="true"]', cards], ['#occurrence-table tbody tr[data-search]', occurrences],
     ['[data-chip]', chips], ['[data-filter]', filters], ['a[href^="#"]', links],
-    ['[data-pin]', pins], ['[data-copy]', [copy]], ['.session-card, .session-card details', [...cards, betaDetails]],
+    ['[data-pin]', pins], ['[data-copy]', [copy]], ['[data-project-pick]', projectButtons], ['.session-card, .session-card details', [...cards, betaDetails]],
   ]);
   new Script(detailedListingController).runInNewContext({
     document: {
@@ -139,7 +141,7 @@ function controllerFixture () {
     setTimeout: (callback: () => void) => callback(),
   });
   const input = (id: string, value: string) => { const control = ids.get(id)!; control.value = value; control.fire('input'); control.fire('change'); };
-  return { ids, cards, ignored, ignoredDetails, betaDetails, turn, links, chips, pins, copy, main, occurrences, table, input };
+  return { ids, cards, ignored, ignoredDetails, betaDetails, turn, links, chips, pins, copy, main, occurrences, table, input, projectButtons };
 }
 
 test('detailed controller combines exact ranges, unknown/model/chip/search filters and occurrence view', () => {
@@ -207,4 +209,29 @@ test('comparison pins exactly two summaries, density opens full prompts and clip
   assert.ok(f.cards.every((card) => !card.open));
   await f.copy.fire('click');
   assert.match(f.ids.get('action-status')!.textContent, /Select and copy/);
+});
+
+test('project filter is inclusive and offers multi and unknown categories, also from chart buttons', () => {
+  const f = controllerFixture();
+  const visible = () => f.cards.filter((card) => !card.hidden).map((card) => card.id);
+  f.ids.get('show-all')!.fire('click');
+  assert.deepEqual(visible(), ['alpha', 'beta', 'unknown']);
+  f.input('project', 'P1');
+  assert.deepEqual(visible(), ['alpha', 'beta'], 'a multi-project chat matches each project it references');
+  f.input('project', 'P2');
+  assert.deepEqual(visible(), ['beta']);
+  f.input('project', '__multi');
+  assert.deepEqual(visible(), ['beta']);
+  f.input('project', '__unknown');
+  assert.deepEqual(visible(), ['unknown']);
+  f.input('project', 'P1');
+  f.input('search', 'alpha');
+  assert.deepEqual(visible(), ['alpha'], 'project combines with the other filters');
+  f.ids.get('reset')!.fire('click');
+  assert.equal(f.ids.get('project')!.value, '', 'reset clears the project filter');
+  f.projectButtons[0]!.fire('click');
+  assert.equal(f.ids.get('project')!.value, 'P2');
+  assert.deepEqual(visible(), ['beta'], 'a chart label applies its project filter');
+  f.input('view', 'occurrences');
+  assert.deepEqual(f.occurrences.filter((row) => !row.hidden).map((row) => row.id), ['beta-occurrence']);
 });

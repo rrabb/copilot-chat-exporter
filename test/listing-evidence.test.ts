@@ -224,8 +224,13 @@ test('SDK model intervals, child delegation and bytes exclude unrelated scopes',
   assert.ok(sdkListingTurns(asyncFailure, base).every((turn) => !turn.files.some((file) => file.file === 'bad.ts')),
     'failed completion after the next prompt must not become a successful file-change count');
   const row: SessionOccurrence = { ...occurrence(root, file, raw), provider: 'copilot-cli', backing: { status: 'verified', source: child } };
-  const evidence = (await collectListingEvidence([row])).get('occurrence')!;
+  row.parentOccurrenceId = 'parent-occurrence';
+  const parent: SessionOccurrence = { ...row, occurrenceId: 'parent-occurrence', parentOccurrenceId: undefined, backing: { status: 'verified', source: base } };
+  await fs.writeFile(path.join(root, 'workspace.yaml'), `id: ${id}\ncwd: 'C:\\Project'\n`);
+  const evidence = (await collectListingEvidence([row, parent])).get('occurrence')!;
   assert.equal(evidence.bytes, log.events.filter((event) => event.agentId === 'child').reduce((sum, event) => sum + Buffer.byteLength(event.recordedLine), 0));
+  assert.ok(evidence.context.some((item) => item.field === 'cwd' && item.value === 'C:\\Project' && item.source.startsWith('parent.')),
+    'child cwd is inherited through its own recorded parent, even when the child is enriched first');
   assert.ok(!evidence.models.includes('main-model'));
   assert.ok(evidence.titles.some((title) => title.source === 'delegation.arguments.description' && title.value === 'Resolve hosted session transcripts'));
   assert.ok(evidence.titles.some((title) => title.source === 'subagent.started.agentDisplayName' && title.value === 'identity-research'));

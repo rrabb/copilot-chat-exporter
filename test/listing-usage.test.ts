@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compactTokenCount, listingUsage } from '../src/session/listing-usage.ts';
 import { formatDetailedSessionListingHtml } from '../src/session/detailed-listing.ts';
+import { compactCss } from './detailed-listing-fixture.ts';
 import { detailedEvidence, detailedOccurrence } from './detailed-listing-fixture.ts';
 
 test('usage totals preserve independent coverage, zero counters and unknown or invalid values', () => {
@@ -49,7 +50,7 @@ test('usage appears in the header, details and each turn without summing workspa
   assert.ok(html.includes('<span class="glyph">⑂?</span> Tentative hints'));
   assert.ok(html.includes('📝 Editing history'));
   assert.ok(html.includes('∅ No response evidence'));
-  assert.ok(html.includes('font:700 0.9375rem "Arial Narrow"'));
+  assert.ok(compactCss(html).includes('font:700 0.9375rem "Arial Narrow"'));
 });
 
 test('unavailable usage and models are explained only inside expanded cards', () => {
@@ -105,8 +106,7 @@ test('conversation references, children and header counters use singular and plu
   const header = html.match(/<summary class="session-summary">([\s\S]*?)<\/summary>/u)![1];
   assert.ok(header.includes('🚨 1 error<'));
   assert.ok(header.includes('🔎 1 audit note<'));
-  assert.ok(html.includes('<strong>1 turn</strong> · 1 ref</span>'));
-  assert.ok(!html.includes('1 references'));
+  assert.ok(html.includes('<strong>1 turn</strong></span>'));
   assert.ok(!html.includes('1 refs'));
   assert.ok(!html.includes('1 turns'));
 });
@@ -115,22 +115,22 @@ test('workspace-reference chip is bold magenta while tentative fork hints keep t
   const reference = { ...a, occurrenceId: 'a2', provenance: { ...a.provenance, workspaceStoragePath: 'C:\\other' } };
   const html = formatDetailedSessionListingHtml([a, reference], new Map([['a', detailedEvidence()], ['a2', detailedEvidence()]]));
   assert.ok(html.includes('class="tag tone-refs" title="One verified conversation referenced from distinct workspace stores">2 w/s refs · 1 conv</span>'));
-  assert.ok(html.includes('.tone-refs{color:#b00079;border-color:#c2188f;font-weight:700}'));
+  assert.ok(compactCss(html).includes('.tone-refs{color:#b00079;border-color:#c2188f;font-weight:700}'));
   assert.ok(!html.includes('tone-likely'));
 });
 test('card actions sit in the title row as small Arial Narrow controls and stay flex when scripted', () => {
   const html = formatDetailedSessionListingHtml([detailedOccurrence('one')], new Map([['one', detailedEvidence()]]));
   assert.match(html, /<div class="titles-head"><h3>🏷️ Titles at each storage level<\/h3><div class="card-actions enhanced-only">/u);
   assert.equal((html.match(/data-pin="session-1"/gu) ?? []).length, 1);
-  assert.ok(html.includes('.card-actions button{font:0.6875rem "Arial Narrow"'));
-  assert.ok(html.includes('.card-actions a{font:0.6875rem "Arial Narrow"'));
-  assert.ok(html.includes('.js .card-actions.enhanced-only{display:flex}'));
+  assert.ok(compactCss(html).includes('.card-actions button{font:0.6875rem "Arial Narrow"'));
+  assert.ok(compactCss(html).includes('.card-actions a{font:0.6875rem "Arial Narrow"'));
+  assert.ok(compactCss(html).includes('.js .card-actions.enhanced-only{display:flex}'));
 });
 test('summary charts use semantic colors and the same display labels as the cards', () => {
   const html = formatDetailedSessionListingHtml([detailedOccurrence('one')], new Map([['one', detailedEvidence()]]));
   assert.ok(html.includes('<span>Local</span><span class="bar" aria-label="100%"><i class="bar-local" style="width:100%"></i>'));
   assert.ok(html.includes('<span>verified</span><span class="bar" aria-label="100%"><i class="bar-verified" style="width:100%"></i>'));
-  assert.ok(html.includes('.chart-row .bar i.bar-verified{background:#139577}'));
+  assert.ok(compactCss(html).includes('.chart-row .bar i.bar-verified{background:#139577}'));
 });
 test('selected-model chip appears only when it adds information beyond the answering model', () => {
   const same = detailedEvidence();
@@ -147,11 +147,15 @@ test('Local-only audited bytes and artifact counts read correctly for SDK and si
       { kind: 'transcript', path: 'C:\\t.jsonl', form: 'file', state: 'missing', bytes: null, files: null },
     ],
     auditedBytes: 10,
+    storage: [
+      { kind: 'journal', path: 'C:\\j.jsonl', state: 'present', bytes: 10, files: 1, modified: null, parts: [], measurement: 'File length.' },
+      { kind: 'transcript', path: 'C:\\t.jsonl', state: 'missing', bytes: null, files: null, modified: null, parts: [], measurement: '' },
+    ],
   });
   const local = formatDetailedSessionListingHtml([detailedOccurrence('one')], new Map([['one', data]]));
-  assert.ok(local.includes('10 bytes (0.0 MB) / 1 file<'));
+  assert.ok(local.includes('<strong>10 B</strong> <span class="exact-bytes">10 bytes</span>'));
   assert.ok(!local.includes('1 files'));
   assert.ok(!local.includes('unknown / unknown'));
   const sdk = formatDetailedSessionListingHtml([detailedOccurrence('two')], new Map([['two', detailedEvidence()]]));
-  assert.ok(sdk.includes('Audited Local bytes: not applicable'));
+  assert.ok(!sdk.includes('Checked Local journal / sibling total:'));
 });

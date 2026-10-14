@@ -9,6 +9,7 @@ import type { SdkEvent } from './sdk-events.ts';
 import type { SessionOccurrence, SdkEventSource } from './sources.ts';
 import type { ListingEvidence, ListingTurnEvidence, ListingArtifactLocation } from './listing-evidence-types.ts';
 import { localListingChanges, listingToolChanges, incompleteLocalListingEdits, listingRecordedItems } from './listing-edits.ts';
+import { collectListingStorage } from './listing-storage.ts';
 
 function describe (error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -485,5 +486,16 @@ export async function collectListingEvidence (occurrences: readonly SessionOccur
     evidence.titles = evidence.titles.map((title) => ({ ...title, value: redactText(title.value).text }));
     evidence.flags = [...new Set(evidence.flags)];
   }
+  for (const occurrence of occurrences) {
+    const data = result.get(occurrence.occurrenceId);
+    const parent = occurrence.parentOccurrenceId ? result.get(occurrence.parentOccurrenceId) : undefined;
+    if (data && parent) {
+      for (const item of parent.context.filter((item) => item.field === 'cwd' || item.field === 'workingDirectory')) {
+        if (!data.context.some((existing) => existing.field === item.field))
+          data.context.push({ ...item, source: `parent.${item.source}` });
+      }
+    }
+  }
+  await collectListingStorage(occurrences, result);
   return result;
 }

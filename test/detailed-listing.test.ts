@@ -82,7 +82,7 @@ test('cards collapse natively with type-colored headers, early title provenance,
   assert.ok(html.includes('class="added">+12'));
   assert.ok(html.includes('class="removed">-3'));
   assert.ok(!html.includes('<details class="full-prompt">'), 'short complete prompt is not repeated in a disclosure');
-  assert.ok(html.includes('10,397,753 bytes (9.9 MB)'));
+  assert.ok(html.includes('<strong>9.9 MB</strong> <span class="exact-bytes">10,397,753 bytes</span>'));
   assert.match(html, /<details><summary>Prompt \/ request timestamps \(2\)<\/summary>/u);
   assert.ok(html.indexOf('id="conversation-index"') < html.indexOf('id="grouped-view"'));
 });

@@ -60,6 +60,39 @@ export function detailedWorkspace (group: ConversationGroup, parent?: Conversati
   return { uri: `${uri ?? 'Workspace/project not recorded'}${invalidEncoding ? ' (invalid URI encoding; recorded text retained)' : ''}`, name, inherited: Boolean(inherited), known: Boolean(uri) };
 }
 
+export interface DetailedProject {
+  /** Workspace identity URI; two storage folders pointing at one URI are one project. */
+  key: string;
+  label: string;
+  kind: 'folder' | 'workspace';
+}
+
+function projectName (uri: string): string {
+  let decoded = uri;
+  try {
+    decoded = decodeURIComponent(uri);
+  } catch (error) {
+    if (!(error instanceof URIError))
+      throw error;
+  }
+  return decoded.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) || uri;
+}
+
+/**
+ * Distinct recorded workspaces/folders a conversation is referenced from. A child with no recorded
+ * workspace of its own inherits its recorded parent's, matching the displayed workspace name.
+ */
+export function detailedProjects (group: ConversationGroup, parent?: ConversationGroup): DetailedProject[] {
+  const own = group.occurrences.filter((row) => row.provenance.workspaceIdentity);
+  const rows = own.length ? own : parent?.occurrences.filter((row) => row.provenance.workspaceIdentity) ?? [];
+  const projects = new Map<string, DetailedProject>();
+  for (const row of rows) {
+    const identity = row.provenance.workspaceIdentity!;
+    !projects.has(identity.uri) && projects.set(identity.uri, { key: identity.uri, label: projectName(identity.uri), kind: identity.kind });
+  }
+  return [...projects.values()];
+}
+
 export function detailedBytes (bytes: number | null | undefined): string {
   if (bytes == null)
     return 'unknown';
