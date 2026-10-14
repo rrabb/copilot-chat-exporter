@@ -2,7 +2,25 @@
 
 ## Current status
 
-Task #35 (round-3 display requests, October 9) is complete; see "October 9 round-3 display requests" below. Verified: both typechecks, 283 tests, golden, build, 11 bundled CLI tests, 19 actual Edge checks per normal/ignored report, 48 byte-identical basic/console comparisons, clean `git diff --check`. No staging or commit. Open backlog: #20 SDK usage correlation (deferred) and #21 model-icon decision (pending the user).
+Snapshot: October 13, 2026, 19:40. The listing and reporting side of the project (discovery, safe CLI default, console/basic HTML, detailed HTML report with the redesigned Why/source, design docs) is complete and verified. The export side (SDK Markdown, Local fidelity flags, source-aware verification) is still pending and is the largest remaining body of work. Last full verification (after the source redesign; later changes were documentation only): both typechecks, **298 tests**, unchanged golden, build, and 20 actual Edge checks per normal/ignored report. Nothing from this session is staged or committed beyond commit `2f5dffc`; the worktree holds 38 changed files (about 4,659 insertions, 505 deletions) plus 6 untracked paths. The codebase-memory graph is stale (indexed October 1).
+
+| Workstream | Tasks | State | Evidence / what remains |
+| --- | --- | --- | --- |
+| Discovery and inventory | #1, #7 | Mostly complete | Journals, index-only rows, Agent Host/CLI/external references, exact child scopes, duplicate grouping. Live selected root: 210 occurrences, 81 journal files. Remaining: global/empty-window/legacy/transferred stores (#22, needs decision), other profiles and remote stores, `superseded-placeholder` reason is declared but never assigned |
+| Root selection and safe CLI | #5, #6 | Implemented, partly accepted | Explicit root, single-root discovery, interactive chooser, non-interactive ambiguity error, listing as the no-argument default, safe `--current`, unique short Local selectors. Remaining: real interactive terminal acceptance; provider export selection depends on the SDK export |
+| Console and basic HTML listing | #8, #17, #18, #19 | Complete | Compact console output (169 lines vs the 1,146-line baseline), offline HTML with filters, full-width source panels, ignored section, ignored-session controls, reports kept in `temp-tool-output` |
+| Detailed HTML report | #23, #25, #26 and earlier rounds | Complete | TOC with project line, project filter and chart, collapsed type-colored cards, ordered turns, usage chips, family links, consolidated Why/source with storage composition. 20 Edge checks per report, light/dark/narrow screenshots reviewed |
+| HTML listing report size reduction | #35 | Pending implementation | [Search-preserving size-reduction handoff](#html-listing-report-size-reduction-task-35): DOM-backed offline search, minimal supplemental metadata, redundant-title removal, measured byte and behavior checks |
+| Documentation | #12, #24, #27, #28 | Mostly complete | README, SPEC, CHANGELOG, storage guide, HTML design guide with wireframes and rebuild section. Remaining: final cross-surface consistency review (#12) and a sample fixture/reference render for the design guide |
+| SDK Markdown export | #9 | Pending (largest gap) | Verified scopes and a full-field event reader exist; the Markdown adapter and writer do not. Agent Host and CLI chats are listed but cannot be exported |
+| Local fidelity and export policy | #15, #16 | Pending | Staged writer and redaction accounting exist and are tested; planner integration, omission reports, `--high-fidelity` and `--no-redact` are not wired. Legacy clipping remains |
+| Source-aware verification and schema drift | #10, #11 | Pending | No SDK census or serialization checks; the known benign `autoModeResolution` record still raises a schema-drift note |
+| SDK usage correlation | #20 | Deferred by user | SDK cards show `Usage unavailable`; no token-to-credit conversion |
+| Open user decisions | #21, #22 | Waiting on the user | Model-chip icon; whether to read the global/legacy chat stores |
+| Acceptance | #13 | In progress | Automated and browser checks pass for the report; manual live-root review of exports and the interactive terminal remain |
+| Repository state | n/a | Needs attention | Large uncommitted worktree; Git warns that CRLF will become LF in many files; graph index stale |
+
+The prioritized next items are in "Prioritized next items" below.
 
 ### October 9 round-3 display requests
 
@@ -209,7 +227,7 @@ Implementation has explicit user approval. Numbers are convenient references, no
 | 3 | exporter-fidelity-decisions | Agree resource exclusions, clipping/redaction limits and unresolved fidelity choices with the user. | Complete: approved policies below; source limitations remain explicit | 2 |
 | 4 | exporter-approval | Obtain explicit green light for the revised implementation plan. | Complete: explicit user approval; ask about new ambiguities during implementation | 1, 3 |
 | 5 | exporter-roots | Add explicit root selection, single-root discovery, terminal choice and non-interactive ambiguity errors. | Implemented and synthetically tested; real interactive terminal acceptance remains | 14, 16 |
-| 6 | exporter-cli | Default to listing; add safe `--current`, explicit selectors and argument validation; remove newest-chat fallback from CLI export. | In progress: compact listing, `--show-ignored`, `--last25`, listing-only `--full-ids`, unique short-UUID Local selection, safe `--current`, staged Markdown overwrite, and HTML listing output implemented; fidelity/provider exports pending | 5, 7 |
+| 6 | exporter-cli | Default to listing; add safe `--current`, explicit selectors and argument validation; remove newest-chat fallback from CLI export. | In progress: compact listing, `--show-ignored`, `--last25`, listing-only `--full-ids`, **unique short-UUID Local selection**, safe `--current`, staged Markdown overwrite, and HTML listing output implemented; fidelity/provider exports pending | 5, 7 |
 | 7 | exporter-inventory | Discover journals, index-only rows and provider references; resolve exact backings/scopes and retain provenance and diagnostics. | In progress: exact provider/peer/child resolution; scope prompt/date metadata and evidence-based grouping implemented; superseded-placeholder parity and final acceptance pending | 5, 16 |
 | 8 | exporter-html | Add default offline HTML and terminal listing, `--no-html`, `--show-ignored`, grouping, controls and export-support information. | Implemented and automated tests pass: default self-contained report, `--no-html`, `--html-output`, explicit overwrite, searchable/sortable/filterable table, charts, selectors, row source details, and linked collapsible guide; manual browser/live-root acceptance and complete sister-filter parity remain in task 13 | 6, 7 |
 | 9 | exporter-sdk | Export verified Agent Host/Copilot CLI main, peer and subagent conversations to rich Markdown, preserving recorded content and order. | In progress: full-field/raw-line event reader and verified scopes implemented; rich Markdown adapter/writer pending | 7 |
@@ -225,6 +243,164 @@ Implementation has explicit user approval. Numbers are convenient references, no
 | 19 | exporter-review-artifacts | Keep development/review reports, runtime captures, validation logs and test outputs in Git-ignored `temp-tool-output`, without changing CLI defaults or fixture sandboxes. | Complete: convention documented, earlier review outputs copied, fresh report/console/verify/build/bundled-test logs saved there | None |
 | 20 | exporter-sdk-usage | SDK usage correlation (deferred by user choice, was #31 in the detailed-report table): verify and display Agent Host / Copilot CLI credit and token usage. The sampled SDK log has `model.model_call_success` usage, child `subagent.completed.totalTokens`, cumulative `session.usage_checkpoint` and `session.shutdown.modelMetrics`; decide which are incremental, bind them to exact scopes and prompts, deduplicate, and never attribute parent totals to children or convert tokens to credits. Until done, SDK and subagent cards show `Usage unavailable`. | Pending (deferred) | 7, 9 |
 | 21 | exporter-model-icon | Decision needed: 🤖 is used for both the Agent Host type chip and answering-model chips. Pick a distinct model-chip icon (suggested: keep 🤖 for Agent Host only). | Pending user decision | None |
+| 22 | exporter-global-chat-stores | Coverage gap found while writing the newcomer guide: the inventory does not read `globalStorage/emptyWindowChatSessions` (1 file on the dev machine), legacy `workspaceStorage/no-workspace/chatSessions` or `globalStorage/transferredChatSessions`. Decide whether to add them as sources (documented in docs/CHAT-SESSION-LOCATIONS.md). | Pending (needs user decision) | None |
+| 23 | exporter-toc-project-filter | TOC second line (bold #N, project name, last updated MMDD-HH:mm, N w/s refs, files chip), project dropdown (All / Multiple / No recorded project / each project; inclusive), chats-per-project chart (not additive), disambiguated duplicate folder names, rewritten TOC tests, controller tests. | Complete: 289-test verify, build, 19 Edge checks on normal and ignored reports | 22 |
+| 24 | exporter-locations-doc | Newcomer guide docs/CHAT-SESSION-LOCATIONS.md. | Complete | None |
+| 25 | exporter-why-source-redesign | Approved combined source design: health, references, compact chain, conditional lineage, storage summary and unified evidence with technical identity. Preserve field/value/reference attribution; no primary/copy labels. | Complete: factual reference labels and observed cwd matches, shared backing counts, derived children with no own index row, per-reference identity/title/date differences and qualified removal impacts. Historical alternate child keys remain unresolved candidates, not proven duplicates. Source/audit/artifact duplication consolidated. SDK event timestamps collapsed and not repeated in technical identity. | 26 |
+| 26 | exporter-vscdb-composition | Cached, read-only storage analysis: physical lengths, SQLite logical value bytes and page counts, JSONL record categories, related directories; distinguish scope from whole backing. | Complete: SQLite read transactions, UTF-8/blob logical sizes, free/allocated pages and largest keys; JSONL categories include separators; directory composition avoids links; related resource/history files and existing database sidecars/backups retained. Changed file/WAL composition omitted with diagnostics. No logical/shared-size reclaimability claims. | None |
+| 27 | exporter-design-guide | `docs/HTML-REPORT-DESIGN.md`: report outline, wireframes (ASCII and draw.io), abbreviations, ID rules, conventions, rationale and rebuild checklist; linked from README. | Complete: documentation only; links resolve, XML parses | 25 |
+| 28 | exporter-design-crosscheck | Cross-check the guide against the renderer and a generated report; add the component reference (TOC, Why/source tables, family, sub-agents, ignored, orphan-like conditions, turns, usage, dates, project). | Complete: corrected TOC and chip formats; findings recorded below | 27 |
+| 35 | exporter-html-size-reduction | [html listing report size reduction](#html-listing-report-size-reduction-task-35): reduce detailed report duplication while preserving and improving offline investigative search; implement DOM-backed search with minimal supplemental metadata and content-redundant tooltip removal. | Pending: planning and audit complete; this entry is a handoff, not an implementation result | 25, 26 |
+
+### HTML listing report size reduction (task #35)
+
+October 14 handoff. Primary goal: keep a useful, self-contained offline search tool for finding chat sessions, their identifiers, prompts, files, artifacts, backing sources and investigative evidence while reducing repeated serialized content. Do not reduce the detailed report to a summary or discard provenance merely to obtain a smaller file. No renderer/controller changes were made during this planning session.
+
+#### Agreed direction and scope
+
+| Area | Requirement / decision |
+| --- | --- |
+| Search coverage | User selected identifying content and investigative evidence: identifiers, prompts, files, artifacts and diagnostic evidence. Exclude generic UI labels, repeated headings and static disclaimers. This intentionally expands the current selected-field corpus; it is not an exact-results-preservation-only optimization. |
+| Primary search source | Use explicitly designated rendered DOM content, including full text in collapsed disclosures. Avoid blindly indexing an entire card and accidentally including controls, generic explanations or unrelated conversation labels. |
+| Supplemental search data | Omit `data-search` unless required searchable information is absent from the designated DOM content. When present, it contains only supplemental values, not a duplicate full corpus. Combine DOM text and supplemental data; do not use one as an either/or fallback for the other. |
+| Tooltip policy | During generation, omit `title` when it adds no information beyond the complete displayed label/value. Keep explanatory or additional information, including exact IDs behind friendly labels, full paths behind basenames, uncertainty reasons, scope and precision. |
+| Preservation | Preserve exact identities, attribution, full prompt availability, redaction, copy values, missing/unknown evidence, relationship navigation and offline operation. Do not invent new orphan classifications; search the evidence actually recorded/displayed. |
+| Architecture | Do not require a comprehensive browser-side serialized model or client-rendered rewrite in the first phase. A cached search representation plus short shared-content references is sufficient. Shared generator helpers are appropriate where they avoid inconsistencies. |
+| Scope boundaries | Start with the detailed report. Do not change basic HTML, discovery, export behavior, native chat stores, SDK usage correlation or deferred global-store coverage as incidental cleanup. Ask before expanding scope. |
+
+#### Baseline and evidence
+
+Audit source: [show-ignored detailed report](temp-tool-output/copilot-chat-sessions-source-redesign-ignored-261013.html). Preserved bundle: [analysis and follow-up assessment](temp-tool-output/html-size-audit-261014/analysis.md), [audit JSON](temp-tool-output/html-size-audit-261014/html-size-audit.json), and [reproducible script](temp-tool-output/html-size-audit-261014/html-size-audit.mjs). These are machine-local, Git-ignored evidence; the measurements and requirements here remain useful without the private files.
+
+| Measurement | Observed value | Interpretation |
+| --- | ---: | --- |
+| Original HTML | 21,824,548 bytes / 20.814 MiB | MiB means 1,048,576 bytes |
+| All attributes and syntax | 12,243,829 bytes / 56.10% | Largest disjoint byte category |
+| `data-search` | 4,600,667 bytes / 4.388 MiB / 21.08% | 675 attributes: 277 session cards and 398 occurrence rows |
+| `title` | 3,236,826 bytes / 3.087 MiB / 14.83% | 49,978 titles, 2,811 distinct values; not all are redundant |
+| Both attribute categories | 7,837,493 bytes / 7.474 MiB / 35.91% | Upper deletion budget, not promised savings |
+| Why/source sections, inclusive | 9,278,541 bytes / 42.51% | Overlaps attribute/text counts; potential later presentation work |
+| Elements / tables | 319,792 / 2,463 | Attribute reduction alone does not reduce element count |
+| Inline styles / embedded CSS / JavaScript | 624 / 18,499 / 8,483 bytes | Low-priority byte contributors |
+
+Deleting all search attributes in memory leaves 16.426 MiB; deleting all titles leaves 17.727 MiB; deleting both leaves 13.339 MiB. These are nonfunctional deletion experiments, not acceptance targets. Supplemental values, necessary titles, shared references and additional controller logic remain. Measure net savings as removed duplication minus newly serialized metadata and controller bytes. Do not add overlapping category savings twice or promise a final size before a prototype is measured.
+
+The current [corpus builder](src/session/detailed-listing.ts) includes titles/aliases, IDs, workspace paths/URIs, backing status/path/reason, prompts, models/effort, changed-file paths and context values, but not every displayed evidence table. The [controller](src/session/detailed-listing-controller.ts) reads `dataset.search` and selects occurrence rows through `tr[data-search]`. Removing attributes alone breaks nonempty search and leaves the occurrence collection empty. Empty-query testing can conceal the former because an empty word list passes `every`.
+
+The graph lookup missed nested search helpers; coverage reported the current listing/controller files as not tracked by the October 1 graph generation. Planning used direct current source reads. Reverify source and coverage at implementation time.
+
+#### High-level implementation
+
+1. Define the search field contract before editing. Inventory each intended field as full rendered text, abbreviated/clipped text, attribute-only value, supplemental metadata or deliberately excluded UI text. Separate conversation-wide content from occurrence-specific workspace/backing evidence.
+2. Mark meaningful searchable content at container boundaries or through existing semantic selectors. Avoid adding attributes to every small value, which would introduce another markup cost. Exclude controls, static warnings/headings and unrelated relationship labels unless deliberately part of the search contract.
+3. Extract designated text through `textContent`, not visibility-dependent `innerText`. Include full prompts and collapsed evidence. Separate fragments with spaces and normalize case/whitespace consistently so adjacent elements do not become accidental joined words.
+4. Build/cache search representations once before filtering, independently of visibility. Parse query words once per update. Preserve case-insensitive substring matching with AND semantics across words. Do not walk large DOM subtrees on every keystroke.
+5. Associate occurrence rows with shared conversation content through short stable references. Retain occurrence-specific identifiers, source paths, workspace associations and diagnostics. Do not concatenate every workspace's provenance into every occurrence's search corpus or require all query words to match a single fragment when the contract allows them across fragments.
+6. Serialize only absent required values as supplemental metadata, preserving redaction and safe HTML/JSON handling. Full prompts should not be repeated in each occurrence row. Shared cached fragments should not be eagerly copied into a complete duplicate string for every record without measurement.
+7. Discover cards/rows through identity/container selectors independent of optional `data-search`. Update filtering, counters, sorting, reset, reveal, ignored/limited behavior and fixtures together. Continue to combine text matching with existing independent filters.
+8. Apply tooltip content-redundancy rules in appropriate rendering helpers. Prefer explicit helper inputs indicating visible label and additional information over a fragile HTML-string comparison. Compare complete values, not arbitrary lengths; preserve informative titles and accessible names.
+9. Regenerate the controller CSP hash through the existing generation path whenever script bytes change. Preserve offline/no-network operation and the fully readable no-JavaScript report.
+
+#### Tooltip safeguards
+
+| Example | Expected action |
+| --- | --- |
+| Complete exact path displayed, title repeats that path | Omit redundant title |
+| Basename displayed, title contains full URI/path | Keep the value or expose it in a disclosure before removal |
+| Friendly model label, title contains exact recorded model ID | Preserve additional identifier |
+| `?`, `??` or `???`, title explains missing evidence | Preserve discoverable reason |
+| Count or size, title explains precision, partial coverage or ownership | Preserve explanation; shared legends are a separate UX decision |
+| Copy-button title repeats its adequate accessible name | Candidate for omission; retain the accessible name |
+| Preview/full prompt | Keep full content available; do not replace it with hover-only access |
+
+This is content redundancy, not actual visual clipping detection. Actual truncation depends on viewport, CSS, fonts and density mode. Do not introduce resize/layout observers in the first phase unless a separate clipping-dependent rule is approved. Do not remove `aria-label` simply because `title` is removed. The redundant subset of the 3.087 MiB title budget remains unmeasured.
+
+#### Sequence and checkpoints
+
+| Phase | Deliverable | Exit check |
+| --- | --- | --- |
+| 1. Baseline and contract | Preserve current dirty work; capture normal/show-ignored reports, source revisions, commands, search cases and byte audits; classify rendered/supplemental fields and titles | Existing failures and missing evidence explicit; investigative coverage defined |
+| 2. Search prototype | DOM-backed cached search, supplemental-only metadata, shared conversation references and independent row selectors | Portable fixtures demonstrate required matches and occurrence isolation; no controller exceptions |
+| 3. Tooltip optimization | Content-redundancy policy applied consistently to relevant helpers | Redundant-title fixtures pass; informative explanations and copy/accessibility behavior preserved |
+| 4. Integrated report acceptance | Same-input before/after reports and audits; browser checks on normal/ignored reports | Net bytes improve, search/filter/navigation correctness holds, startup/input responsiveness measured |
+| 5. Documentation and handoff | Update [HTML design guide](docs/HTML-REPORT-DESIGN.md), [SPEC](docs/SPEC.md), relevant user-facing docs and this task | Record measured savings, commands/results, intentional behavior expansion and remaining opportunities |
+
+Use the narrowest existing tests after each substantive slice, then run `npm run verify` and `npm run build` for integrated acceptance. Review fixture changes as intentional contracts, not a way to silence failures. Keep generated reports/logs under timestamped `temp-tool-output` paths and preserve the original audit. Do not stage or commit without separate authorization.
+
+#### Acceptance criteria
+
+- A standalone local HTML file searches without network access or extra fetchable assets. No-JavaScript reading still exposes the detailed evidence.
+- Required fixtures cover title aliases, exact session/occurrence IDs, full prompt text beyond previews, changed-file/artifact paths, workspace/source references, model/effort/context values and diagnostic evidence. Newly searchable artifact/diagnostic terms are tested explicitly.
+- Grouped and occurrence searches retain correct identities and workspace/backing attribution. Multiword queries can match different approved content fragments. Tests include negative cases for unrelated workspaces, relationship labels and generic disclaimers.
+- Empty queries, case/whitespace normalization, missing supplemental attributes, unknown metadata, ignored/limited records, combined numeric/date/type/status/project/model/chip filters, counts, sorting, reset and deep-link reveal behave correctly.
+- Exact copy values, informative tooltips/uncertainty reasons, keyboard-accessible controls, redaction, safe serialization and CSP behavior remain intact. Do not substitute browser Find for report search.
+- DOM extraction and query execution are measured separately. Record startup/indexing time and representative query latency under documented browser/hardware conditions; do not invent an unapproved latency cap. Attribute removal must not hide an occurrence-sized index duplication in memory.
+- Reaudit identical preserved inputs, report exact before/after bytes and relevant attribute counts, and reconcile accounting. Live-root inventories may change, so use stable fixtures/captures for causal comparisons and fresh real reports for acceptance.
+- There is a measured net size reduction, not merely a relocation of identical strings into JSON. Compression figures alone do not demonstrate rendering improvements.
+
+#### Later opportunities and decisions
+
+| Candidate | Priority / caution |
+| --- | --- |
+| Consolidate repeated static storage/ownership explanations | Good follow-up if caveats remain readily discoverable; this changes presentation beyond duplicate titles |
+| Shared workspace/path references | Potential savings; preserve access to full exact values and attribution |
+| Reduce `data-copy` duplication | Only when exact redacted copy values can be recovered without formatting, prefix or whitespace corruption |
+| Simplify Why/source tables, wrappers and repeated classes | Largest later presentation opportunity; do not remove identifying evidence for a byte target |
+| Comprehensive structured model and client rendering | Defer unless targeted work leaves justified size/startup problems; replacing duplicate HTML with duplicate JSON is not a solution |
+| CSS/whitespace minification | Low payoff in this audit |
+| Gzip/Brotli distribution | Separate optional packaging optimization; does not reduce expanded element count and is not a directly openable HTML replacement |
+
+Ask about new material ambiguities rather than silently changing search scope or evidence representation. The user approved the investigative search direction and requested this task/handoff; implementation has not begun. Numeric size/latency targets and larger client-rendered architecture changes remain undecided.
+
+### Approved source redesign implementation plan
+
+1. Preserve the generated HTML comparisons in the ignored reference archive and retain an index for navigation.
+2. Collect unique storage artifacts once per report, read databases in a read-only transaction, and separate physical, logical, scoped and directory measurements.
+3. Consolidate source presentation without changing basic listings, discovery, exports or deferred global-store coverage. Keep all per-reference identity differences and derived references with no own index row visible.
+4. Use bold abbreviated sizes and regular small Arial Narrow exact byte counts. Keep full values available through copy controls and technical disclosures.
+5. Add fixture coverage for SQLite UTF-8 byte lengths, JSONL separators, shared storage, missing/unreadable artifacts, reference differences and factual labels; run typechecks, tests, golden/build and actual browser review.
+6. Synchronize the storage guide and completion evidence. Do not stage or commit.
+
+### Source redesign validation and reference archive
+
+- `npm run verify`: both typechecks, 298 tests and the unchanged portable golden digest/render passed. New tests cover Unicode/blob SQLite byte lengths, free pages, read-only preservation, JSONL separators and invalid records, shared inspection results, missing/unreadable/changed artifacts, junction refusal, per-reference child IDs/titles, inherited parent cwd and collapsed SDK event timestamps.
+- `npm run build`: CLI, library bundles and declarations succeeded. Fresh normal and `--show-ignored` reports were generated with the bundled CLI and explicit Stable user-data root.
+- Installed Edge: 20 acceptance checks per final report; zero controller exceptions. Checked new source/identity disclosures, derived references, database composition, exact-size font/weight, full-path clipboard success and explicit clipboard failure, unique IDs, existing filters/comparison/navigation, desktop/narrow bounds, light/dark rendering and no-JavaScript reading. Visually reviewed source summary, evidence table, narrow table and dark-mode screenshots. Narrow evidence tables scroll within their own wrappers.
+- Browser review corrected a source-table grid overflow and an overly broad browser credit-chip sample (a token-only usage chip is not a credit sample). Concurrent browser checks of an intermediate report timed out after duplicated SDK event dates inflated the technical table; duplicate event dates were removed, event date provenance was collapsed, and both final reports passed separately.
+- Final outputs: `temp-tool-output/copilot-chat-sessions-source-redesign-261013.html` and `temp-tool-output/copilot-chat-sessions-source-redesign-ignored-261013.html`. Browser evidence: `detailed-browser-validation-source-accepted-normal-261013.json` and `detailed-browser-validation-source-accepted-ignored-261013.json`.
+- `temp-tool-output/reference-archive-261013_1844` retains prior comparisons plus both final outputs, with `index.html` and `manifest.csv` (57 HTML files including the index). Originals remain; browser scratch profiles were cleaned. No staging or commit performed.
+- Limitations unchanged: live filesystem measurements are not an atomic backup; global empty-window/legacy/transferred stores remain backlog #22; SDK usage correlation remains deferred. Sharing counts cover inventoried occurrences, including hidden entries, and do not prove redundancy or exclusive ownership.
+
+### HTML report design guide (tasks #27-#28)
+
+Created `docs/HTML-REPORT-DESIGN.md` as the shared lightweight design reference, linked from README. It consolidates implemented page/card/source outlines, basic-versus-detailed differences, abbreviations, UUID prefix rules, path prefixes, semantic colors/icons, typography, date/usage/unknown conventions, interaction behavior and rationale. Implementation references and deferred decisions are explicit; this is not another detailed CLI/storage specification. Documentation-only change; no runtime validation required.
+
+Follow-up review found the first outline was incomplete and did not match the renderer. Corrected it from `detailed-listing.ts` and added ASCII wireframes (page, collapsed/expanded card, TOC item, Why/source), `docs/diagrams/html-report-wireframe.drawio`, and a "Rebuilding the report" section (inputs, page behavior, chip catalog, style tokens, checklist). Validated: drawio XML parses with unique IDs, local links resolve, no trailing whitespace. Known remaining gaps for a byte-faithful rebuild: exact palettes and markup are only in source, and there is no standalone sample-data fixture or reference render in the docs.
+
+Second cross-check (TOC, Why/source and the other components) against `detailed-listing.ts`, `detailed-source.ts`, `listing-relationships.ts`, `listing-usage.ts`, `detailed-listing-presentation.ts`, `inventory.ts` and a generated show-ignored report (277 cards, ~21.7 MB; construct counts matched). Added a "Component reference" section (header, filters, project, titles, turns, credits/tokens, dates, family and sub-agents, ignored reasons, orphan-like conditions, Why/source tables) and corrected the TOC item layout and model/credit/token chip formats. Findings: no orphan classification exists, `superseded-placeholder` is declared but never assigned, the evidence table's Field column is always `Location`, and report size grows with per-card source evidence.
+
+## Prioritized next items
+
+Ranked by value for the effort. Effort: S under half a day, M about a day, L several days. Items marked "decision" need an answer from the user before work starts. IDs are session todo IDs.
+
+| Rank | ID | Item | Why it pays off | Effort | Needs from you |
+| --- | --- | --- | --- | --- | --- |
+| 1 | next-commit-checkpoint | Review and commit the current worktree in logical commits; consider a `.gitattributes` line-ending rule | About 4,700 changed lines exist only in the working tree and index; one mistake loses them. Also removes the CRLF warnings | S | Approval to stage and commit, and the commit grouping |
+| 2 | next-graph-reindex | Re-index the codebase-memory graph for this project | The graph predates the report modules, so AI structural lookups miss them and force slower source reads | S | None |
+| 3 | next-drift-automode | Handle the benign `autoModeResolution` record (#11) with an explicit known-record entry, without blanket suppression | Removes a false drift warning from every export of affected chats; small, contained change | S | None |
+| 4 | next-global-stores | Decide and implement #22: read `emptyWindowChatSessions`, legacy `no-workspace` and `transferredChatSessions` | Closes the remaining known hole behind the original "incomplete list" complaint | M | Decision on whether to include these stores |
+| 5 | next-report-size | Measure what dominates the 21.7 MB show-ignored report and slim it (shorter repeated captions/purposes, shared text) | Opening, filtering and browser automation slow down with 277 cards; an earlier intermediate version timed out | S to measure, M to fix | None |
+| 6 | next-evidence-field-column | Replace the constant `Location` field with real field names or remove the column | Wasted width in every evidence row; the design guide already calls it a placeholder | S | Choose drop or rename |
+| 7 | next-model-icon | Pick a distinct model-chip icon (#21) | Ends the ambiguity between Agent Host and model chips; two-line change plus tests | S | Decision |
+| 8 | next-needs-attention | Add a report-level "Needs attention" summary (unresolved, index-only, journal-only, ambiguous, derived children) with filter links | Delivers the orphan and cleanup overview you asked for using evidence the report already has, without claiming deletability | M | Confirm wording and placement |
+| 9 | next-sdk-markdown | SDK Markdown export for verified Agent Host and CLI chats (#9) | Largest functional unlock: 78 Agent Host and 5 CLI occurrences are listed but not exportable | L | Review of the rendering approach |
+| 10 | next-local-fidelity | Wire planner, omission reports, `--high-fidelity` and `--no-redact` for Local export (#15) | Makes exports trustworthy and removes legacy clipping; builds on tested contracts | L | None |
+| 11 | next-verification | Source-aware SDK verification/census and serialization checks (#10) | Safety net for items 9 and 10; do it alongside them | M | None |
+| 12 | next-acceptance | Interactive terminal root-chooser check and the final cross-surface documentation review (#13, #12) | Closes the acceptance gaps; mostly manual | S | A short manual terminal run |
+| 13 | next-design-fixture | Add an anonymized sample dataset and reference render for the design guide | Lets another engineer or AI check a rebuild against a known output | S | None |
+| 14 | next-sdk-usage | SDK usage correlation (#20) | Fills `Usage unavailable` for agent chats; needs careful binding to avoid double counting | M to L | Deferred by you |
+
+Recommended order: 1 to 3 immediately, then 4 and 5 once you decide, then the export work (9 to 11) as the main body of work, with 8 and 12 interleaved.
 
 ## Session-wide research requirement for AI agents
 
@@ -259,7 +435,7 @@ The originally referenced "Pasted text #1" was not available as an attachment. T
 | Compact console listing (October 8) | Group only verified identity/scope matches and Local journals with the same ID and raw-byte digest; never group by title. Show creation date only from recorded creation evidence, updated/activity date separately, and `unknown` when creation is unavailable. |
 | Listing prompt counts (October 8) | Main rows count main-scope human prompts only; delegated prompts do not inflate the parent. Each verified child row counts one delegation plus any separately recorded child-scope human `user.message` records. Unknown/malformed prompt data is reported as `unknown`, not guessed. |
 | Listing filters and summary (October 8) | Hide `/fix`, confirmed-empty, and ambiguous entries by default; `--show-ignored` restores them. Keep unresolved/index-only entries visible. Show all eligible grouped conversations by default, with `--last25` as an optional newest-first limit. State `X of Y` conversations, ignored categories, and duplicate source counts. |
-| Listing ID selection (October 8) | Show the shortest unique hexadecimal UUID prefix of at least 8 characters by default; `--full-ids` restores complete IDs and is listing-only. Accept a prefix for export only when exactly one Local journal matches in the selected root. Ambiguous prefixes list candidate IDs; repeated UUIDs across workspaces still require an exact journal path. Prefix matching ignores UUID hyphens so displayed longer prefixes remain selectable. |
+| Listing ID selection (October 8) | Show the **shortest unique hexadecimal UUID prefix** of at least 8 characters by default; `--full-ids` restores complete IDs and is listing-only. Accept a prefix for export only when exactly one Local journal matches in the selected root. Ambiguous prefixes list candidate IDs; repeated UUIDs across workspaces still require an exact journal path. Prefix matching ignores UUID hyphens so displayed longer prefixes remain selectable. |
 | Unknown `New Chat` placeholders (October 8, 17:14) | Hide a row by default only when its title is exactly `New Chat` (case-insensitive after trimming) and both creation date and prompt count are unknown. `--show-ignored` restores it. This is a convenience filter, not a claim that the underlying chat is empty; do not broaden it to other titles or metadata combinations without another decision. |
 | Listing identity/status clarity (October 8, 17:14) | Show chat type, an exact copyable Local UUID prefix without an ellipsis, and widen the ID column when needed. Explain `verified`, `unresolved`, and `ambiguous`; mark repeated Local journal IDs `path required`, since UUID alone is not an unambiguous selector. |
 | No arguments | Produce a listing, not a Markdown chat export, even when a current-session environment variable exists. |
@@ -580,6 +756,8 @@ Local research artifacts are retained in the chat session's `files` directory: `
 Evidence: codebase-memory `search_graph`, `trace_path`, `get_code_snippet`, and per-file `check_index_coverage`; current scoped source reads; filesystem listings; read-only exporter listing and `resolveSession()` probe; sister `--json --no-output` listing; saved HTML inventory/counters; read-only schema parse; Git status/diff summary. No implementation tests were required for adding this planning-only log, and no export was written during reproduction.
 
 ## Next action
+
+Awaiting your direction on the ranked list in "Prioritized next items": approval for the commit checkpoint (rank 1), decisions for #22, the evidence Field column and the model icon (ranks 4, 6, 7), and which export item to start with. Ranks 2 and 3 need no decision. The paragraph below is the earlier export-side plan and still applies to ranks 9 to 11.
 
 The latest slice has passed `npm run verify`, `npm run build`, bundled CLI tests and `git diff --check`; no new live inventory run was needed because selection behavior was covered with synthetic journals. Next continue the archive planner's consistent redaction, introductory/end omission reports and companion-producing text/metadata/image presentation, then the SDK Markdown adapter using verified identity/scope evidence. Revalidate identity/SHA-256 on export and include identity/scope warnings. The staged writer is wired for existing Local Markdown exports, but their renderer still has legacy clipping and incomplete loss accounting; `--high-fidelity`/`--no-redact` must not be accepted until all paths obey them. Follow with Local fidelity fixes, offline HTML, documented filter parity and full acceptance. Investigate historical `parentToolCallId` before extending child support; missing identity is not permission to infer a transcript. Ask about material choices and preserve private sources/concurrent edits.
 
