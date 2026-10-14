@@ -213,7 +213,8 @@ export async function collectListingStorage (occurrences: readonly SessionOccurr
     if (!data)
       continue;
     const workspace = row.provenance.workspaceStoragePath;
-    const paths = new Set([path.join(workspace, 'workspace.json'), path.join(workspace, 'state.vscdb')]);
+    const paths = new Set([path.join(workspace, 'state.vscdb')]);
+    row.provenance.store !== 'empty-window' && paths.add(path.join(workspace, 'workspace.json'));
     data.artifactLocations.forEach((item) => paths.add(item.path));
     data.artifacts.forEach((item) => paths.add(item.path));
     data.history.path && paths.add(data.history.path);

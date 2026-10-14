@@ -139,6 +139,15 @@ export interface ToolNode {
 
 export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode;
 
+/** The model Auto resolved to for one request. Kept on the turn scalars, never in the body. */
+export interface AutoModelResolution {
+  modelId: string;
+  modelName: string;
+  /** Router confidence, recorded only by older builds. */
+  confidence: number | null;
+  predictedLabel: string;
+}
+
 /** A file this turn changed, with the strongest operation seen for it. */
 export interface FileTouch {
   file: string;
@@ -174,6 +183,8 @@ export interface TurnScalars {
   modeInfo?: { modeId?: string; kind?: string };
   variableData?: unknown;
   isCanceled?: boolean;
+  /** From `autoModeResolution` response items, in recorded order. */
+  autoModelResolutions?: AutoModelResolution[];
   [field: string]: unknown;
 }
 

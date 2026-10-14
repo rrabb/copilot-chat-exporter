@@ -20,12 +20,13 @@ export const detailedListingStyles = `
 .storage-size strong { font-family: Arial, sans-serif; font-weight: bold; white-space: nowrap; }
 .exact-bytes { display: inline-block; font: normal .75rem "Arial Narrow", Arial, sans-serif; white-space: nowrap; color: var(--muted); }
 .unified-evidence { font-size: .8rem; }
+.attention summary { cursor: pointer; }
+.attention td.numeric { text-align: right; }
 .unified-evidence td:first-child { min-width: 7rem; }
-.unified-evidence td:nth-child(2) { min-width: 4rem; }
-.unified-evidence td:nth-child(3) { min-width: 13rem; }
-.unified-evidence td:nth-child(4) { min-width: 6.5rem; }
-.unified-evidence td:nth-child(5) { min-width: 6rem; }
-.unified-evidence td:nth-child(6), .unified-evidence td:nth-child(7) { min-width: 9rem; }
+.unified-evidence td:nth-child(2) { min-width: 13rem; }
+.unified-evidence td:nth-child(3) { min-width: 6.5rem; }
+.unified-evidence td:nth-child(4) { min-width: 6rem; }
+.unified-evidence td:nth-child(5), .unified-evidence td:nth-child(6) { min-width: 9rem; }
 :root {
   color-scheme: light dark;
   --bg: #f1f5f9;

@@ -50,11 +50,15 @@ workspaceStorage\<workspace-hash>\
 
 | Location | Meaning | Tool coverage |
 | --- | --- | --- |
-| `globalStorage\emptyWindowChatSessions\<id>.jsonl` | Chats from windows with no folder open | Not inventoried yet (backlog #22) |
-| `workspaceStorage\no-workspace\chatSessions` | Older layout for the same case | Not inventoried yet (backlog #22) |
-| `globalStorage\transferredChatSessions` | Chats transferred between windows | Not inventoried yet (backlog #22) |
+| `globalStorage\emptyWindowChatSessions\<id>.jsonl` | Journals from windows with no folder open | Inventoried. The chat index for these windows is the same `chat.ChatSessionStore.index` key, but in `globalStorage\state.vscdb` (application scope), so Agent Host and CLI references saved from an empty window appear as references too. Shown as "(empty window)" with no invented project |
+| `workspaceStorage\no-workspace\chatSessions` | Older layout for the same case | Covered by the normal `workspaceStorage` scan, as an ordinary store with no `workspace.json` |
+| `globalStorage\transferredChatSessions` | A temporary copy made when a chat is moved to another window | Deliberately not inventoried (see below) |
 
-Until #22 is done, a chat that exists only in these places will not appear in the listing. Check them by hand if a chat you remember is missing.
+Evidence: VS Code's [`chatSessionStore.ts`](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/chatSessionStore.ts) picks `emptyWindowChatSessions` for a window with no folder and `no-workspace\chatSessions` as the previous empty-window location, and stores the index in the application scope for empty windows. The same file records a transfer in a separate profile-scoped index (`ChatSessionStore.transferIndex`) keyed by the destination folder, with a 5-minute expiry, and deletes the file after use. It is a short-lived duplicate of a chat that already exists elsewhere, so listing it would show the same conversation twice and then disappear. This is derived from reading the source, not from a live transfer.
+
+On the development machine this added three rows to the Stable root (one real Agent Host chat, one `New Chat` placeholder that is hidden by default, and one empty journal that is hidden as confirmed empty) and two to the Insiders root (one Copilot CLI chat and one empty journal). Counts change as VS Code runs.
+
+The store is not a workspace, so the report labels it "(empty window)" rather than guessing a project. The project filter files these chats under "No recorded project" unless the chat itself records a working directory.
 
 ## Step 5 - the Agent Host and Copilot CLI chain
 

@@ -2,48 +2,131 @@
   <diagram id="detailed-report-wireframe" name="Detailed report wireframe">
     <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="900" math="0" shadow="0">
       <root>
-        <mxCell id="0"/>
-        <mxCell id="1" parent="0"/>
-        <mxCell id="t1" value="1. Page layout (one main element, top to bottom)" style="text;html=1;fontStyle=1;fontSize=14;" vertex="1" parent="1"><mxGeometry x="20" y="0" width="520" height="20" as="geometry"/></mxCell>
-        <mxCell id="p1" value="header: caption, h1, generated date and root, nav links, privacy warning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="30" width="520" height="60" as="geometry"/></mxCell>
-        <mxCell id="p2" value="metrics strip: groups, occurrences, main candidates, shown, ignored, model IDs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="100" width="520" height="40" as="geometry"/></mxCell>
-        <mxCell id="p3a" value="Backing status chart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="150" width="165" height="50" as="geometry"/></mxCell>
-        <mxCell id="p3b" value="Chat types chart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="197" y="150" width="165" height="50" as="geometry"/></mxCell>
-        <mxCell id="p3c" value="Answering models chart (top 8)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="375" y="150" width="165" height="50" as="geometry"/></mxCell>
-        <mxCell id="p4" value="Chats per project: multiple projects, no recorded project, top 12, all-projects disclosure (bars are not additive)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="210" width="520" height="45" as="geometry"/></mxCell>
-        <mxCell id="p5" value="Session TOC (collapsible): number, type, title, then project, last update, refs and edit chips" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="265" width="520" height="40" as="geometry"/></mxCell>
-        <mxCell id="p6" value="Find the chat you remember: search, Type / Backing / Project / Model selects, quick chips, date and numeric ranges, view / density / sort, reset, show all, count and status lines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="315" width="520" height="70" as="geometry"/></mxCell>
-        <mxCell id="p7" value="Comparison panel: two pinned summaries (hidden until pinned)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="395" width="520" height="35" as="geometry"/></mxCell>
-        <mxCell id="p8" value="Grouped view: one details.session-card per conversation (type-colored border and title)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#176ba1;strokeWidth=3;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="20" y="440" width="520" height="60" as="geometry"/></mxCell>
-        <mxCell id="p9" value="Occurrence view: one row per workspace reference (hidden until selected)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="510" width="520" height="35" as="geometry"/></mxCell>
-        <mxCell id="p10" value="Guides: Models used, Storage guide, IDs / sizes, How to use, Audit legend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="555" width="520" height="40" as="geometry"/></mxCell>
-        <mxCell id="p11" value="Ignored sessions (links to shown cards, or full cards)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="605" width="520" height="35" as="geometry"/></mxCell>
-        <mxCell id="p12" value="footer: generated locally, no external resources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1"><mxGeometry x="20" y="650" width="520" height="30" as="geometry"/></mxCell>
-        <mxCell id="t2" value="2. Conversation card" style="text;html=1;fontStyle=1;fontSize=14;" vertex="1" parent="1"><mxGeometry x="600" y="0" width="520" height="20" as="geometry"/></mxCell>
-        <mxCell id="c1" value="&lt;b&gt;Collapsed summary&lt;/b&gt;&lt;br&gt;Line 1: number, type chip, title, subagent / fork / w/s refs / likely-fork chips&lt;br&gt;Line 2: bold turns, project, created, updated, models chip, edits, usage&lt;br&gt;Line 3: status, export support, issues, wsID, sID or agentID" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#dae8fc;strokeColor=#176ba1;strokeWidth=3;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="30" width="520" height="95" as="geometry"/></mxCell>
-        <mxCell id="c2" value="Titles at each storage level (top right: Compare, Link, TOC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="140" width="520" height="32" as="geometry"/></mxCell>
-        <mxCell id="c3" value="Notes (only when usage or model is unavailable) / Usage disclosure" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="178" width="520" height="32" as="geometry"/></mxCell>
-        <mxCell id="c4" value="Ordered prompts / delegated tasks (turn cards: person icon, date, model, credits, edits, preview, full prompt only if clipped)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="216" width="520" height="42" as="geometry"/></mxCell>
-        <mxCell id="c5" value="Family / relationships (or: none recorded)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="264" width="520" height="30" as="geometry"/></mxCell>
-        <mxCell id="c6" value="Model-switch timeline (or one-line field)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="300" width="520" height="30" as="geometry"/></mxCell>
-        <mxCell id="c7" value="Conversation / workspace / outcomes cards and first / last previews" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="336" width="520" height="30" as="geometry"/></mxCell>
-        <mxCell id="c8a" value="Dates and provenance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="372" width="255" height="30" as="geometry"/></mxCell>
-        <mxCell id="c8b" value="Editing history / injected prompts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1"><mxGeometry x="865" y="372" width="255" height="30" as="geometry"/></mxCell>
-        <mxCell id="c9" value="Why / source (see column 3)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontStyle=1;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="408" width="520" height="34" as="geometry"/></mxCell>
-        <mxCell id="c10" value="Export selector / command (Copy selector, Copy command)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1"><mxGeometry x="600" y="448" width="520" height="30" as="geometry"/></mxCell>
-        <mxCell id="t3" value="3. Why / source" style="text;html=1;fontStyle=1;fontSize=14;" vertex="1" parent="1"><mxGeometry x="1180" y="0" width="480" height="20" as="geometry"/></mxCell>
-        <mxCell id="w1" value="Binding / content status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="30" width="480" height="30" as="geometry"/></mxCell>
-        <mxCell id="w2" value="Health / audit checks (warnings first, none when clean)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="68" width="480" height="30" as="geometry"/></mxCell>
-        <mxCell id="w3" value="Where it is referenced: W1, W2, W3 labels, project, reference basis, cwd match" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="106" width="480" height="42" as="geometry"/></mxCell>
-        <mxCell id="w4" value="Chain at a glance (recorded evidence route, not a runtime lookup order)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="156" width="480" height="34" as="geometry"/></mxCell>
-        <mxCell id="w5" value="Detailed lineage (only for multiple refs, derivation or unresolved mappings)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="198" width="480" height="34" as="geometry"/></mxCell>
-        <mxCell id="w6" value="Storage summary (scope, sizes are not additive)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="240" width="480" height="30" as="geometry"/></mxCell>
-        <mxCell id="w7" value="&lt;b&gt;Unified evidence table (collapsed)&lt;/b&gt;&lt;br&gt;Artifact, field, prefixed value with copy, size, shared by, purpose, seen in, state and removal impact" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1180" y="278" width="480" height="55" as="geometry"/></mxCell>
-        <mxCell id="w8" value="Artifact composition: SQLite keys, JSONL kinds, directory children" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1200" y="341" width="440" height="30" as="geometry"/></mxCell>
-        <mxCell id="w9" value="Technical identity: unique field and value tuples with the references that carry them" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1"><mxGeometry x="1200" y="379" width="440" height="34" as="geometry"/></mxCell>
-        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#176ba1;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="p8" target="c1"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="c9" target="w1"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="n1" value="Dashed boxes are hidden until JavaScript or a link reveals them. Colors: blue Local, purple Agent Host, amber sub-agent, teal CLI, pink External." style="text;html=1;whiteSpace=wrap;fontSize=11;fontStyle=2;" vertex="1" parent="1"><mxGeometry x="20" y="700" width="1100" height="30" as="geometry"/></mxCell>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t1" value="1. Page layout (one main element, top to bottom)" style="text;html=1;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="20" y="0" width="520" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" value="header: caption, h1, generated date and root, nav links, privacy warning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="30" width="520" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" value="metrics strip: groups, occurrences, main candidates, shown, ignored, model IDs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="100" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p3a" value="Backing status chart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="150" width="165" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p3b" value="Chat types chart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="197" y="150" width="165" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p3c" value="Answering models chart (top 8)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="375" y="150" width="165" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" value="Chats per project: multiple projects, no recorded project, top 12, all-projects disclosure (bars are not additive)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="210" width="520" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="p4b" value="Needs attention (collapsed): per-condition count chips; table of conditions with Show filter buttons; link to Ignored sessions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="265" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p5" value="Session TOC (collapsible): number, type, title, then project, last update, refs and edit chips" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="315" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p6" value="Find the chat you remember: search, Type / Backing / Project / Model selects, quick chips, date and numeric ranges, view / density / sort, reset, show all, count and status lines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="365" width="520" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p7" value="Comparison panel: two pinned summaries (hidden until pinned)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="445" width="520" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="p8" value="Grouped view: one details.session-card per conversation (type-colored border and title)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#176ba1;strokeWidth=3;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="490" width="520" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p9" value="Occurrence view: one row per workspace reference (hidden until selected)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="560" width="520" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="p10" value="Guides: Models used, Storage guide, IDs / sizes, How to use, Audit legend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="605" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p11" value="Ignored sessions (links to shown cards, or full cards)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="655" width="520" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="p12" value="footer: generated locally, no external resources" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="700" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="2. Conversation card" style="text;html=1;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="600" y="0" width="520" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="&lt;b&gt;Collapsed summary&lt;/b&gt;&lt;br&gt;Line 1: number, type chip, title, subagent / fork / w/s refs / likely-fork chips&lt;br&gt;Line 2: bold turns, project, created, updated, models chip, edits, usage&lt;br&gt;Line 3: status, export support, issues, wsID, sID or agentID" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=8;fillColor=#dae8fc;strokeColor=#176ba1;strokeWidth=3;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="30" width="520" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="Titles at each storage level (top right: Compare, Link, TOC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="140" width="520" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="Notes (only when usage or model is unavailable) / Usage disclosure" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="178" width="520" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="Ordered prompts / delegated tasks (turn cards: person icon, date, model, credits, edits, preview, full prompt only if clipped)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="216" width="520" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="Family / relationships (or: none recorded)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="264" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="Model-switch timeline (or one-line field)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="300" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" value="Conversation / workspace / outcomes cards and first / last previews" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="336" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c8a" value="Dates and provenance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="372" width="255" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c8b" value="Editing history / injected prompts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="865" y="372" width="255" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="c9" value="Why / source (see column 3)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="408" width="520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="c10" value="Export selector / command (Copy selector, Copy command)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="600" y="448" width="520" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="3. Why / source" style="text;html=1;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="0" width="480" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" value="Binding / content status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="30" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="w2" value="Health / audit checks (warnings first, none when clean)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="68" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="w3" value="Where it is referenced: W1, W2, W3 labels, project, reference basis, cwd match" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="106" width="480" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" value="Chain at a glance (recorded evidence route, not a runtime lookup order)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="156" width="480" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="w5" value="Detailed lineage (only for multiple refs, derivation or unresolved mappings)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="198" width="480" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="w6" value="Storage summary (scope, sizes are not additive)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="240" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="w7" value="&lt;b&gt;Unified evidence table (collapsed)&lt;/b&gt;&lt;br&gt;Artifact, prefixed value with copy, size / state, tied to, purpose and potential impact if removed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="278" width="480" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="w8" value="Artifact composition: SQLite keys, JSONL kinds, directory children" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="341" width="440" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="w9" value="Technical identity: unique field and value tuples with the references that carry them" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="379" width="440" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#176ba1;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="p8" target="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=classic;" edge="1" parent="1" source="c9" target="w1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="Dashed boxes are hidden until JavaScript or a link reveals them. Colors: blue Local, purple Agent Host, amber sub-agent, teal CLI, pink External." style="text;html=1;whiteSpace=wrap;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="750" width="1100" height="30" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

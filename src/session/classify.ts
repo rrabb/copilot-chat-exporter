@@ -26,6 +26,7 @@ export const HANDLED_RESPONSE_KINDS = new Set([
   'workspaceEdit',
   'inlineReference',
   'markdownContent',
+  'autoModeResolution',
 ]);
 
 // Produce no export node ON PURPOSE: presentation, bookkeeping, or content already captured
@@ -59,7 +60,6 @@ export const KNOWN_UNSEEN_KINDS = new Set([
   'planReview',
   'hook',
   'externalEdit',
-  'autoModeResolution',
   'elicitationSerialized',
   'clearToPreviousToolInvocation',
   'disabledClaudeHooks',
@@ -194,7 +194,27 @@ export function classifyNode (item: any) {
     const value = typeof ref === 'string' ? ref : (ref?.path || ref?.fsPath || ref?.name || '');
     return { type: 'ref', text: value ? path.basename(String(value)) : '' };
   }
+  if (item.kind === 'autoModeResolution') {
+    // Which model Auto picked for this request. Observed in two shapes: the newer
+    // `resolved: { id, name }` object and older flattened `resolvedModel*` fields with a
+    // router confidence and label. It is request metadata, not response content.
+    const modelId = nonEmptyString(item.resolved?.id) || nonEmptyString(item.resolvedModel);
+    const modelName = nonEmptyString(item.resolved?.name) || nonEmptyString(item.resolvedModelName);
+    if (!modelId && !modelName)
+      return null;
+    return {
+      type: 'autoModel',
+      modelId,
+      modelName,
+      confidence: typeof item.confidence === 'number' && Number.isFinite(item.confidence) ? item.confidence : null,
+      predictedLabel: nonEmptyString(item.predictedLabel),
+    };
+  }
   if (item.kind == null && typeof item.value === 'string')
     return { type: 'text', text: item.value };
   return null;
+}
+
+function nonEmptyString (value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
 }

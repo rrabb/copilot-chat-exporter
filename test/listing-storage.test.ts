@@ -162,6 +162,29 @@ test('source UI attributes different child IDs to the right references without i
   assert.ok(!html.includes('all values are identical'));
 });
 
+test('the evidence table has one row per artifact and no constant Field column', async (context) => {
+  const { root, row } = await fixture(context);
+  const file = path.join(root, 'workspace.json');
+  await fs.writeFile(file, '{}');
+  const data = detailedEvidence({ artifactLocations: [{ kind: 'related', path: file, state: 'present', form: 'file', bytes: 2, files: null }] });
+  await collectListingStorage([row], new Map([[row.occurrenceId, data]]));
+  const html = renderDetailedSource(groupOccurrences([row])[0]!, new Map([[row.occurrenceId, data]]), 'session-1');
+  const start = html.indexOf('class="unified-evidence"');
+  const table = html.slice(start, html.indexOf('</table>', start));
+  assert.match(table, /<thead><tr><th>Artifact<\/th><th>Value<\/th><th>Size \/ state<\/th><th>Tied to<\/th><th>Purpose<\/th><th>Potential impact if removed<\/th><\/tr><\/thead>/u);
+  assert.ok(!table.includes('<th>Field</th>') && !table.includes('<td>Location</td>'));
+});
+
+test('an empty-window reference is labeled as such and does not look for workspace.json', async (context) => {
+  const { root, row } = await fixture(context);
+  const emptyWindow = { ...row, provenance: { ...row.provenance, store: 'empty-window' as const } };
+  const data = detailedEvidence();
+  await collectListingStorage([emptyWindow], new Map([[emptyWindow.occurrenceId, data]]));
+  assert.ok(!data.storage!.some((item) => item.path.endsWith('workspace.json')));
+  const html = renderDetailedSource(groupOccurrences([emptyWindow])[0]!, new Map([[emptyWindow.occurrenceId, data]]), 'session-1');
+  assert.ok(html.includes('(empty window)'), root);
+});
+
 test('storage size presentation keeps exact bytes regular/narrow and the abbreviated size bold', () => {
   assert.equal(storageBytes(19606580), '<span class="storage-size"><strong>18.7 MB</strong> <span class="exact-bytes">19,606,580 bytes</span></span>');
   assert.ok(storageBytes(null).includes('title="Size not measured">?</span>'));

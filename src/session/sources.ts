@@ -3,6 +3,8 @@ export type SessionProvider = 'local' | 'agent-host' | 'copilot-cli' | 'external
 export interface SourceProvenance {
   userDataRoot: string;
   workspaceStoragePath: string;
+  /** Set for chats VS Code saved in a window with no folder open (global storage, not a workspace folder). */
+  store?: 'empty-window';
   workspaceIdentity?: { kind: 'folder' | 'workspace'; uri: string };
   indexKey?: string;
 }

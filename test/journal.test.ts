@@ -51,6 +51,18 @@ test('kind 3 deletes a request property', () => {
   assert.equal('responseId' in session.rawRequests[0], false);
 });
 
+test('autoModeResolution is request metadata: it reaches the scalars, not the body, and is not drift', () => {
+  const resolution = { kind: 'autoModeResolution', resolved: { id: 'gpt-x', name: 'GPT X' } };
+  const raw = journal({ kind: 0, v: { version: 3, requests: [request('r1', 'question', [{ value: 'answer' }, resolution])] } });
+
+  const session = parseChatSession('session.jsonl', raw);
+
+  assert.deepEqual(session.turns[0].body.map((node) => node.type), ['text']);
+  assert.deepEqual(session.turns[0].scalar.autoModelResolutions,
+    [{ modelId: 'gpt-x', modelName: 'GPT X', confidence: null, predictedLabel: '' }]);
+  assert.deepEqual(session.census.unhandled, []);
+});
+
 test('compact confirmation remains on its recorded request', () => {
   const raw = journal(
     { kind: 0, v: { version: 3, requests: [request('r1', 'question'), request('r2', '/compact')] } },

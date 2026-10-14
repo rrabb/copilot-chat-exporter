@@ -54,6 +54,10 @@ The page is one `<main>`, rendered in this order. A [draw.io wireframe](diagrams
 |   multiple projects ████░░  n | no recorded project ██░░ n | top 12 projects…  |
 |   "All N projects" disclosure; each name is a project-filter button            |
 +--------------------------------------------------------------------------------+
+| #needs-attention  🛎️ Needs attention · N conditions  [❓ n][⛔ n][🟠 n][🔎 n]  |
+|   collapsed; expands to Condition | Chats | What it means | [Show]             |
+|   "none detected" one-liner when clean; link to Ignored sessions               |
++--------------------------------------------------------------------------------+
 | <details #conversation-index> 📚 Session TOC (N)  -- all groups, one per line  |
 |   ordered list; 2 lines per item (see TOC item)                                |
 +--------------------------------------------------------------------------------+
@@ -145,8 +149,8 @@ Missing values use `?`/`??`/`???` with tooltips. The refs and edit chips appear 
 +-- Detailed lineage (only for multiple refs / derivation / unresolved) ---------+
 +-- Storage summary: scope, artifacts, sizes (not additive)                      |
 +-- ▸ Unified evidence table                                                    |
-|   Artifact | Field | Value (prefixed, copy) | Size | Shared by | Purpose |     |
-|   Seen in  | State / if removed                                               |
+|   Artifact | Value (prefixed, copy) | Size / state | Tied to | Purpose |        |
+|   Potential impact if removed                                                  |
 |   ▸ composition (SQLite keys, JSONL kinds, directory children)               |
 |   ▸ Technical identity: field + value + references that carry it             |
 +------------------------------------------------------------------------------+
@@ -160,7 +164,7 @@ Missing values use `?`/`??`/`???` with tooltips. The refs and edit chips appear 
 | Chain at a glance | Compact route from a reference to its recorded backing evidence | A mandatory sequence of VS Code database accesses |
 | Detailed lineage | Per-reference routes when multiple references, derivation or unresolved mappings add information | Guessed database hops based on file existence |
 | Storage summary | Conversation scope and related-storage context | An additive disk-usage or reclaimable-space total |
-| Unified evidence | Artifact, field, location/value, size/state, sharing, purpose and qualified removal impact | Exclusive ownership by this chat |
+| Unified evidence | Artifact, value (location), size/state, sharing, purpose and qualified removal impact | Exclusive ownership by this chat |
 | Technical identity | Field/value/reference tuples, including differing child IDs and title/date sources | That all references contain identical values |
 
 There are no separate duplicate "Shared artifacts", "All unique values" and "Technical identity" tables. Their roles are integrated into the unified evidence disclosure. Prompt text stays in Ordered prompts; per-event timestamps stay in Dates and provenance.
@@ -188,6 +192,7 @@ Quick-filter chips (all active chips must match): Local, Verified, Unresolved, H
 - A project is a distinct recorded workspace identity URI (`folder` or `workspace` kind). Two storage folders pointing at one URI are one project.
 - A chat uses its own references' identities. If it has none (for example a sub-agent with no index row), it inherits its recorded parent's. If none exists, the `cwd`/git root/working directory context is used for the displayed name only; with nothing, the project is `??` (not recorded).
 - The `agent-sessions.code-workspace` identity is ignored when another identity exists, so agent chats show the real project.
+- A chat saved by a window with no folder open (global storage) shows `(empty window)` instead of a project. It stays under "No recorded project" in the filter and chart because no workspace identity was recorded.
 - The header shows `📁` and the last path segment; the tooltip has the full URI (and notes inheritance). Colliding names are disambiguated with the parent folder, more segments, then `#ordinal`.
 - A multi-project chat appears under every project in the filter and chart. The TOC shows `📁 name +N`.
 
@@ -248,19 +253,21 @@ The first expanded section lists each distinct title value once, with every stor
 
 Ignored groups show `🙈 Ignored: reason` in the header and technical identity, and appear in the TOC. Without `--show-ignored` the `Ignored sessions` section holds their full cards, independent of main filters and the newest-25 limit. With `--show-ignored` they appear among the main cards and the section only links to them. A link from either place reveals the card without changing its identity.
 
-### Orphan-like conditions
+### Needs attention panel and orphan-like conditions
 
-The report has no "orphan" classification and does not judge importance or deletability. The closest observable conditions are explicit and qualified:
+The report does not classify "orphans" and does not judge importance or deletability. The page-level `Needs attention` panel (after the project chart) lists evidence-based conditions only, and each row's Show button filters the cards to exactly the counted chats (it is a condition filter that Reset filters clears, separate from the quick chips). Counts cover the chats listed in the report; groups hidden by default rules are pointed to through `Ignored sessions` instead of counted. One chat can match several rows.
 
-| Condition | Where shown |
-| --- | --- |
-| Index entry without verified backing (`index-only`, `Metadata only` filter, unresolved status) | Status chip, health check, `Unresolved backing` in the chain |
-| Local journal without an index entry (`journal-only`) | Reference basis `Journal without index entry` |
-| No recorded index entry | Reference basis `No recorded index entry` |
-| Sub-agent with no own index row | Reference basis `Derived through parent`, plus an info health check |
-| Parent or fork target not in the inventory | Family link labeled as outside the inventory |
+| Condition (flag) | Meaning | Also visible in the card as |
+| --- | --- | --- |
+| ❓ Unresolved backing (`unresolved`) | A reference exists but no readable conversation content was verified | Status chip, health check, `Unresolved backing` in the chain |
+| ⛔ Unsupported provider key (`unsupported`) | The index uses a provider key the exporter cannot resolve | Status chip |
+| 🟠 Ambiguous mapping or child scope (`ambiguous`) | Identity or child-scope evidence fits more than one candidate | `🟠 Ambiguous mapping` / `❓ N ambiguous child scope` chips |
+| 🧾 Journal without index entry (`journal-only`) | A Local journal exists but no persisted index entry names it | Reference basis `Journal without index entry` |
+| 🚨 Unreadable or changed source (`unreadable`) | Reading failed, or the file changed during the run | Danger health check |
+| 🔗 Parent or fork source outside this inventory (`dangling-link`) | A recorded parent or fork origin is not among the listed chats | Family link labeled as outside the inventory |
+| 🔎 Audit notes (`audit`) | Parser or audit flags such as partial edit evidence | `🔎 N audit notes` chip |
 
-An explicit orphan label with cleanup guidance is a possible future addition; it would need verified evidence and the same qualified-impact language.
+Other related, deliberately not flagged: a sub-agent with no own index row (`Derived through parent`) is normal, so it only gets an info health check; `No recorded index entry` is a reference basis, not a problem by itself. Rows appear only when their count is above zero. With nothing to report the panel is a single `none detected in the checks performed` line. The panel carries no cleanup advice; the unified evidence table's `Potential impact if removed` column stays qualified.
 
 ### Why/source contents
 
@@ -278,8 +285,7 @@ An explicit orphan label with cleanup guidance is a possible future addition; it
 
 | Column | Contents |
 | --- | --- |
-| Artifact | Kind: workspace.json, state.vscdb (and `-wal`/`-shm`/backup sidecars), journal or events file, agent-host.db, session.db, workspace.yaml, chatEditingSessions, transcripts, debug-logs, other |
-| Field | Currently always `Location`; kept as a column so it can later merge with the technical identity |
+| Artifact | Kind: workspace.json, state.vscdb (and `-wal`/`-shm`/backup sidecars), journal or events file, agent-host.db, session.db, workspace.yaml, chatEditingSessions, transcripts, debug-logs, other. Empty-window references omit workspace.json and use the global `state.vscdb` |
 | Value | Prefixed path (`‹.copilot›`, `‹WS›`, `‹Global›`, `‹Agent›`, `‹Code›`; the tooltip shows the base) with `↗` open and `📋` copy of the full path, then a `Composition / what uses the bytes` disclosure (SQLite keys, JSONL kinds, directory children) |
 | Size / state | Bold abbreviated size and small exact bytes, measurement state, modified date, file count |
 | Tied to | W chips for the references that use it, `N report chats / M refs` sharing counts, `Global database` pill for agent-host.db |
@@ -385,7 +391,7 @@ This section is the checklist for another engineer or AI to rebuild the detailed
 | --- | --- |
 | Selection | The main candidates are groups whose visibility is included (sub-agents are ordinary groups); `--show-ignored` adds ignored groups; `--last25` limits the initially shown set to the newest 25. Ignored groups also get their own section, independent of the main filters |
 | Card data | Each card carries search text, title, type, status, project keys (JSON), models (JSON), chip flags, turns, bytes, created/updated timestamps and generator-local days as `data-*` attributes |
-| Filters | Search words are ANDed against all evidence text. Type, backing and model are exact matches; model `?` means no answering model recorded. Project filter is inclusive; `__multi` means two or more projects, `__unknown` means none. Active quick chips are ANDed. Date and numeric ranges never match unknown values |
+| Filters | Search words are ANDed against all evidence text. Type, backing and model are exact matches; model `?` means no answering model recorded. Project filter is inclusive; `__multi` means two or more projects, `__unknown` means none. Active quick chips are ANDed. A Needs attention Show button sets one extra condition (ANDed with the rest) after clearing the others; Reset filters clears it. Date and numeric ranges never match unknown values |
 | Sorting | Updated, created, turns, bytes or title; unknown values sort last; ties break by card ID; the direction toggle reverses it |
 | Views | Grouped conversations or workspace occurrences; the count line reports shown/total for the active view |
 | Density | Collapsed (default), compact, or comprehensive (opens every card and inner disclosure) |
@@ -425,7 +431,7 @@ This section is the checklist for another engineer or AI to rebuild the detailed
 ### Rebuild checklist
 
 1. Group occurrences and compute the shown set, type and status counts, project and model counts, and relationships.
-2. Render the header, metrics, three charts, project chart and TOC.
+2. Render the header, metrics, three charts, project chart, Needs attention panel and TOC.
 3. Render the Find panel from the real option sets, with `data-filter` and `data-chip` attributes.
 4. Render one card per group using the card wireframe, omitting empty or unavailable sections as described above.
 5. Render Why/source from the source module, preserving per-reference attribution and the non-additive size rules.
@@ -441,7 +447,7 @@ Native `details`/`summary` provides collapsed reading without JavaScript. Filter
 
 Reports are identification aids, not near-lossless exports or atomic backups. Preserve redaction, HTML escaping and offline security policy. Do not imply global-store coverage that discovery does not implement. No warning means only that the checks performed found none.
 
-Known limitations: the report is large because each card carries its own Why/source evidence (a show-ignored sample with 277 cards was about 21.7 MB), so very large inventories can be slow to open; there is no orphan classification; the unified evidence table's Field column is constant; the Peer relationship exists in the model but is rare in real data.
+Known limitations: the report is large because each card carries its own Why/source evidence (a show-ignored sample with 277 cards was about 21 MB; the work log has a size audit and options), so very large inventories can be slow to open; there is no automatic orphan classification beyond the evidence-based Needs attention conditions; the Peer relationship exists in the model but is rare in real data.
 
 Before changing the design, check the basic/detailed distinction, density at desktop and narrow widths, both themes, native reading, per-reference attribution, unknown/partial states and duplication. Keep related rendering tests and browser acceptance checks aligned with intentional changes. Archive generated comparisons under ignored `temp-tool-output`; historical screenshots and sizes are examples, not authoritative current evidence.
 

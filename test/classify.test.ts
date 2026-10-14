@@ -14,6 +14,7 @@ const SAMPLES = {
   workspaceEdit: { kind: 'workspaceEdit', edits: [{ oldResource: { path: '/proj/gone.ts' } }] },
   inlineReference: { kind: 'inlineReference', inlineReference: { path: '/proj/src/b.ts' } },
   markdownContent: { kind: 'markdownContent', content: { value: 'named markdown' } },
+  autoModeResolution: { kind: 'autoModeResolution', resolved: { id: 'gpt-x', name: 'GPT X' } },
 };
 
 test('thinking becomes a think node, and empty partials become nothing', () => {
@@ -182,6 +183,16 @@ test('an unknown kind yields nothing, which is what the census then reports', ()
   assert.equal(classifyNode({ kind: 'somethingNew' }), null);
   assert.equal(classifyNode(null), null);
   assert.equal(classifyNode('a string'), null);
+});
+
+test('autoModeResolution keeps the model Auto picked, in both observed shapes', () => {
+  assert.deepEqual(classifyNode({ kind: 'autoModeResolution', resolved: { id: 'gpt-x', name: 'GPT X' } }),
+    { type: 'autoModel', modelId: 'gpt-x', modelName: 'GPT X', confidence: null, predictedLabel: '' });
+  assert.deepEqual(classifyNode({
+    kind: 'autoModeResolution', resolvedModel: 'old-id', resolvedModelName: 'Old Name', confidence: 0.9, predictedLabel: 'needs_reasoning',
+  }), { type: 'autoModel', modelId: 'old-id', modelName: 'Old Name', confidence: 0.9, predictedLabel: 'needs_reasoning' });
+  assert.equal(classifyNode({ kind: 'autoModeResolution', resolved: {} }), null, 'a record naming no model has nothing to keep');
+  assert.equal(classifyNode({ kind: 'autoModeResolution', confidence: 'high' }), null);
 });
 
 test('fileOperation maps tool names to what they did', () => {

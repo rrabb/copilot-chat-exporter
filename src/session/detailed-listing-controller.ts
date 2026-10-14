@@ -8,7 +8,7 @@ export const detailedListingController = String.raw`
   const search = input('search'), type = input('type'), status = input('status'), model = input('model'), project = input('project');
   const quick = [...document.querySelectorAll('[data-chip]')];
   const pins = new Map();
-  let view = 'grouped', direction = -1;
+  let view = 'grouped', direction = -1, attention = '';
   const numeric = (row,key,minId,maxId,unknownId) => {
     const value = row.dataset[key], unknown = input(unknownId).value;
     const known = value !== '';
@@ -31,6 +31,7 @@ export const detailedListingController = String.raw`
     }
     const flags = (row.dataset.chips || '').split(' ');
     if(!quick.filter(button=>button.getAttribute('aria-pressed')==='true').every(button=>flags.includes(button.dataset.chip))) return false;
+    if(attention && !flags.includes(attention)) return false;
     if(!numeric(row,'prompts','prompts-min','prompts-max','prompts-known')) return false;
     if(!numeric(row,'bytes','bytes-min','bytes-max','bytes-known')) return false;
     const key = input('date-kind').value, date = row.dataset[key+'Day'] || '';
@@ -50,6 +51,7 @@ export const detailedListingController = String.raw`
   const reset = () => {
     for(const field of document.querySelectorAll('[data-filter]')) field.value = field.dataset.default || '';
     for(const button of quick) button.setAttribute('aria-pressed','false');
+    attention = '';
     apply();
   };
   for(const field of document.querySelectorAll('[data-filter]')) {
@@ -60,6 +62,13 @@ export const detailedListingController = String.raw`
     button.setAttribute('aria-pressed',button.getAttribute('aria-pressed')==='true'?'false':'true'); apply();
   });
   input('reset').addEventListener('click',reset);
+  for(const button of document.querySelectorAll('[data-attention]')) button.addEventListener('click',()=>{
+    reset();
+    attention = button.dataset.attention;
+    apply();
+    input('search').scrollIntoView({block:'center'});
+    input('action-status').textContent='Filtered to chats flagged "'+attention+'". Use Reset filters to clear it.';
+  });
   for(const button of document.querySelectorAll('[data-project-pick]')) button.addEventListener('click',()=>{
     if(!project) return;
     project.value = button.dataset.projectPick;

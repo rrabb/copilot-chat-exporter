@@ -587,16 +587,38 @@ Current VS Code source permits these additional named kinds in a serialized resp
 | Text and status | `markdownVuln`, `warning`, `info`, `systemNotification`, `command` |
 | Structured views | `treeData`, `multiDiffData`, `extensions`, `pullRequest`, `planReview` |
 | Editing and control | `notebookEditGroup`, `externalEdit`, `clearToPreviousToolInvocation` |
-| Agent and model state | `hook`, `autoModeResolution`, `elicitationSerialized`, `disabledClaudeHooks` |
+| Agent and model state | `hook`, `elicitationSerialized`, `disabledClaudeHooks` |
 
 These names stay in `KNOWN_UNSEEN_KINDS`, not `IGNORED_RESPONSE_KINDS`. If one reaches a real
 journal, the census still reports it and strict mode fails until its archive behavior is reviewed.
+`autoModeResolution` used to be in this list. It is now observed and handled, see below.
 Active-only kinds such as `toolInvocation`, `elicitation2`, `progressTask`, and `voiceProgress` are
 not part of the normal serialized union. `disabledClaudeHooks` is a compatibility exception that
 the serialized response-part type admits explicitly.
 
 That difference is expected. A declaration is not the same as an observed journal example, and an
 observed example is not the same as a promise that the kind will remain unchanged.
+
+### `autoModeResolution`
+
+Observed in a real corpus (23 records in 22 journals) and handled in `HANDLED_RESPONSE_KINDS`. It
+records which model Auto picked for one request, so it is request metadata, not response content.
+Two shapes exist:
+
+| Shape | Fields |
+|---|---|
+| Newer | `resolved: { id, name }` |
+| Older | flattened `resolvedModel`, `resolvedModelName`, plus a router `confidence` number and `predictedLabel` |
+
+`classifyNode` normalizes both into an `autoModel` node (`modelId`, `modelName`, `confidence`,
+`predictedLabel`). `parseChatSession` moves these out of the turn body into
+`turn.scalar.autoModelResolutions`, and the Markdown turn-info table shows an "Auto resolved model"
+row only when one was recorded. A record that names no model produces nothing, which is still not
+drift because the kind is handled. Test: `test/classify.test.ts`, `test/journal.test.ts`,
+`test/markdown.test.ts`.
+
+Not done: the detailed listing still derives answering models from `toolCallRounds` and
+`result.metadata.resolvedModel`; using this record there is a possible improvement.
 
 ### The three lists in this project
 

@@ -139,6 +139,66 @@ test('recorded activity replaces filesystem time when no indexed date exists', a
   assert.equal(row.visibility.status, 'included');
 });
 
+test('chats from windows with no folder open come from global storage, with no invented project', async (context) => {
+  const { root, workspace } = await fixture(context);
+  await journal(workspace, ONE);
+  const globalStorage = path.join(root, 'User', 'globalStorage');
+  await fs.mkdir(path.join(globalStorage, 'emptyWindowChatSessions'), { recursive: true });
+  await fs.writeFile(path.join(globalStorage, 'emptyWindowChatSessions', `${TWO}.jsonl`), JSON.stringify({
+    kind: 0, v: { version: 3, sessionId: TWO, customTitle: 'No folder open', requests: [] },
+  }));
+  index(globalStorage, {
+    [TWO]: { title: 'Empty window title', lastMessageDate: 1700000000000 },
+    'agent-host-copilotcli:/untitled-1': { title: 'Agent from empty window' },
+  });
+  const result = await inventorySessions(root, { copilotHome: path.join(root, 'copilot') });
+  const rows = new Map(result.occurrences.map((row) => [row.sessionId, row]));
+  assert.equal(result.occurrences.length, 3);
+  assert.equal(rows.get(ONE)?.provenance.store, undefined, 'workspace chats are not tagged');
+  for (const id of [TWO, 'agent-host-copilotcli:/untitled-1']) {
+    const row = rows.get(id)!;
+    assert.equal(row.provenance.store, 'empty-window');
+    assert.equal(row.provenance.workspaceStoragePath, globalStorage);
+    assert.equal(row.provenance.workspaceIdentity, undefined);
+  }
+  assert.equal(rows.get(TWO)?.title, 'Empty window title');
+  assert.equal(rows.get(TWO)?.backing.status, 'verified');
+  assert.equal(rows.get(TWO)?.provenance.indexKey, TWO);
+  assert.equal(rows.get('agent-host-copilotcli:/untitled-1')?.provider, 'agent-host');
+});
+
+test('a global store with only journals, or only an index, is still inventoried', async (context) => {
+  const { root } = await fixture(context);
+  const globalStorage = path.join(root, 'User', 'globalStorage');
+  await fs.mkdir(path.join(globalStorage, 'emptyWindowChatSessions'), { recursive: true });
+  await fs.writeFile(path.join(globalStorage, 'emptyWindowChatSessions', `${ONE}.jsonl`), JSON.stringify({
+    kind: 0, v: { version: 3, sessionId: ONE, requests: [] },
+  }));
+  const journalOnly = await inventorySessions(root);
+  assert.deepEqual(journalOnly.occurrences.map((row) => row.sessionId), [ONE]);
+  assert.equal(journalOnly.occurrences[0].backing.status, 'verified');
+  assert.ok(!journalOnly.diagnostics.some((item) => item.path.includes('globalStorage')), 'a missing global database is not noise');
+  await fs.rm(path.join(globalStorage, 'emptyWindowChatSessions'), { recursive: true });
+  index(globalStorage, { [TWO]: { title: 'Index only' } });
+  const indexOnly = await inventorySessions(root);
+  assert.deepEqual(indexOnly.occurrences.map((row) => row.sessionId), [TWO]);
+  assert.equal(indexOnly.occurrences[0].backing.status, 'unresolved');
+});
+
+test('the legacy no-workspace folder is an ordinary workspace store; transferred chats are not inventoried', async (context) => {
+  const { root } = await fixture(context);
+  const legacy = path.join(root, 'User', 'workspaceStorage', 'no-workspace');
+  await fs.mkdir(path.join(legacy, 'chatSessions'), { recursive: true });
+  await journal(legacy, ONE);
+  const transferred = path.join(root, 'User', 'globalStorage', 'transferredChatSessions');
+  await fs.mkdir(transferred, { recursive: true });
+  await fs.writeFile(path.join(transferred, `${TWO}.jsonl`), JSON.stringify({ kind: 0, v: { version: 3, sessionId: TWO, requests: [] } }));
+  const result = await inventorySessions(root);
+  assert.deepEqual(result.occurrences.map((row) => row.sessionId), [ONE]);
+  assert.equal(result.occurrences[0].provenance.store, undefined);
+  assert.equal(path.basename(result.occurrences[0].provenance.workspaceStoragePath), 'no-workspace');
+});
+
 test('inventory does not create absent native directories or databases', async (context) => {
   const { root, workspace } = await fixture(context);
   await inventorySessions(root);

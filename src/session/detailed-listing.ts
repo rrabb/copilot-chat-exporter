@@ -6,6 +6,7 @@ import { groupOccurrences, localWorkspaceCounts, sessionType, shortIds } from '.
 import type { ConversationGroup, SessionListingOptions } from './listing-model.ts';
 import { escapeHtml as html, pathLink, chartRows, storageGuideHtml } from './listing-html.ts';
 import { renderDetailedSource, storageBytes } from './detailed-source.ts';
+import { attentionFlags, renderAttentionPanel } from './detailed-attention.ts';
 import { formatLocalListingDate as date, formatListingTurnDate, previewListingPrompt, listingModelLabel, sdkListingPromptOverview } from './listing-preview.ts';
 import type { ListingEvidence, ListingFileChange } from './listing-evidence-types.ts';
 import { listingRelationships } from './listing-relationships.ts';
@@ -233,6 +234,7 @@ export function formatDetailedSessionListingHtml (
       data?.responsePresent === false ? 'no-response' : '',
       data?.state !== 'read' ? 'metadata-only' : '',
       data?.flags.length || data?.diagnostics.length || group.childWarnings || group.occurrences.some((row) => row.diagnostics.length) ? 'audit' : '',
+      ...attentionFlags(group, data, edges),
     ].filter(Boolean).join(' ');
   };
   const searchFor = (group: ConversationGroup, data: ListingEvidence | undefined) => [
@@ -409,6 +411,11 @@ ${exportSection}
   const ignoredCards = ignored.map((group) => mainGroups.includes(group)
     ? `<p><a href="#${anchors.get(group.key)}">${safe(titleFor(group))}</a> ${tag(`Ignored: ${group.visibility.status === 'hidden' ? group.visibility.reason : ''}`, 'Already shown in the main listing with --show-ignored', 'warning')}</p>`
     : renderCard(group, false)).join('');
+  const attentionCounts = new Map<string, number>();
+  for (const group of mainGroups)
+    for (const flag of new Set(chipsFor(group, metadata(group)).split(' ')))
+      attentionCounts.set(flag, (attentionCounts.get(flag) ?? 0) + 1);
+  const attentionPanel = renderAttentionPanel(attentionCounts, mainGroups.length, options.showIgnored ? 0 : ignored.length);
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-${scriptHash}'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'"><title>Detailed VS Code chat session listing</title><style>${detailedListingStyles}</style></head>
 <body><main><header><div class="caption">Offline · read-only · detailed identification report</div><h1>VS Code chat session listing</h1><p>Generated <span class="datetime">${date(Date.parse(generatedAt))}</span> for <code>${safe(occurrences[0]?.provenance.userDataRoot ?? 'selected user-data root')}</code>. Dates use the generator's local clock.</p>
@@ -417,6 +424,7 @@ ${exportSection}
 <section class="metrics">${[[groups.length, 'grouped conversations'], [occurrences.length, 'workspace occurrences'], [mainGroups.length, 'main candidates'], [selected.size, 'initially shown'], [ignored.length, 'ignored groups'], [allModels.size, 'answering model IDs']].map(([value, label]) => `<div class="metric"><strong>${value}</strong>${label}</div>`).join('')}</section>
 <section class="grid"><div class="panel"><h2>Backing status</h2>${chartRows(statuses, groups.length, (value) => value, (value) => `bar-${value}`)}</div><div class="panel"><h2>Chat types</h2>${chartRows(types, groups.length, (value) => detailedTypeOf(value).label, (value) => `bar-${detailedTypeOf(value).key}`)}</div><div class="panel"><h2>Answering models</h2><p class="caption">Top eight raw IDs by conversation count. Mixed-model conversations appear more than once; totals are not additive.</p>${chartRows(new Map([...allModels].sort((a, b) => b[1] - a[1]).slice(0, 8)), groups.length, listingModelLabel)}<a href="#models-used">All ${allModels.size} answering model IDs ↓</a></div></section>
 ${projectChart}
+${attentionPanel}
 <details class="guide" id="conversation-index"><summary>📚 Session TOC / grouped conversation index (${groups.length})</summary><p class="caption">All conversations, including ignored and newest-25-limited entries. Follow a title to reveal and open its card.</p><ol class="index-list">${indexLinks}</ol></details>
 <section class="panel"><h2>Find the chat you remember</h2><div class="controls"><input id="search" data-filter type="search" aria-label="Search titles, full prompts, IDs, workspace, model and files" placeholder="Search titles, full prompts, IDs, models, files or projects…">
 <label>Type <select id="type" data-filter><option value="">All</option>${[...types.keys()].map((type) => `<option>${safe(type)}</option>`).join('')}</select></label><label>Backing <select id="status" data-filter><option value="">All</option>${[...statuses.keys()].map((status) => `<option>${status}</option>`).join('')}</select></label><label>Project <select id="project" data-filter title="Projects are the recorded workspaces/folders a chat is referenced from"><option value="">All projects</option><option value="__multi">Multiple projects (${multiProjectCount})</option><option value="__unknown">No recorded project (${unknownProjectCount})</option>${projectOptions}</select></label>

@@ -14,7 +14,7 @@
 //   - the journal re-emits a tool call each time its status changes, so later copies are merged
 //     into the first, which is the order the chat displayed.
 
-import type { ParsedSession } from '../types.ts';
+import type { AutoModelResolution, ParsedSession } from '../types.ts';
 import { COLLATOR, parseJson } from '../text.ts';
 import { workspacePath } from '../host.ts';
 import {
@@ -253,6 +253,7 @@ export function parseChatSession (
         return null;
 
       const nodes = [];
+      const autoModelResolutions: AutoModelResolution[] = [];
       const toolNodesById = new Map();
       for (const item of Array.isArray(request?.response) ? request.response : [])
         for (const leaf of flattenItems(item)) {
@@ -269,6 +270,11 @@ export function parseChatSession (
             continue;
           }
           for (const node of classified) {
+            if (node.type === 'autoModel') {
+              const { type: _type, ...resolution } = node;
+              autoModelResolutions.push(resolution as AutoModelResolution);
+              continue;
+            }
             if (node.type === 'tool' && node.toolCallId) {
               const existing = toolNodesById.get(node.toolCallId);
               // Only fold this node into an already-tracked one while that one is still
@@ -291,6 +297,7 @@ export function parseChatSession (
       for (const field of SCALAR_FIELDS)
         if (request?.[field] != null)
           scalar[field] = request[field];
+      autoModelResolutions.length && (scalar.autoModelResolutions = autoModelResolutions);
 
       const thoughts: string[] = [];
       collectThinking(request, thoughts);

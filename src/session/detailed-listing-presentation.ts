@@ -56,8 +56,13 @@ export function detailedWorkspace (group: ConversationGroup, parent?: Conversati
       throw error;
     invalidEncoding = true;
   }
-  const name = decoded.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) || 'workspace unknown';
-  return { uri: `${uri ?? 'Workspace/project not recorded'}${invalidEncoding ? ' (invalid URI encoding; recorded text retained)' : ''}`, name, inherited: Boolean(inherited), known: Boolean(uri) };
+  const emptyWindow = !uri && group.occurrences.some((row) => row.provenance.store === 'empty-window');
+  const name = emptyWindow ? '(empty window)' : decoded.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1) || 'workspace unknown';
+  return {
+    uri: emptyWindow ? 'Empty window: no folder or workspace was open when VS Code saved this chat (global storage)'
+      : `${uri ?? 'Workspace/project not recorded'}${invalidEncoding ? ' (invalid URI encoding; recorded text retained)' : ''}`,
+    name, inherited: Boolean(inherited), known: Boolean(uri) || emptyWindow,
+  };
 }
 
 export interface DetailedProject {

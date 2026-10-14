@@ -17,7 +17,8 @@ export function sourceDetails (group: ConversationGroup): string {
     const provenance = item.provenance;
     const identity = provenance.workspaceIdentity;
     const storageId = path.basename(provenance.workspaceStoragePath);
-    let workspaceName = 'unknown';
+    const emptyWindow = provenance.store === 'empty-window';
+    let workspaceName = emptyWindow ? 'empty window (no folder open)' : 'unknown';
     if (identity) {
       const uri = new URL(identity.uri);
       workspaceName = decodeURIComponent(uri.pathname.split('/').filter(Boolean).at(-1) ?? '') || 'unknown';
@@ -40,8 +41,8 @@ ${provenance.indexKey ? `<dt>Index key</dt><dd><code>${escapeHtml(provenance.ind
 <dt>Workspace identity</dt><dd>${escapeHtml(identity?.kind ?? 'unknown')} - ${workspaceLink}</dd>
 </dl></section><section class="source-card"><h4>Files / locations</h4><dl class="source-fields">
 ${backing.status === 'verified' ? `<dt>${backing.source.kind === 'local-journal' ? 'Journal JSONL' : 'SDK events JSONL'}</dt><dd>${pathLink(backing.source.path)}</dd>` : `<dt>Backing issue</dt><dd>${escapeHtml(backing.reason)}</dd>`}
-<dt>Workspace storage</dt><dd>${pathLink(provenance.workspaceStoragePath)}</dd>
-<dt>Workspace metadata</dt><dd>${pathLink(path.join(provenance.workspaceStoragePath, 'workspace.json'))}</dd>
+<dt>${emptyWindow ? 'Global storage' : 'Workspace storage'}</dt><dd>${pathLink(provenance.workspaceStoragePath)}</dd>
+${emptyWindow ? '' : `<dt>Workspace metadata</dt><dd>${pathLink(path.join(provenance.workspaceStoragePath, 'workspace.json'))}</dd>`}
 <dt>User-data root</dt><dd>${pathLink(provenance.userDataRoot)}</dd>
 ${provenance.indexKey ? `<dt>Index database</dt><dd>${pathLink(path.join(provenance.workspaceStoragePath, 'state.vscdb'))}</dd>` : ''}
 </dl></section></div>

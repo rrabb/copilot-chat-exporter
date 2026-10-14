@@ -98,42 +98,57 @@ export interface SessionInventory {
 export async function inventorySessions (userDataRoot: string, options: ProviderResolverOptions = {}): Promise<SessionInventory> {
   const root = await resolveUserDataRoot({ userDataRoot });
   const storageRoot = path.join(root, 'User', 'workspaceStorage');
+  const globalStorageRoot = path.join(root, 'User', 'globalStorage');
   const occurrences: SessionOccurrence[] = [];
   const diagnostics: InventoryDiagnostic[] = [];
-  let workspaces;
+  interface ChatStore { storagePath: string; journalDirectory: string; emptyWindow: boolean }
+  const stores: ChatStore[] = [];
   try {
-    workspaces = await fs.readdir(storageRoot, { withFileTypes: true });
+    const workspaces = await fs.readdir(storageRoot, { withFileTypes: true });
+    for (const workspace of workspaces.filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+      const storagePath = path.join(storageRoot, workspace.name);
+      stores.push({ storagePath, journalDirectory: path.join(storagePath, 'chatSessions'), emptyWindow: false });
+    }
   } catch (error) {
     diagnostics.push({
       path: storageRoot, category: missingPath(error) ? 'source-unavailable' : 'unreadable',
       description: describeError(error),
     });
-    return { userDataRoot: root, occurrences, diagnostics };
   }
-  for (const workspace of workspaces.filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
-    const workspaceStoragePath = path.join(storageRoot, workspace.name);
+  // Windows with no folder open keep their chats in global storage: journals in
+  // emptyWindowChatSessions and the same chat index key in the global state database.
+  const emptyWindowJournals = path.join(globalStorageRoot, 'emptyWindowChatSessions');
+  const hasGlobalStore = await Promise.all([emptyWindowJournals, path.join(globalStorageRoot, 'state.vscdb')]
+    .map((candidate) => fs.stat(candidate).then(() => true, () => false)));
+  hasGlobalStore.some(Boolean)
+    && stores.push({ storagePath: globalStorageRoot, journalDirectory: emptyWindowJournals, emptyWindow: true });
+  for (const store of stores) {
+    const { storagePath: workspaceStoragePath, journalDirectory, emptyWindow } = store;
     const workspaceMetadataPath = path.join(workspaceStoragePath, 'workspace.json');
     let workspaceIdentity: SessionOccurrence['provenance']['workspaceIdentity'];
     const workspaceDiagnostics: InventoryDiagnostic[] = [];
     try {
-      const metadata: unknown = JSON.parse(await fs.readFile(workspaceMetadataPath, 'utf8'));
-      if (!isRecord(metadata))
-        throw new Error('Workspace metadata is not an object.');
-      const kind = typeof metadata.folder === 'string' ? 'folder' : 'workspace';
-      const uri = kind === 'folder' ? metadata.folder : metadata.workspace;
-      if (typeof uri !== 'string' || !uri)
-        throw new Error('Workspace metadata has no supported folder/workspace URI.');
-      decodeURIComponent(new URL(uri).pathname);
-      workspaceIdentity = { kind, uri };
+      if (!emptyWindow) {
+        const metadata: unknown = JSON.parse(await fs.readFile(workspaceMetadataPath, 'utf8'));
+        if (!isRecord(metadata))
+          throw new Error('Workspace metadata is not an object.');
+        const kind = typeof metadata.folder === 'string' ? 'folder' : 'workspace';
+        const uri = kind === 'folder' ? metadata.folder : metadata.workspace;
+        if (typeof uri !== 'string' || !uri)
+          throw new Error('Workspace metadata has no supported folder/workspace URI.');
+        decodeURIComponent(new URL(uri).pathname);
+        workspaceIdentity = { kind, uri };
+      }
     } catch (error) {
       if (!missingPath(error))
         workspaceDiagnostics.push({ path: workspaceMetadataPath, category: 'invalid-data', description: describeError(error) });
     }
     diagnostics.push(...workspaceDiagnostics);
-    const index = readChatIndex(workspaceStoragePath);
+    // A missing global database is normal for a profile that never used an empty window.
+    const hasDatabase = !emptyWindow || await fs.stat(path.join(workspaceStoragePath, 'state.vscdb')).then(() => true, () => false);
+    const index = hasDatabase ? readChatIndex(workspaceStoragePath) : { entries: new Map<string, Record<string, unknown>>(), diagnostics: [] };
     diagnostics.push(...index.diagnostics);
     const journals = new Map<string, string>();
-    const journalDirectory = path.join(workspaceStoragePath, 'chatSessions');
     try {
       for (const entry of await fs.readdir(journalDirectory, { withFileTypes: true })) {
         if (entry.isFile() && entry.name.endsWith('.jsonl') && UUID.test(entry.name.slice(0, -6)))
@@ -148,6 +163,7 @@ export async function inventorySessions (userDataRoot: string, options: Provider
       const metadata = index.entries.get(key);
       const provenance = {
         userDataRoot: root, workspaceStoragePath,
+        ...(emptyWindow ? { store: 'empty-window' as const } : {}),
         ...(workspaceIdentity === undefined ? {} : { workspaceIdentity }),
         ...(metadata === undefined ? {} : { indexKey: key }),
       };

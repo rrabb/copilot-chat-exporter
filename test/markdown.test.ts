@@ -266,6 +266,16 @@ test('turnInfo lists the per-turn fields as a table', () => {
   assert.match(info, /\| Credits \| n\/a \|/);
 });
 
+test('turnInfo shows which model Auto resolved to, only when one was recorded', () => {
+  const none = turnInfo(testTurn({ ts: 0, scalar: { modelId: 'auto' } })).join('\n');
+  assert.doesNotMatch(none, /Auto resolved model/);
+  const info = turnInfo(testTurn({ ts: 0, scalar: { modelId: 'auto', autoModelResolutions: [
+    { modelId: 'gpt-x', modelName: 'GPT X', confidence: null, predictedLabel: '' },
+    { modelId: 'old-id', modelName: 'old-id', confidence: 0.9, predictedLabel: 'needs_reasoning' },
+  ] } })).join('\n');
+  assert.match(info, /\| Auto resolved model \| GPT X \(gpt-x\)<br>old-id; label needs_reasoning, confidence 0\.9 \|/);
+});
+
 test('turnInfo renders the current prompt token breakdown', () => {
   const info = turnInfo(testTurn({ ts: 0, scalar: {
     promptTokenDetails: [

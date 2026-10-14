@@ -13,7 +13,7 @@
 // export would stop matching what the chat window showed.
 
 import path from 'node:path';
-import type { FileTouch, ParsedSession, SessionLocation, TodoItem, ToolNode, Turn, TurnNode, TurnScalars } from './types.ts';
+import type { AutoModelResolution, FileTouch, ParsedSession, SessionLocation, TodoItem, ToolNode, Turn, TurnNode, TurnScalars } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
@@ -578,6 +578,14 @@ export function turnCost (scalar: TurnScalars) {
   return `<sub>${parts.join(' · ')}</sub>`;
 }
 
+function autoResolutionText (resolutions: readonly AutoModelResolution[]) {
+  return resolutions.map((item) => {
+    const label = item.modelName && item.modelId && item.modelName !== item.modelId ? `${item.modelName} (${item.modelId})` : item.modelName || item.modelId;
+    const extra = [item.predictedLabel && `label ${item.predictedLabel}`, item.confidence != null && `confidence ${item.confidence}`].filter(Boolean);
+    return esc(extra.length ? `${label}; ${extra.join(', ')}` : label);
+  }).join('<br>');
+}
+
 export function turnInfo (turn: Turn) {
   const scalar = turn.scalar;
   const promptDetails = scalar.promptTokenDetails;
@@ -591,6 +599,7 @@ export function turnInfo (turn: Turn) {
   const agent = scalar.agent && (scalar.agent.extensionId?.value || scalar.agent.id);
   const rows = [
     ['Model', esc(modelName(scalar.modelId))],
+    ...(scalar.autoModelResolutions?.length ? [['Auto resolved model', autoResolutionText(scalar.autoModelResolutions)]] : []),
     ['Mode', esc(scalar.modeInfo?.modeId || scalar.modeInfo?.kind || 'unknown')],
     ['Agent', esc(agent || 'unknown')],
     ['Response ID', esc(scalar.responseId || 'n/a')],
