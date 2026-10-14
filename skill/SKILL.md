@@ -39,6 +39,7 @@ The exporter reads VS Code's **native chat journal** (`chatSessions/<id>.jsonl`)
 - The listing `TYPE` column identifies local, agent, sub-agent, or Copilot CLI rows; `ID/PREFIX` contains the copyable selector. `verified` means backing identity was checked; `unresolved` means no chat backing was verified; `ambiguous` / `🟠 ❓` means a safe backing/scope could not be selected. Verified SDK backing does not yet mean SDK Markdown export is supported.
 - `New Chat` rows with both creation date and prompt count unknown are hidden by default; `--show-ignored` includes them.
 - Listing also writes a self-contained HTML report to the invoking directory by default. Use `--no-html` to suppress it or `--html-output <path>` to choose a destination; an existing report requires `--overwrite`. The report is offline and is not opened automatically.
+- Add listing-only `--detailed` for the richer identification report: prompts, models, historical edits, title/date evidence, family links and source diagnostics. It replaces basic HTML only; console output is unchanged. `--detailed --no-html` warns and produces only the console listing. Reports contain private text and paths; best-effort redaction is not full sanitization.
 
 ## Steps
 1. Prefer the host's `ai:export:chat` script when present (a linked install defines it as `node tools/copilot-chat-exporter/dist/cli.js`). Use `npm exec -- copilot-chat-export` only when the package is installed; otherwise npm downloads whatever package has that name from the registry.

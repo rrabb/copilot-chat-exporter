@@ -81,7 +81,11 @@ export function* flattenItems (item: any): Generator<any> {
   }
 }
 
-export function parseChatSession (sessionPath: string, raw: string): ParsedSession {
+export function parseChatSession (
+  sessionPath: string,
+  raw: string,
+  onReplayedState?: (state: unknown) => void,
+): ParsedSession {
   // Replay the chatSessions journal mutations to reconstruct final
   // request objects before deriving turn-level render nodes.
   const lines = raw.split(/\r?\n/).filter(Boolean);
@@ -200,6 +204,7 @@ export function parseChatSession (sessionPath: string, raw: string): ParsedSessi
       deleteAtPath(state, record.k);
   }
 
+  onReplayedState?.(state);
   const requests = Array.isArray(state?.requests) ? state.requests : [];
   const collapsePrefixes = (texts: string[]) => texts.filter((text, i) => !texts.some((other, j) => j !== i && other.length > text.length && other.startsWith(text)));
   const mergeToolNode = (target: any, next: any) => {

@@ -12,6 +12,8 @@ import { looksLikeSessionArgument } from './session/locate.ts';
 import { resolveUserDataRoot } from './session/roots.ts';
 import { inventorySessions } from './session/inventory.ts';
 import { formatSessionListing, formatSessionListingHtml } from './session/listing.ts';
+import { collectListingEvidence } from './session/listing-evidence.ts';
+import { formatDetailedSessionListingHtml } from './session/detailed-listing.ts';
 import { defaultListingHtmlPath, writeListingHtml } from './session/listing-report.ts';
 import { writeArchive } from './archive-writer.ts';
 import {
@@ -157,7 +159,7 @@ if (!parsed.ok) {
 }
 const {
   list: listMode, current: currentMode, verify: verifyMode, strict: strictMode,
-  showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode,
+  showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode, detailed: detailedMode,
   golden: goldenAction, snapshot: snapshotAction,
   installSkill: installSkillTarget,
   workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
@@ -226,16 +228,19 @@ try {
     let htmlPath: string | null = null;
     if (!noHtmlMode) {
       const destination = htmlOutputArg === null
-        ? defaultListingHtmlPath(process.cwd(), generatedAt)
+        ? defaultListingHtmlPath(process.cwd(), generatedAt, detailedMode)
         : path.resolve(htmlOutputArg);
       htmlPath = await writeListingHtml(
         destination,
-        formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString()),
+        detailedMode
+          ? formatDetailedSessionListingHtml(inventory.occurrences, await collectListingEvidence(inventory.occurrences), listingOptions, generatedAt.toISOString())
+          : formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString()),
         overwriteMode,
       );
     }
     console.log(`VS Code user-data root: ${inventory.userDataRoot}\n`);
     console.log(formatSessionListing(inventory.occurrences, listingOptions));
+    detailedMode && noHtmlMode && console.warn('Invalid flag combination: --detailed requests an HTML report but --no-html suppresses it. Only the compact console listing was produced.');
     htmlPath && console.log(`HTML report: ${htmlPath}`);
     process.exit(0);
   }

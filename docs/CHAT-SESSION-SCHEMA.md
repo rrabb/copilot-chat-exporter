@@ -12,6 +12,20 @@ in this project's local sessions. Every section labels which kind of evidence it
 
 ## Start Here
 
+### Detailed listing enrichment
+
+**Observed here / exporter policy:** [listing-evidence.ts](../src/session/listing-evidence.ts) adds read-only identification metadata after inventory verification. Its typed [contracts](../src/session/listing-evidence-types.ts) preserve title/date provenance, prompts, answering versus selected model evidence, edit/history state, artifacts, scoped sizes and diagnostics. Journal metadata comes from the same final replayed state as the exporter; a callback on `parseChatSession` observes that state without changing ordinary export output. Supported editing-history operations are counted only for matching recorded request IDs.
+
+SDK prompt/model intervals use `eventsInScope`, with main settings sampled at prompt boundaries and assistant model IDs read only inside that scope. Child tasks require recorded scoped instructions or the unique parent tool call's task arguments. Source changes after inventory omit rich content instead of attaching stale or guessed evidence. Optional workspace scalar metadata is not a general YAML parser; malformed/duplicate/identity-conflicting metadata produces diagnostics.
+
+Child title evidence also retains `description`/`name` from the unique `tool.execution_start` whose recorded tool-call ID matches the verified child scope, plus matching `subagent.started.agentDisplayName`. The detailed renderer considers real titles across all grouped references before these recorded task labels; synthetic UUID labels do not override a real title. This does not modify inventory identity or console headings. Optional Local usage evidence reads numeric finite nonnegative request `copilotCredits` and nonnegative safe-integer `promptTokens`/`completionTokens`. No string coercion or token-to-credit conversion occurs. Each session metric sums counted requests once, with independent coverage and labelled partial totals; missing counters remain unknown.
+
+Observed in the sampled SDK log: `model.model_call_success.responseChunk.usage` token counters, agent-scoped `subagent.completed.totalTokens`, cumulative `session.usage_checkpoint` quota fields and `session.shutdown.modelMetrics` usage. These have different aggregation and identity semantics. Their correlation to report turns is deferred; the report explicitly shows unsupported/missing usage rather than assigning parent totals to children or treating cumulative checkpoints as increments.
+
+Tool file changes describe submitted patches/text changes, not current file diffs. Uncovered text-edit markers and bounded large-text diff approximations are labelled estimates. Windows serialized URI and tool paths share a comparison identity; POSIX case is preserved. Unsupported editing arguments make totals partial, not falsely zero. Missing/pruned editing histories and removed file content stay unknown.
+
+[listing-relationships.ts](../src/session/listing-relationships.ts) keeps persisted parents/peers/forks separate from best-effort copy/fork hints. Prompt similarity is never used as backing identity, grouping or export-selection evidence. The report preserves existing inventory status semantics and explicitly states that verified SDK backing is not SDK Markdown support.
+
 ### Provider-backed SDK sources
 
 The inventory now distinguishes Local content version 3, chat index version 1 and SDK event version 1 as independent formats. Agent Host and Copilot CLI backings are verified for listing and scope selection; SDK Markdown rendering and semantic fidelity verification are not yet implemented.

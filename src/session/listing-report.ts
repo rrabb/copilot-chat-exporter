@@ -12,11 +12,11 @@ function twoDigits (value: number): string {
   return String(value).padStart(2, '0');
 }
 
-export function defaultListingHtmlPath (directory: string, generatedAt = new Date()): string {
+export function defaultListingHtmlPath (directory: string, generatedAt = new Date(), detailed = false): string {
   if (!Number.isFinite(generatedAt.getTime()))
     throw new Error('Listing report generatedAt must be a valid timestamp.');
   const stamp = `${twoDigits(generatedAt.getFullYear() % 100)}${twoDigits(generatedAt.getMonth() + 1)}${twoDigits(generatedAt.getDate())}_${twoDigits(generatedAt.getHours())}${twoDigits(generatedAt.getMinutes())}${twoDigits(generatedAt.getSeconds())}`;
-  return path.resolve(directory, `copilot-chat-sessions-listing-${stamp}.html`);
+  return path.resolve(directory, `copilot-chat-sessions-${detailed ? 'detailed-' : ''}listing-${stamp}.html`);
 }
 
 async function saveNewFile (filePath: string, content: string): Promise<void> {

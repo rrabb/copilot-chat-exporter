@@ -2,6 +2,190 @@
 
 ## Current status
 
+Task #35 (round-3 display requests, October 9) is complete; see "October 9 round-3 display requests" below. Verified: both typechecks, 283 tests, golden, build, 11 bundled CLI tests, 19 actual Edge checks per normal/ignored report, 48 byte-identical basic/console comparisons, clean `git diff --check`. No staging or commit. Open backlog: #20 SDK usage correlation (deferred) and #21 model-icon decision (pending the user).
+
+### October 9 round-3 display requests
+
+| # | Ask (element) | Result |
+| --- | --- | --- |
+| 1 | `unknown turns` -> `?? turns`; review other "unknown" text, choose 1/2/3 marks, put detail in titles | Value slots use `?` (minor detail), `??` (headline value, source read) or `???` (headline value, source unreadable/unverified), each with a reason in its `title`. Applied to header turns/dates/workspace, TOC, occurrence table, grids, tables and ordered-prompt counts. Prose and filter controls keep the word; a legend item was added to "How to use". |
+| 2 | TOC `3 references` -> `3 refs` / `1 ref` | Done (TOC only). |
+| 3 | Base font too small; px vs rem | Answer: use `rem` (follows the browser's default font size, unlike `px`; keyword sizes like `small` are relative to the parent and unpredictable). All 33 font sizes converted to `rem`; one knob, `html{font-size:125%}` (about two zoom steps). |
+| 4 | TOC titles in Arial Narrow | Done; also the model-switch links. |
+| 5 | Light grey/blue backgrounds for filter chips and buttons | Chips `#eef4fb`, buttons `#dbe9f8` with hover/pressed states and dark-mode variants. |
+| 6 | Suggestion #4 (empty space beside Dates) | Artifact locations table is a collapsed disclosure ("Artifact locations (4 present of 5 checked)"). |
+| 7 | Suggestion #3 in the work-log todo list | Added as #20 here and in the session todo database; #21 records the open model-icon question. |
+| 8 | `li#session-1-turn-3`, `summary` (Full prompt): hide when already shown | Cause: prompts differing only by whitespace (trailing newline) counted as different. 112 of 500 disclosures in the real report were redundant (including the 31- and 19-word examples); 6 genuinely differ (derived wrappers) and keep it. Whitespace-only differences no longer create the disclosure or the "Derived SDK overview" caption. |
+| 9 | `a` timeline: Arial Narrow | Done. `selected Auto` is no longer repeated after `Auto`. |
+| 10 | `summary` audit with none: `<same header>: none` | Field line `🔎 Audit flags / diagnostics: none`. The count now includes diagnostics (it showed `(0)` while diagnostics existed). |
+| 11 | `summary` export selector: field/value | `📋 Export selector / command: <selector> [Copy selector] [Copy command]`; the command is in the tooltip. |
+| 12 | `span` token chip `⬆️~15.5M ⬇️~730k` without prefix icon | Done (`⬆️~15.4M ⬇️~730k` for the real data); arrows also label the table rows. |
+| 13 | Replace the word markdown in chips with md/MD | `MD` (file-format abbreviation). Tooltips keep "Markdown (MD)". |
+| 14 | Omit updated when equal to created | Omitted when equal to the minute; the created chip's tooltip says so. |
+| 15 | Bold date chips | Header created/updated dates are bold. |
+| 16 | `a` TOC link icon 🔝 | Card action uses 🔝; page navigation keeps 📚. |
+| 17 | `summary` Family with no info: field format | `🌳 Family / forks / copies: none recorded`. The same rule now applies to a model timeline with at most one entry and a single prompt timestamp. |
+
+Also fixed while reviewing: `Scoped payload: ?. ?` double mark, and the unresolved card's model timeline now shows `???` like its other headline values.
+
+Evidence: [verification](temp-tool-output/verify-round3-261009_1430.txt) (283 tests, golden), [bundled CLI](temp-tool-output/bundled-cli-round3-261009_1430.txt), [normal Edge](temp-tool-output/browser-round3-261009_1430-normal.txt) and [ignored Edge](temp-tool-output/browser-round3-261009_1430-ignored.txt) (19 checks each, including root/body font sizes, themed backgrounds, field lines, no redundant full prompts, `?`-marks and TOC refs), [basic/console parity](temp-tool-output/listing-parity-round3-261009_1430.txt), [capture log](temp-tool-output/capture-round3-261009_1430.txt). Reports: [normal](temp-tool-output/copilot-chat-sessions-detailed-round3-261009_1430.html), [show ignored](temp-tool-output/copilot-chat-sessions-detailed-round3-ignored-261009_1430.html).
+
+Tasks #28-#34 are complete. #33 corrected the October 9 display refinement (#32), which had misapplied several asks, and #34 is a visual review with minor fixes (see "October 9 ask audit and visual review"). User selected children `↳`, editing history `📝`, no response `∅`, tentative hints `⑂?`, canceled `🚫` and Agent Host `🤖`, retaining subagent/fork icons. User approved Local usage now and a separate SDK usage-correlation follow-up (#31). Verified both typechecks, 268 tests, unchanged golden checks, build, 11 bundled CLI tests, 18 actual Edge checks per normal/ignored mode and 48 byte-identical basic/console comparisons. Browser profiles were cleaned up. No staging or commit.
+
+October 9 display request as later corrected: whole-number rounded-up credits/detail totals; compact tokens as `in~15.4M out~730k` (nearest, matching the user's example) with `~` for partial session metrics; omit unavailable header/turn usage chips and model chips; replace the unavailable credits/tokens disclosure with a `Usage unavailable` chip in normal flow; Compare/Link/TOC small Arial Narrow at the top right of the expanded card; bold magenta text and border on the `N w/s refs · 1 conv` chip; `⑂?` for likely fork/copy; `↳` instead of puzzle imagery for subagents.
+
+| Task | Latest review change | Status |
+| --- | --- | --- |
+| #28 | Research Local/SDK usage and sister icons; confirm icon set and scope; expose validated Local per-turn counters and independent counted-turn sums | Done |
+| #29 | One answering-model chip, compact Arial Narrow fonts/titles, date icons/tooltips and chosen semantic icons | Done |
+| #30 | Regression tests, docs, build, fresh normal/ignored reports and browser validation under temp-tool-output | Done |
+| #31 | Separate SDK usage follow-up: verify model-call/child/cumulative counter semantics, exact identity binding, deduplication and turn attribution before displaying usage | Deferred by user choice |
+| #32 | First pass at usage rounding/abbreviation/partial markers, unavailable placement, model-evidence messaging, likely relationship styling and subagent icon | Done, but several asks were misapplied; corrected by #33 |
+| #33 | Audit the October 9 asks against the implementation and fix mismatches: magenta chip target, action placement/typography, unavailable chip/note placement, compact token rounding | Done |
+| #34 | Visual review in isolated Edge (light/dark/narrow, collapsed/expanded cards, TOC, charts, guides) and minor fixes | Done |
+
+Research: census of verified Local journal requests found numeric credits on 771 requests, prompt tokens on 775 and completion tokens on 913; 311/307/169 respectively had no such field. The sampled SDK log contains model-call token usage, child-completion totals and cumulative quota checkpoints; these are not assumed to be interchangeable incremental counters. The public GitHub SDK event declarations were consulted as a version-dependent reference, not substituted for recorded local evidence. Sister `src/cli/list-html.ts` uses a satellite Agent Host icon, child arrows, fork badges and editing-history labels; the selected replacements are presentation-only.
+
+Latest review artifacts:
+
+- [Detailed usage report](temp-tool-output/copilot-chat-sessions-detailed-usage-261008_2345.html) and [show-ignored report](temp-tool-output/copilot-chat-sessions-detailed-usage-ignored-261008_2345.html).
+- [Collapsed headers](temp-tool-output/detailed-collapsed-261008_2345.png) and [expanded usage/turn screenshot](temp-tool-output/detailed-card-261008_2345.png), visually inspected after the actual-browser checks.
+- [Verification](temp-tool-output/verify-usage-fonts-261008_2345.txt), [bundled CLI tests](temp-tool-output/bundled-cli-usage-261008_2345.txt), [build](temp-tool-output/build-usage-fonts-261008_2345.txt), [normal browser checks](temp-tool-output/detailed-browser-validation-261008_2345.json), [ignored browser checks](temp-tool-output/detailed-browser-validation-261008_2345-ignored.json) and [basic/console parity](temp-tool-output/listing-parity-usage-261008_2345.json).
+
+Usage regressions cover independent metric coverage, invalid/absent values, zero counters, overflow, header/details/per-turn placement and duplicate workspace references. Totals describe counted Local requests; partial counters and unavailable SDK correlation are explicit. Basic HTML, console output, source identity and Markdown behavior remain unchanged.
+
+### October 9 ask audit and visual review (tasks #33-#34)
+
+The user reported that the first pass (#32, section below) misapplied several asks. Audit of the 00:03 prompt, element by element:
+
+| # | Ask (target element) | First pass | Corrected |
+| --- | --- | --- | --- |
+| 1 | No decimals, round up (credits chip) | Done | Unchanged: credits and detailed token totals use ceiling |
+| 2 | Partial uses `~`; tokens like `in~15.4M out~730k` (tokens chip) | `~` done, but compact values used ceiling (`in~15.5M out~731k`), contradicting the example | Compact `k`/`M` values round to nearest (15,413,458 -> 15.4M; 730,211 -> 730k); unit-tested at boundaries |
+| 3 | No chip when usage unavailable; say so on expansion (header chip) | Header chip removed | Unchanged |
+| 4 | No chip when model unavailable; say so on expansion (header chip) | Chip removed, note right-aligned | Note is left-aligned in normal flow beside the usage chip |
+| 5-6 | Use `⑂?` for "Likely fork" (hint chip) | Icon done | Unchanged; chip keeps the amber hint tone; filter chip icon matches |
+| 7 | Bold magenta text and border (`N w/s refs · 1 conv` chip) | Wrongly applied to the Likely fork chip | Applied to the w/s refs chip; Likely fork/copy reverted to the hint tone |
+| 8 | `↳` instead of puzzle (Sub-agent chip) | Done, rendered as a tiny glyph | Symbol-font glyph class for readability |
+| 9 | Remove the collapsible when usage is unavailable and show the unavailable chip (usage disclosure `div`) | Chip pushed to the right edge | Chip replaces the disclosure in normal flow after the titles |
+| 10 | Compare/Link/TOC at top right of the expanded card (actions `div`); later: smaller, Arial Narrow | Moved to the left; usage disclosure placed on the right instead | Actions share the titles-heading row at the top right, 11px Arial Narrow; the CSS rule `.js .enhanced-only{display:inline-block}` had also been collapsing the flex layout, so the Link and TOC icons touched |
+
+Visual review (isolated Edge, light/dark/640px, scripts in `temp-tool-output`) found and fixed:
+
+- TOC: columns overlapped, entries had duplicate numbering (`1. #1`) and wrong plurals. Now a non-overlapping grid, one number, `1 turn` / `1 reference`.
+- Plurals: `1 errors`, `1 audit notes`, `1 subagents`, `1 forks`, `1 files`, `1 ambiguous child scopes`.
+- Payload card: Agent Host/subagent cards said "Audited Local bytes: unknown across the five checked locations"; now "not applicable". Missing artifacts show `-` instead of `unknown / unknown files`.
+- Summary charts: bar colors were positional (unresolved purple, verified green by luck); now semantic and the type labels match the cards (Agent Host, Copilot CLI) with the same type colors.
+- Duplicate information: per-turn `Selected: X` chip is omitted when it equals the answering model.
+- Guides: inline code was visibly smaller than body text; slightly larger inside guides.
+- Not changed (needs a decision): the 🤖 icon is used for both the Agent Host type and model chips.
+
+Evidence: [before captures](temp-tool-output/capture-before-261009_1140.txt), [after captures](temp-tool-output/capture-final-261009_1330.txt), [verification](temp-tool-output/verify-review-fixes-261009_1330.txt) (268 tests, both typechecks, golden), [bundled CLI](temp-tool-output/bundled-cli-reviewed-261009_1330.txt) (11 tests), [normal Edge](temp-tool-output/browser-reviewed-261009_1330-normal.txt) and [ignored Edge](temp-tool-output/browser-reviewed-261009_1330-ignored.txt) (18 checks each, including geometry assertions for action placement, 11px Arial Narrow controls, left-aligned notes, magenta chip color/weight, TOC overflow and chart colors), and [basic/console parity](temp-tool-output/listing-parity-reviewed-261009_1330.txt) (48 byte-identical). Reports: [normal](temp-tool-output/copilot-chat-sessions-detailed-reviewed-261009_1330.html), [show ignored](temp-tool-output/copilot-chat-sessions-detailed-reviewed-ignored-261009_1330.html).
+
+### October 9 compact usage/card placement refinement (first pass, partly superseded)
+
+Superseded where it conflicts with the audit above: compact token rounding, the top-right placement of the usage disclosure/unavailable chip, and the magenta `⑂?` label.
+
+- Whole credits and detailed totals round upward with no decimal digits. Compact token chips use `k`/`M`; partial session aggregates have a leading `~`.
+- Header and turn rows omit unavailable usage/model chips. On expansion, a chat with recorded usage has its usage disclosure at the expanded card's top right; a chat with no supported counters omits that disclosure and instead shows one `Usage unavailable` pill there. Missing model evidence is explained in the expanded card.
+- Tentative likely-fork/copy chips use bold magenta `⑂?`; subagent labels use `↳`. Existing recorded-fork icon remains 🌿.
+- Moving the action bar exposed a duplicate Compare toolbar retained lower in each card. Removed it and added a one-button-per-card regression; browser pinning now passes.
+- Fresh reports: [normal](temp-tool-output/copilot-chat-sessions-detailed-final-261009_0008.html) and [show ignored](temp-tool-output/copilot-chat-sessions-detailed-final-ignored-261009_0008.html). Inspected [collapsed headers](temp-tool-output/detailed-collapsed-261009_0008-normal.png) and [expanded top-right usage](temp-tool-output/detailed-card-261009_0008-normal.png).
+- [Full verification](temp-tool-output/verify-display-refinement-261009_0003.txt): both typechecks, **261 tests**, unchanged golden digest/render. [Build](temp-tool-output/build-display-refinement-261009_0003.txt) and [11 bundled CLI tests](temp-tool-output/bundled-cli-final-261009_0008.txt) pass.
+- [Normal Edge checks](temp-tool-output/detailed-browser-validation-261009_0008-normal.json) and [ignored Edge checks](temp-tool-output/detailed-browser-validation-261009_0008-ignored.json): **17 checks each**, no controller exceptions; 274 total cards / 131 included cards; 216 cards have no supported usage counters; usage/model omissions, top-right placement, one model chip, layout at 1440/640, dark mode, no-JS readability, named subagent, comparison pins and filters pass.
+- `git diff --check` is clean. Isolated browser profiles are removed. No staging/commit.
+
+Detailed-report refinement tasks #25-#27 are complete and verified. The report has recorded subagent titles and optional credit evidence, type-colored collapsed cards with two compact subheaders, styled turns, early title provenance, compact dates with collapsed prompt timestamps, formatted bytes, duplicate reduction and a top-linked session TOC. Rich counts include child follow-ups; SDK rich activity dates use all exact-scope events. Existing inventory/console/source identity/grouping/export rules remain unchanged. Final checks passed: both typechecks, 257 tests, unchanged golden checks, build, 11 bundled CLI tests, 16 actual-browser checks in each of normal/show-ignored modes and 48 basic/console byte comparisons. No staging or commit was performed.
+
+Detailed-report phases D1-D5 were implemented and verified before this refinement, with 251 tests at that checkpoint. `--detailed` selects the combined offline HTML report, with unchanged compact console output and basic HTML as the default. Historical D1-D5 evidence remains below; latest review artifacts and results are in the refinement section. Human review of the new report is welcome.
+
+October 8 detailed-report expansion: user requested a separate `--detailed` report combining the basic inventory, all sister identification-report capabilities, and the proposed discovery/comparison additions. Confirmed flag decision: generate only detailed HTML when requested; keep compact console output unchanged and basic HTML as the default without the flag. Implementation proceeds in phases below. Do not expose a partial detailed report as feature-complete or drop requested capabilities to simplify a phase.
+
+Confirmed compatibility decision: `--detailed --no-html` will suppress HTML and keep the console listing, with an explicit console message that the flags conflict. The user chose this nonfatal behavior instead of a usage error.
+
+## Detailed report implementation plan
+
+| Task | Refinement | Status |
+| --- | --- | --- |
+| #25 | Recover recorded child titles from all verified references and uniquely bound delegation events; retain provenance; expose recorded Local credits and consistent rich turn/date metrics | Done |
+| #26 | Semantic colors/icons, collapsed cards with compact summaries, parent workspace fallback, styled turns, title/date/size presentation, TOC and duplicate reduction | Done |
+| #27 | Regression tests, build/browser checks, same-identity sister comparison and fresh private report artifacts | Done |
+
+### Detailed report refinement after user review
+
+| User request / finding | Implemented behavior / evidence |
+| --- | --- |
+| Monotonous presentation | Local blue, Agent Host purple, subagent amber, Copilot CLI teal, External pink and Other gray; matching complete card borders, headings and type chips. Separate success/warning/error/model/Auto/effort/credit colors, with visible text and explanatory tooltips. Light/dark palettes verified in Edge. |
+| Large session cards | Native closed `details` cards with title/tag line and exactly two compact metadata subheaders. Includes recorded rich turns, parent-derived child workspace, local created/updated dates, up to three model labels or model count, edit pills, source/export status, errors/cancellation/ambiguity/audit notes and compact IDs. Child `agentID` is explicitly distinguished from main/native `sID`; full keys/backing identities remain in source details. |
+| Subagent titles missing | Detailed headings previously preferred the latest occurrence even when it was a synthetic UUID title. New presentation uses real recorded alternate-reference titles, then exact uniquely bound task description/name/start display name, then `Subagent (parent title)`. Enrichment records those title fields without altering identity or inventory titles. The supplied named example resolves to **Resolve hosted session transcripts**. |
+| Other child discrepancies | Additional audit initially found only **17/30** prompt/date matches even after title recovery. The old detailed header reused the console's narrower one-delegation-plus-human count and last message activity. Rich evidence already held subsequent non-user task follow-ups and later scoped events. Headers, TOC, occurrence rows, initial ordering/newest-25 selection and filter/sort attributes now consistently use rich task-entry counts and first/last valid scoped event dates. Filesystem dates are not promoted. The compact count remains separately labelled in comparison summaries and is unchanged in the console. |
+| Exact sister comparison | [Final same-identity audit](temp-tool-output/subagent-parity-refined-261008_2300.json) matches **30/30 titles and 30/30 prompt/created/updated triples** for comparable groups, matched by hosted-chat namespace and exact recorded tool-call ID. Counts are comparison groups, not proof of all discovery or every semantic field. Snapshot card numbers are not stable identifiers. |
+| Titles immediately after headers | List-based source/title rows before prompts; same title value appears once with all its source labels. `journal.customTitle` and the request-derived first title remain present; the latter's exporter source is `derived.firstPrompt` (the sister calls this first-question-derived title). Long values wrap without a table. |
+| Turn presentation | Light rounded borders/backgrounds, human icon with `title=human`, role/model/effort/credit pills and pencil/file-change pills with green additions/red removals. Finite nonnegative recorded Local `copilotCredits` is displayed; SDK credits are not guessed from token counts or parent totals. Short complete prompts have no duplicate full-text disclosure; clipped/derived prompts preserve full recorded text. |
+| Compact dates and readable sizes | Small Arial Narrow evidence labels and local light-blue dates; non-prompt dates visible in open cards, prompt/request timestamp list collapsed. Aligned source grids no longer stretch date panels to match taller neighbors. Payload/artifact bytes show comma-separated totals plus binary-scaled MB. |
+| Duplication and TOC | First/last/identity/outcome comparison summary is optional instead of permanently expanded above every turn list. Complete ignored cards are rendered once even with `--show-ignored`; this valid mode no longer produces an incorrect unexpected-visibility warning. A top-linked collapsible TOC includes every group and opens/reveals filtered/limited/ignored targets. Nested missing titles use the displayed parent title with cycle/depth guards. |
+
+Validation and review:
+
+- [Latest bundled report](temp-tool-output/copilot-chat-sessions-detailed-refined-261008_2320.html), [console capture](temp-tool-output/detailed-refined-listing-261008_2320.txt) and [show-ignored report](temp-tool-output/copilot-chat-sessions-detailed-ignored-261008_2320.html).
+- [Collapsed-card screenshot](temp-tool-output/detailed-collapsed-261008_2320.png), [named subagent screenshot](temp-tool-output/detailed-subagent-261008_2320.png), [turn screenshot](temp-tool-output/detailed-card-261008_2320.png) and [dark-mode screenshot](temp-tool-output/detailed-dark-261008_2320.png).
+- [Full verification](temp-tool-output/verify-detailed-refinement-261008_2320.txt): both typechecks, **257 passing tests**, unchanged golden digest and normalized render. New regression coverage includes child title fallback/alternate references and nested/cyclic inputs, rich child counts/dates/order/filter attributes, native collapsed cards, short/full prompt distinction, credits, invalid URI labels, ignored deduplication and a >25-row limit.
+- [Build](temp-tool-output/build-detailed-refinement-261008_2320.txt) succeeded; [bundled CLI](temp-tool-output/bundled-cli-refinement-261008_2320.txt) passed **11 tests**.
+- [Normal browser evidence](temp-tool-output/detailed-browser-validation-261008_2320.json) and [show-ignored browser evidence](temp-tool-output/detailed-browser-validation-261008_2320-ignored.json): **16 actual Edge checks per mode**, zero controller exceptions, distinct type colors in light/dark mode, native toggle/linked-child reveal/parent workspace, comparison, filters, no-JavaScript readability and no horizontal overflow at widths 1440/640. Each mode has 274 cards and 393 source grids, demonstrating no duplicated ignored cards. Normal report has 497 full-text disclosures (only clipped/derived prompts).
+- [Basic/console parity](temp-tool-output/listing-parity-refinement-261008_2300.json): **48 byte-identical comparisons** against committed renderers across default/ignored/newest-25/full-ID settings and three console widths.
+- Final whitespace check passed. Review artifacts/scripts are Git-ignored; isolated browser profiles were removed. No native storage, sister source, supplied snapshots or dependencies were modified.
+
+Source fallback: graph/browser-sharing tools were not available in this runtime. Used direct bounded project/sister source reads, exact offline snapshot/event comparisons, persistent tests and an isolated headless Edge/CDP session. Public [MDN details reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details) was consulted; its simplified fetch supplied only the page heading, so native disclosure behavior is substantiated by actual-browser acceptance instead. No private session data was sent to public services.
+
+| Phase / task | Deliverable | Required coverage | Status |
+| --- | --- | --- | --- |
+| #20 / D1 / exporter-report-modules | Separate report modules and shared pure inventory presentation helpers | Separate basic HTML, console and shared grouping modules; preserve imports and default behavior; establish separate module responsibilities for the forthcoming detailed renderer, controller, styles, metadata and relationships | Done |
+| #21 / D2 / exporter-report-evidence | Typed evidence enrichment and independent tests | Local and exact scoped SDK prompts; first/last and ordered questions; delegated/later child tasks; selected/resolved models, Auto and recorded effort; title/date provenance; CLI context; scoped bytes versus Local audited payload; edits/history; outcomes; five artifact locations; explicit partial/unknown data | Done |
+| #22 / D3 / exporter-report-relationships | Navigable evidence-based families and optional unproven hints | Persisted parent/child/nested/peer distinctions, recorded forks and reverse links; separately labelled hints without grouping/selection effects; missing/non-unique targets; target reveal, breadcrumbs, family tree and grouped/occurrence index | Done |
+| #23 / D4 / exporter-report-detailed-ui | Combined offline detailed report and creative additions | Type icons/tags/colors; full-width grids; exact prompt preview/full text and abbreviated local dates; models/timeline; full-text/project/file search, chips and ranges; grouped/occurrence and compact/comprehensive views; two-chat comparison; safe selectors; compact charts and all explanatory/ignored sections | Done |
+| #24 / D5 / exporter-report-detailed-acceptance | CLI integration, docs, source safety and feature parity acceptance | Flag/output safety; source and bundled tests; boundary/scope/edit/model/inference/controller/CSP checks; actual-browser desktop/narrow/no-JS acceptance; reference rich-example counts; same-inventory basic/console parity; docs and private review artifacts | Done (automated; user visual feedback pending) |
+
+The reference is the sister report generated October 8 at 18:54 plus its renderer/metadata/controller code, read-only. The pasted `session-26` example is a required acceptance case: all title sources, recorded and filesystem dates, per-turn models/Auto, file-change indicators and recorded editing history must be represented from actual backing evidence. Existing verified/unresolved/unsupported/ambiguous statuses and safe Local export selectors remain authoritative; the detailed report adds audit evidence rather than substituting inferred identity. Other requested sections: storage/IDs/status guide linked at the top and placed at the bottom; models used; understanding IDs/sizes; grouped conversation index; how to use/limits; audit flag legend. Development reports and validation logs stay in `temp-tool-output`.
+
+### D1 implementation and verification
+
+- Moved the existing basic renderer into [basic-listing.ts](src/session/basic-listing.ts), console rendering into [console-listing.ts](src/session/console-listing.ts), and common grouping/selector/counter rules into [listing-model.ts](src/session/listing-model.ts). [listing.ts](src/session/listing.ts) remains a compatibility entry, so callers do not migrate imports.
+- Added [listing-preview.ts](src/session/listing-preview.ts) and [boundary tests](test/listing-preview.test.ts). Detailed question previews preserve all 70 words at the threshold and use exactly 50 head/20 tail words above it. Local date formatting is shared with basic HTML; turn dates keep their year across years or when creation evidence is unavailable. Helpers are ready for the later detailed UI, not proof that UI is implemented.
+- [Live parity evidence](temp-tool-output/listing-module-parity-261008_1940.json): one inventory of **393 occurrences**, compared against committed `HEAD:src/session/listing.ts`; **48 byte-identical console/HTML comparisons** across default/ignored/newest-25/full-ID modes and three terminal widths. Used the same generated timestamp for both renderers. Counts are workspace occurrences, not grouped conversations.
+- [Full verification](temp-tool-output/verify-report-foundation-261008_1945.txt): both typechecks, **230 passing tests**, unchanged golden digest and normalized render. [Build](temp-tool-output/build-report-foundation-261008_1950.txt) succeeded; [bundled CLI](temp-tool-output/bundled-cli-report-foundation-261008_1950.txt) passed **nine tests**. Whitespace check passed and the generated report is Git-ignored.
+- [Fresh basic report](temp-tool-output/basic-report-module-split-261008_1950.html) and [console capture](temp-tool-output/basic-report-module-split-261008_1950.txt) are for regression review, not a detailed-report sample. Existing outputs were preserved; the one-use refactoring script was removed.
+- Public [VS Code session-management documentation](https://code.visualstudio.com/docs/agents/run/sessions/manage-sessions) was consulted as conceptual context. It describes current upstream behavior, not a verified schema for the installed VS Code build; private stored evidence remains authoritative. Graph tools were not available in this runtime; targeted source reads were used. No private session content was sent to a public service.
+- At this checkpoint, no staging or commit was performed; D2 evidence enrichment was next, before relationship and UI wiring.
+
+### D2-D5 implementation and acceptance
+
+Evidence was implemented and its targeted tests passed before the richer renderer/controller was added. Read-only sister sources consulted: `common/session-metadata.ts`, `common/file-changes.ts`, `common/artifacts.ts`, `common/agent-host-transcript.ts`, and `cli/lineage.ts`, `cli/list-html.ts`, `cli/session-listing.ts`. New project-owned modules reuse existing journal replay, patch parser, redactor, source verification and safe report writer rather than copying the sister renderer wholesale.
+
+| Requested capability | Implementation / acceptance |
+| --- | --- |
+| Accurate per-turn models, Auto, effort | Selected models remain separate from recorded answering models; answering intervals are scope-specific. Friendly display labels preserve raw IDs. SDK scope-wide model/response evidence survives zero counted human prompts. Child choice/effort is explicitly inherited session setting. |
+| Historical file counts and editing history | Tool identity deduplication, create/replace/multi-replace/patch counts, marker estimates for uncovered files, Windows URI/path normalization and distinct matching history request IDs. Missing arguments/counts are partial/unknown, deletion without saved text is unknown, oversized LCS is labelled estimated. No current source-file reconstruction. |
+| Rich reference example | [Reference evidence](temp-tool-output/reference-example-evidence-261008_200313.json) matches the sister's `session-26`: **17 prompts, two answering models, 11 files in 10 turns, +365/-88, three recorded history turns and four present artifact locations**. Earlier resource-only artifact counting was corrected to match the sister's five-location inventory. Individual resource files remain separate. |
+| Titles, dates, contexts, byte scopes | Source-labelled index/final replayed journal/request/SDK metadata fields, filesystem dates, supported workspace scalar context, scoped SDK UTF-8 bytes and separate Local journal/five-location audited totals. File links, scope identity, SHA-256 and full verification warnings are exposed. |
+| Parent/child/fork/copy identification | Recorded parents, same-host distinct peers and metadata forks have exact navigation; missing/non-unique targets remain explicit. Family breadcrumbs/tree and reverse links are present. Hint candidates use recorded content only, omit redacted/tied candidates, and never change source selection or grouping. |
+| Prompts and human-readable layout | First/last and ordered prompts, exact 70/71-word boundary and 50/20 head/tail previews, year-aware local dates, full redacted prompt/task text, per-turn edit chips, responsive identity/workspace/outcome/source cards and provenance tables. SDK main overviews are labelled derived when recognized context wrappers are omitted; full recorded text remains accessible. |
+| Browser discovery and creative additions | Full-text/model/project/file search; all-active chips; model/type/backing/date/numeric known/unknown filters; unknown-last sorting; grouped/occurrence views; reset/reveal; compact/balanced/comprehensive modes; model-switch navigation; two pinned summary comparison; supported Local selectors and PowerShell command copying. |
+| Explanations, guides and safety | Linked bottom storage/status diagrams, models used, IDs/sizes, grouped index, how-to/limits, audit legend and complete ignored groups. Static controller has hash CSP and no data embedded as executable code; no network content. Clipboard failures are explicit; no-JavaScript native disclosures remain readable. |
+| CLI compatibility | `--detailed` alone implicitly lists, or works with `--list`. It writes only detailed HTML and leaves console unchanged. Default detailed filename is distinct; explicit paths and overwrite safety are shared. `--detailed --no-html` warns without failing or generating HTML. |
+
+Validation and review artifacts:
+
+- [Full verification](temp-tool-output/verify-detailed-261008_200222.txt): both typechecks, **251 passing tests**, unchanged golden digest and normalized render.
+- [Build](temp-tool-output/build-detailed-261008_200222.txt) and [bundled CLI](temp-tool-output/bundled-cli-detailed-261008_200222.txt): successful build and **11 passing CLI tests**, including detailed output and nonfatal no-HTML conflict.
+- [Final bundled detailed report](temp-tool-output/copilot-chat-sessions-detailed-listing-261008_200313.html), [console capture](temp-tool-output/detailed-listing-261008_200313.txt), [overview screenshot](temp-tool-output/detailed-browser-261008_200313.png), and [expanded-card screenshot](temp-tool-output/detailed-card-261008_200313.png).
+- [Actual-browser acceptance](temp-tool-output/detailed-browser-validation-261008_200313.json): **12 checks**, no controller exceptions, desktop width 1440 and narrow expanded-source width 640 without document overflow. Covers exact ranges, unknown/model/chip/date filters, sorting, occurrences, ignored target reveal, two-chat comparison, density, clipboard failure and no-JavaScript fallback. Browser used an isolated headless Edge profile; its temporary profile was cleaned.
+- Final live report has **274 grouped cards, 393 source grids, 1,555 full prompt/task entries and 274 model timelines**. Main listing has **131 groups** and the separate ignored section **143 groups**. These are snapshot counts, not proof of all historical/profile/remote discovery.
+- [Basic/console parity](temp-tool-output/listing-parity-detailed-261008_200313.json): **48 byte-identical comparisons** against the committed pre-refactor renderer using one inventory and a fixed generation time. Different live/sister snapshots are not treated as discovery-count parity.
+
+Limits remain explicit: private storage formats are version-sensitive; unsupported editing/history/YAML variants produce unknowns or diagnostics; read checks are not an atomic cross-store snapshot; recognized SDK outcome events are not every possible failure; redaction is best effort; broader discovery and SDK Markdown/fidelity work are separate backlog items. The legacy journal parser's broader type-safety migration remains a suggested follow-up, not an unrelated rewrite in this report change.
+
+## Earlier implementation checkpoints
+
 Artifact-location validation: [full verification log](temp-tool-output/verify-261008_183335.txt) records both typechecks, **224 passing tests** and unchanged golden checks; [build log](temp-tool-output/build-261008_183352.txt) and [bundled CLI test log](temp-tool-output/bundled-cli-tests-261008_183352.txt) record successful build and **nine passing tests**. A fresh [listing report](temp-tool-output/copilot-chat-sessions-listing-261008_183352.html) and [console capture](temp-tool-output/listing-261008_183352.txt) are saved alongside them. Twelve earlier review captures and the preceding full verification log were copied into the folder; originals were preserved. No CLI runtime default or fixture sandbox behavior changed.
 
 October 8 artifact-location decision: the user chose to keep the CLI report default unchanged (the command's working directory), while storing all development/review reports, runtime captures, test output logs and validation logs in the project-root [temp-tool-output](temp-tool-output/) folder. Use explicit `--html-output` paths and timestamped log names for our runs. Automated fixture sandboxes and their normal cleanup remain unchanged. The folder is already Git-ignored; preserve private outputs for user review, not commits. Existing HTML reports have been relocated there; historical root-relative report links below refer to files now under that folder. The latest full-width report is [here](temp-tool-output/copilot-chat-sessions-listing-261008_181452.html). Earlier review capture files from session artifacts are copied there without deleting the originals. The convention is also recorded in the repository's agent instructions and README.
@@ -39,6 +223,8 @@ Implementation has explicit user approval. Numbers are convenient references, no
 | 17 | exporter-html-refinement | Apply local datetime/font/prompt styling, full linked source/workspace details, and a collapsed ignored-session section. | Complete: 222-test verify, build, nine bundled CLI tests and fresh live-report structural checks passed; visual browser acceptance remains under task 13 | 8 |
 | 18 | exporter-html-panels | Expand source details across the full table width with grouped cards, accessible controls and session-paired sorting/filtering. | Complete: 224-test verify, build, nine bundled CLI tests and 274 live-report panel/ID/controller checks passed; visual browser acceptance remains under task 13 | 17 |
 | 19 | exporter-review-artifacts | Keep development/review reports, runtime captures, validation logs and test outputs in Git-ignored `temp-tool-output`, without changing CLI defaults or fixture sandboxes. | Complete: convention documented, earlier review outputs copied, fresh report/console/verify/build/bundled-test logs saved there | None |
+| 20 | exporter-sdk-usage | SDK usage correlation (deferred by user choice, was #31 in the detailed-report table): verify and display Agent Host / Copilot CLI credit and token usage. The sampled SDK log has `model.model_call_success` usage, child `subagent.completed.totalTokens`, cumulative `session.usage_checkpoint` and `session.shutdown.modelMetrics`; decide which are incremental, bind them to exact scopes and prompts, deduplicate, and never attribute parent totals to children or convert tokens to credits. Until done, SDK and subagent cards show `Usage unavailable`. | Pending (deferred) | 7, 9 |
+| 21 | exporter-model-icon | Decision needed: 🤖 is used for both the Agent Host type chip and answering-model chips. Pick a distinct model-chip icon (suggested: keep 🤖 for Agent Host only). | Pending user decision | None |
 
 ## Session-wide research requirement for AI agents
 

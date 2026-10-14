@@ -25,6 +25,7 @@ npm run ai:export:chat -- --current
 - The `TYPE` column distinguishes local, agent, sub-agent, and Copilot CLI entries. `verified` means a backing identity was checked, `unresolved` means no chat backing was verified, and `ambiguous` / `🟠 ❓` means the backing/scope could not be safely resolved.
 - Use `--last25` for a compact recent list or `--show-ignored` to restore `/fix`, confirmed-empty, ambiguous, and `New Chat` rows with unknown creation date and prompt count omitted by default.
 - Listing generates an offline HTML report by default; pass `--no-html` to suppress it, `--html-output <path>` to select a destination, and `--overwrite` only with explicit authorization to replace an existing report.
+- Add listing-only `--detailed` for prompt/model/edit evidence and family navigation in a richer offline HTML report. Console output stays unchanged. With `--detailed --no-html`, report generation is suppressed and the CLI prints a conflicting-flags warning. Treat reports as private; redaction is best effort.
 - If the output already exists, get explicit authorization before retrying with `--overwrite`; do not silently replace an earlier archive.
 
 After the command completes, report the written file path (printed as `Output: ...`) and a one-line summary of turns, tool calls, reasoning notes, and resources. Do not fabricate content; the script reads the native VS Code chat journal.

@@ -10,6 +10,7 @@ export interface CliOptions {
   last25: boolean;
   fullIds: boolean;
   noHtml: boolean;
+  detailed: boolean;
   htmlOutput: string | null;
   current: boolean;
   overwrite: boolean;
@@ -31,7 +32,7 @@ export type ParsedArgs =
 
 const BOOLEAN_FLAGS = new Set([
   '--list', '--current', '--overwrite', '--verify', '--audit', '--strict',
-  '--show-ignored', '--last25', '--full-ids', '--no-html',
+  '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed',
 ]);
 
 // Value is the usage line shown when the flag is wrong, so the message lives next to the flag.
@@ -90,7 +91,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
   const listRequested = booleans.has('--list')
     || (modes === 0 && positionals.length === 0 && !booleans.has('--current'));
   if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
-    || booleans.has('--no-html') || values.has('--html-output')) && !listRequested)
+    || booleans.has('--no-html') || booleans.has('--detailed') || values.has('--html-output')) && !listRequested)
     return { ok: false, error: 'Listing options are available only when listing sessions.' };
   if (booleans.has('--no-html') && values.has('--html-output'))
     return { ok: false, error: '--no-html cannot be combined with --html-output.' };
@@ -111,6 +112,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       last25: booleans.has('--last25'),
       fullIds: booleans.has('--full-ids'),
       noHtml: booleans.has('--no-html'),
+      detailed: booleans.has('--detailed'),
       htmlOutput: values.get('--html-output') ?? null,
       current: booleans.has('--current'),
       overwrite: booleans.has('--overwrite'),

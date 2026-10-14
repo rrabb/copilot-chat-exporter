@@ -6,6 +6,18 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Local session and per-turn credit/input/output-token chips with independent coverage and labelled partial totals; a dedicated usage disclosure explains provenance and unavailable SDK correlation.
+- Compact Arial Narrow titles/chips, one chip per answering-model list, created/updated icons with tooltips and user-selected child/history/hint/cancellation/Agent Host icons.
+- Detailed report presentation round 3: `rem`-based type scale on a 125% root; `⬆️~15.4M ⬇️~730k` token chips; `?`/`??`/`???` instead of the word unknown (reason in tooltips); `N refs` in the TOC with Arial Narrow titles; themed buttons and filter chips; `icon label: value` lines for sections with nothing or one line; collapsed artifact locations; no repeated full prompts when only whitespace differs; `MD` in chips; bold header dates with the updated date omitted when equal to created; 🔝 for the card TOC link; Arial Narrow model-switch links. Fixed a double `?` for unknown payload and a `(0)` audit count that ignored diagnostics.
+- Rounded whole-number credits, abbreviated `k`/`M` token chips (nearest, for example `⬆️~15.4M ⬇️~730k`) with `~` for partial values, and an unavailable-usage chip that replaces the credits/tokens disclosure in the expanded card (in normal flow, not right-aligned). Unknown model chips are omitted. Tentative fork/copy hints use `⑂?` in the amber hint tone; the `N w/s refs · 1 conv` chip is bold magenta. Compare/Link/TOC are small Arial Narrow controls at the top right of the expanded card.
+- Detailed report review fixes: correct singular/plural labels, TOC grid without overlapping columns and duplicate numbering, semantic summary-chart colors with card-matching type labels, readable symbol glyphs, non-Local audited-byte wording, artifact counts, and no repeated `Selected` chip when it equals the answering model.
+- Type-colored, natively collapsed detailed cards with two metadata subheaders, a top session TOC, icon controls and colored turn/edit/credit/effort pills.
+- Early list-based title provenance, compact date provenance with collapsed prompt timestamps, comma-formatted payload sizes and no redundant full-prompt disclosures for short complete text.
+- Separate `--detailed` offline identification report with ordered/full prompt text, model/Auto/effort evidence, title/date provenance, historical file-change/editing-history details, artifacts and exact scoped SDK sizes.
+- Verified family/peer/recorded-fork navigation and explicitly unproven copy/fork hints; grouped/occurrence views, full-text filters/ranges, model-switch timeline and two-chat summary comparison.
+- Separate evidence, edit parsing, relationship, basic/detailed rendering, shared HTML, style and controller modules; hash-authorized detailed controller with offline CSP and native no-JavaScript readability.
+- Detailed report names are distinct from basic names. `--detailed --no-html` warns and keeps only the compact listing. Existing default console/basic report behavior and publication safety are preserved.
+
 - Full-width HTML source panels with grouped identity/workspace/file cards, accessible expand/close controls, and session-paired sorting/filtering in both session tables.
 
 - Refined HTML listing with local `YYMMDD_HH:MM` dates, compact Arial Narrow dates/selectors, bold prompt counts, complete linked workspace/source details, and a separate collapsed ignored-session table.
@@ -36,6 +48,9 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- Detailed subagent headings now use real titles from alternate workspace references or uniquely bound recorded delegation descriptions/names instead of a synthetic agent UUID. Parent workspace and fallback titles remain presentation-only.
+- Detailed `--show-ignored` no longer duplicates complete ignored cards in both main and ignored sections.
+- Detailed headers, filters, initial ordering and TOC now use all recorded child task/follow-up entries and latest exact-scope SDK event activity. The compact console's existing prompt-count policy remains unchanged.
 - No-argument CLI invocation now lists instead of exporting an implicit newest/current session.
 - Library resolution requires an explicit source or explicit `current: true`; duplicate UUIDs, conflicting current/root evidence and wrong-format journal paths fail instead of selecting a guessed source.
 - Short UUID prefixes select a Local journal only when the prefix uniquely matches; collisions and repeated workspace IDs fail safely instead of selecting arbitrarily.
@@ -47,7 +62,7 @@ All notable changes to this project are documented here.
 
 ### Known limitations
 
-- SDK Markdown rendering/current selection, default filter parity, offline HTML and shared fidelity/redaction/companion rendering are still in progress.
+- SDK Markdown rendering/current selection, broader default filter parity and shared fidelity/redaction/companion rendering are still in progress. Basic and detailed offline HTML listings are available; private formats and broader discovery coverage remain limited.
 - VS Code's journal is a private, undocumented format and can change without notice.
 - Resource, transcript, model, and memory stores are optional best-effort enrichment.
 - Redaction is best effort and is not a compliance or secret-scanning control.

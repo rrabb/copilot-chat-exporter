@@ -104,6 +104,28 @@ These additive contracts support the staged implementation; fidelity flags and c
 
 ### Running it
 
+#### Detailed identification report
+
+Use `--detailed` alone or with `--list` to generate the combined detailed HTML report instead of basic HTML. Console output stays compact and unchanged. The default filename is `copilot-chat-sessions-detailed-listing-<timestamp>.html` in the invoking directory; `--html-output`, `--overwrite`, ignored-session rules and root selection behave as before. `--detailed --no-html` produces only the console listing and prints an explicit conflicting-flags warning. Detailed mode is listing-only, not an export format.
+
+The detailed report includes ordered prompt previews/full text, per-turn local dates, selected versus recorded answering models, Auto/effort, historical edit evidence and editing-history state, title/date provenance, artifacts, source grids, verified parent/child/peer navigation, recorded SDK forks and separately labelled best-effort copy/fork hints. It also provides full-text/project/file/model search, conjunctive quick chips, date/numeric known/unknown ranges, grouped/occurrence views, model-switch navigation, two-chat summary comparison, charts and collapsible explanatory sections. Native disclosures and all main cards remain readable without JavaScript; interactive filtering, copying and comparison require it.
+
+Cards start collapsed, with type-colored borders/titles, a title/tag line and two compact metadata lines. Open a card to see title provenance immediately, then prompts and other disclosures. The top-linked collapsible session TOC includes ignored/limited entries; following a link reveals its target. Comprehensive mode opens cards and their inner sections. Duplicate title values share one row with all source labels, and `--show-ignored` does not repeat full cards in the bottom ignored index.
+
+Child headings prefer a real recorded workspace-reference title, then the uniquely bound delegation description/name or child display name. Only when these are unavailable is `Subagent (parent title)` used as a labelled fallback. The heading and inherited parent workspace are presentation aids, not new identity evidence. Short complete prompts are not repeated in a full-text disclosure; clipped or derived previews retain one. Local recorded credits and input/output tokens appear in header and per-turn chips, and in a credits/tokens disclosure after the titles when available. Partial values use `~`; credits and detailed token totals round up to whole units, while the token chip shows `⬆️` prompt and `⬇️` completion counts as `k`/`M` rounded to the nearest unit (for example `⬆️~15.4M ⬇️~730k`). When usage is unavailable, the expanded card shows one `Usage unavailable` chip in place of the disclosure; header and turns omit unavailable usage chips. Missing answering-model evidence is stated only inside the expanded card. Unknown values show `?` (minor detail), `??` (headline value such as turns or a date) or `???` (the source could not be read or verified at all) with the reason in a tooltip. Sections with nothing or one line to show (audit flags, family, a single-entry model timeline, the export selector) are `icon label: value` lines instead of disclosures. Prompts that differ only by whitespace are not repeated. The updated date is omitted when it equals created. Chips say `MD` for Markdown. Compare, Link and 🔝 TOC are small Arial Narrow controls at the top right of the expanded card. The `N w/s refs · 1 conv` chip is bold magenta; `⑂?` marks tentative fork/copy hints. All font sizes are `rem` on a 125% root (change `html{font-size}` in the stylesheet to rescale the whole report); `rem` follows the browser's default font size, unlike `px`. Model labels share one Arial Narrow chip, titles are smaller Arial Narrow, and created/updated icons retain descriptive tooltips. Dates keep non-prompt provenance visible inside an open card, with request/prompt timestamps collapsed separately. Byte counts use commas plus binary-scaled MB.
+
+Detailed turn counts include every recorded child delegated task and follow-up; compact console counts retain their existing human-prompt policy. SDK detailed created/updated dates use the first/last valid recorded event in the exact scope, not filesystem dates or just the last user/assistant message. Headers, TOC, initial newest-25 selection, filters, sorting and occurrence rows share these rich metrics. The compact inventory count remains available in the expanded comparison summary. A child header labels its exact scope ID as `agentID`; the provider/native key and backing SDK session ID remain in source details.
+
+Long prompt previews use exactly the first 50 and last 20 whitespace-delimited words above 70 words, separated by `. . . . .`; full redacted text is retained. Turn dates omit the year only when creation and turn timestamps share a known generator-local year. Model labels are shortened for display but raw IDs remain in tooltips, filters and the model inventory; aliases are not silently merged. A selected model alone is not counted as proof of an answering model.
+
+These are identification aids, not a near-lossless export or complete audit of every private storage field. Unknown remains different from zero. Edit counts describe submitted tool changes or labelled marker estimates, not current filesystem diffs or Keep/Undo decisions. Missing/malformed edit arguments are marked partial. Changed backings are not enriched. SDK sizes describe exact scoped event-record bytes, excluding separators and unrelated scopes; Local journal and optional artifact bytes are separate. Never sum these figures as unique disk usage.
+
+The report contains private prompts and local paths. Prompt/title text uses the existing best-effort credential redactor, but this is not complete sanitization. Keep generated reports private.
+
+Local artifact counts use the same five session-keyed locations as the sister tool: journal, editing-session directory, transcript, debug-log directory and resource directory. Each location has present/missing/unreadable state and a stat-based byte/file count. Individual resource files are listed separately. The audited Local payload includes the journal once and is not additional to journal bytes or a globally deduplicated disk total.
+
+#### Listing and export commands
+
 List known sessions, then export one by id or exact journal path. No arguments means listing, even when `VSCODE_TARGET_SESSION_LOG` is set. Use `--current` to request a verified current Local session explicitly; missing/conflicting identity never falls back to newest. An output path alone is no longer an export selector. During development, run the TypeScript source directly with
 `node src/cli.ts`; after `npm run build` the same arguments work against `dist/cli.js`.
 
@@ -114,6 +136,8 @@ node src/cli.ts --list --last25 --user-data-root "C:\Users\you\AppData\Roaming\C
 node src/cli.ts --list --show-ignored --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --full-ids --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --no-html --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --detailed --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --detailed --html-output temp-tool-output/detailed-listing.html --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --html-output docs/temp/chat-list.html --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --current docs/temp/current.md --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts <sessionId-or-unique-prefix> docs/temp/name.md
@@ -269,6 +293,8 @@ to understand, so it does not get its own file. There is no `utils.ts` - a bucke
 has nothing in common, and becomes the drawer everything imports and nobody owns. Split when a
 file actually hurts, and write down why.
 
+The listing renderer is split by responsibility because detailed transcript identification would otherwise mix storage enrichment, terminal formatting and browser interaction. The console, basic HTML and detailed HTML share inventory grouping and selector rules, while retaining existing `listing.ts` imports. Detailed evidence, file-change parsing, relationships, styles and browser controls have separate modules and tests.
+
 **5. Evidence over recall.** Never add a kind, an API, or a version number because it sounds
 right. Fourteen names once sat on the suppression list purely from general knowledge of VS Code,
 silently disarming the alarm built to catch them; the version marker shipped a wrong number for
@@ -373,6 +399,15 @@ function-level detail you need while actually patching.
 |---|---|
 | Storage discovery, workspace root, output path, git | `src/host.ts` |
 | Finding, listing and resolving a session | `src/session/locate.ts` |
+| Inventory grouping, selectors and shared listing counters | [src/session/listing-model.ts](src/session/listing-model.ts) |
+| Compact console inventory | [src/session/console-listing.ts](src/session/console-listing.ts) |
+| Basic offline HTML inventory | [src/session/basic-listing.ts](src/session/basic-listing.ts) |
+| Report date formatting and detailed turn-preview rules | [src/session/listing-preview.ts](src/session/listing-preview.ts) |
+| Listing renderer compatibility entry | [src/session/listing.ts](src/session/listing.ts) |
+| Detailed read-only evidence and contracts | [src/session/listing-evidence.ts](src/session/listing-evidence.ts), [listing-evidence-types.ts](src/session/listing-evidence-types.ts) |
+| Historical tool changes and marker estimates | [src/session/listing-edits.ts](src/session/listing-edits.ts) |
+| Recorded and best-effort relationships | [src/session/listing-relationships.ts](src/session/listing-relationships.ts) |
+| Detailed offline HTML, styles and controller | [src/session/detailed-listing.ts](src/session/detailed-listing.ts), [detailed-listing-styles.ts](src/session/detailed-listing-styles.ts), [detailed-listing-controller.ts](src/session/detailed-listing-controller.ts) |
 | Journal reading, delta replay, and the kind census | `src/session/journal.ts` |
 | **Response item → node. Kinds live here** | `src/session/classify.ts` |
 | Resources, memory files, versions, model names | `src/session/enrich.ts` |

@@ -10,6 +10,28 @@ import test from 'node:test';
 const CLI = process.env.CCE_TEST_CLI ?? fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 const UUID = '11111111-1111-4111-8111-111111111111';
 
+test('detailed listing writes only a detailed report while retaining compact console output', async (context) => {
+  const { invoke } = await fixture(context);
+  const result = invoke('--detailed');
+  assert.equal(result.status, 0, result.stderr);
+  const reportPath = result.stdout.match(/HTML report: (.+)/u)![1]!.trim();
+  assert.match(reportPath, /copilot-chat-sessions-detailed-listing-/u);
+  const report = await fs.readFile(reportPath, 'utf8');
+  assert.match(report, /Detailed VS Code chat session listing/u);
+  assert.match(report, /Ordered prompts \/ delegated tasks/u);
+  assert.match(report, /journal.customTitle/u);
+  assert.match(result.stdout, /ID \/ PREFIX/u);
+  assert.doesNotMatch(result.stdout, /Model-switch timeline/u);
+});
+
+test('detailed plus no-html warns without failing the console listing or creating reports', async (context) => {
+  const { invoke } = await fixture(context);
+  const result = invoke('--detailed', '--no-html');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /Invalid flag combination/u);
+  assert.doesNotMatch(result.stdout, /HTML report:/u);
+});
+
 async function fixture (context: test.TestContext, multipleRoots = false) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-cli-'));
   context.after(() => fs.rm(home, { recursive: true, force: true }));

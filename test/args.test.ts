@@ -67,6 +67,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     last25: false,
     fullIds: false,
     noHtml: false,
+    detailed: false,
     htmlOutput: null,
     current: false,
     overwrite: false,
@@ -79,6 +80,15 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     outDir: null,
     userDataRoot: null,
     positionals: [],
+  });
+
+  test('detailed implicitly lists, is listing-only and permits the nonfatal no-html combination', () => {
+    assert.equal(ok(['--detailed']).list, true);
+    assert.equal(ok(['--list', '--detailed']).detailed, true);
+    assert.equal(ok(['--detailed', '--no-html']).noHtml, true);
+    assert.match(err(['--detailed', 'session']), /only when listing/);
+    assert.match(err(['--current', '--detailed']), /only when listing/);
+    assert.match(err(['--verify', '--detailed']), /only when listing/);
   });
 });
 

@@ -12,6 +12,8 @@ test('default listing report name is timestamped in the invoking directory', () 
     path.resolve('C:\\reports', 'copilot-chat-sessions-listing-261008_135007.html'),
   );
   assert.throws(() => defaultListingHtmlPath('.', new Date(NaN)), /valid timestamp/);
+  assert.equal(defaultListingHtmlPath('C:\\reports', date, true),
+    path.resolve('C:\\reports', 'copilot-chat-sessions-detailed-listing-261008_135007.html'));
 });
 
 test('HTML publication refuses existing files unless overwrite is explicit', async (context) => {
