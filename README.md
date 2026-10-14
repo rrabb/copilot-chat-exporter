@@ -106,9 +106,15 @@ These additive contracts support the staged implementation; fidelity flags and c
 
 #### Detailed identification report
 
+The [HTML report design guide](docs/HTML-REPORT-DESIGN.md) documents the page/card outline, abbreviations, ID rules, typography, semantic colors, progressive disclosure and design rationale for both report levels.
+
 Use `--detailed` alone or with `--list` to generate the combined detailed HTML report instead of basic HTML. Console output stays compact and unchanged. The default filename is `copilot-chat-sessions-detailed-listing-<timestamp>.html` in the invoking directory; `--html-output`, `--overwrite`, ignored-session rules and root selection behave as before. `--detailed --no-html` produces only the console listing and prints an explicit conflicting-flags warning. Detailed mode is listing-only, not an export format.
 
 The detailed report includes ordered prompt previews/full text, per-turn local dates, selected versus recorded answering models, Auto/effort, historical edit evidence and editing-history state, title/date provenance, artifacts, source grids, verified parent/child/peer navigation, recorded SDK forks and separately labelled best-effort copy/fork hints. It also provides full-text/project/file/model search, conjunctive quick chips, date/numeric known/unknown ranges, grouped/occurrence views, model-switch navigation, two-chat summary comparison, charts and collapsible explanatory sections. Native disclosures and all main cards remain readable without JavaScript; interactive filtering, copying and comparison require it.
+
+Why/source now consolidates health/audit notes, workspace references, a compact recorded-evidence chain, conditional per-reference lineage, storage summary and a collapsed unified evidence table. Technical identity is a nested disclosure preserving each field/value/reference association instead of claiming all references are identical. Reference labels describe persisted index entries, derivation through a parent, observed cwd matches and additional workspace references; they do not assign primary/copy ownership. Artifact rows retain purpose, sharing within the inventoried report, full-path copy/link controls and qualified potential removal impact. No cleanup is performed. Sizes emphasize the bold abbreviated value and keep exact comma-separated bytes regular and small in Arial Narrow.
+
+Detailed enrichment inspects each unique storage artifact once per report. Workspace databases use read-only transactions for page counts, logical UTF-8/blob value totals and largest keys; no stored prompt-history bodies are exposed. JSONL composition groups actual byte lengths by recorded type/mutation, while related directories group regular-file lengths by immediate child without following links. Composition is omitted if a file/WAL changes during analysis. These are separate physical, logical, directory and conversation-scope measures, not additive totals or reclaimable-space estimates. The report remains a live best-effort filesystem observation, not an atomic backup. See [the storage guide](docs/CHAT-SESSION-LOCATIONS.md) for the evidence routes and limitations.
 
 Cards start collapsed, with type-colored borders/titles, a title/tag line and two compact metadata lines. Open a card to see title provenance immediately, then prompts and other disclosures. The top-linked collapsible session TOC includes ignored/limited entries; following a link reveals its target. Comprehensive mode opens cards and their inner sections. Duplicate title values share one row with all source labels, and `--show-ignored` does not repeat full cards in the bottom ignored index.
 
@@ -306,6 +312,8 @@ can be copied out whole and still work.
 
 ### Where the data lives
 
+Newcomer guide: [docs/CHAT-SESSION-LOCATIONS.md](docs/CHAT-SESSION-LOCATIONS.md).
+
 VS Code keeps per-folder state under `workspaceStorage/<hash>/`, where `<hash>` identifies the
 workspace, not the session:
 
@@ -445,6 +453,7 @@ re-saving the recorded exports without destroying them - is in
 | `src/verify/layers.ts` | the three checks: journal vs parse, parse vs journal, parse vs rendered file |
 | `src/verify/golden.ts` | the recorded checks: saved digest, saved copy, and what a comparison ignores |
 | `docs/SPEC.md` | the contract: data sources, document layout, visual design, verification |
+| `docs/CHAT-SESSION-LOCATIONS.md` | newcomer guide to where chat sessions live, why copies exist and what the statuses mean |
 | `docs/CHAT-SESSION-SCHEMA.md` | visual guide to the observed journal tree, official source evidence, and schema-change workflow |
 | `docs/UPGRADING.md` | **what to do when VS Code or Copilot changes the format** |
 | `docs/BUILD-PROMPT.md` | rebuild or port the exporter from the spec |
