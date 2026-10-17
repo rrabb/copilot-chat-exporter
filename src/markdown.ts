@@ -12,24 +12,25 @@
 // tool calls and edit markers interleave exactly as they streamed. Never bucket by type - the
 // export would stop matching what the chat window showed.
 
+import { createHash } from 'node:crypto';
 import path from 'node:path';
-import type { AutoModelResolution, FileTouch, ParsedSession, SessionLocation, TodoItem, ToolNode, Turn, TurnNode, TurnScalars } from './types.ts';
+import { planToolText } from './export-policy.ts';
+import type { CompanionArtifact, CompanionKind } from './export-policy.ts';
+import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, Turn, TurnNode, TurnScalars, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
 import {
   COLLATOR, COMMAND_CODE, FILE_LINK_COLOR, MARK, MUTED, MUTED_CODE, NESTED_INDENT, PROMPT_BADGE,
-  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, clipText, closeUnbalancedFences,
-  esc, extractUri, fenceFor, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
+  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences,
+  esc, extractUri, fenceFor, fmtAiCredits, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
   mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
   userMessageAnchor, userMessageHref,
 } from './text.ts';
 
 const MAX_EMBEDDED_RESOURCE_BYTES = 96 * 1024;
-const MAX_TERMINAL_OUTPUT_BYTES = 24 * 1024;
 const MAX_COPY_SOURCE_BYTES = 32 * 1024;
-const MAX_FILE_DIFF_BYTES = 96 * 1024;
 // A summary wraps to the next line rather than truncating, so the cap only exists to stop a
 // pathological one-liner (a multi-KB generated command) from burying the rows around it.
 const MAX_SUMMARY_CHARS = 1000;
@@ -147,6 +148,61 @@ function resourceBody (resource: Resource) {
   ];
 }
 
+// --- long tool text ---
+
+/** Where text over the line threshold is saved in full. The caller writes the companions next to the Markdown. */
+export interface TextOverflow {
+  assetsDirectory: string;
+  companions: CompanionArtifact[];
+}
+
+// buildDocument is synchronous, so one active sink per call is safe and avoids threading a
+// parameter through every renderer below it.
+let overflow: TextOverflow | null = null;
+
+function saveOverflow (text: string, kind: CompanionKind, label: string, extension: string, toolCallId?: string) {
+  const sink = overflow!;
+  const hash = createHash('sha256').update(text).digest('hex').slice(0, 8);
+  const name = `${label}-${hash}.${extension}`;
+  const relativePath = `${sink.assetsDirectory}/${name}`;
+  sink.companions.some((item) => item.relativePath === relativePath) || sink.companions.push({
+    id: name, kind, relativePath, mediaType: 'text/plain; charset=utf-8', bytes: new TextEncoder().encode(text),
+    location: { sourceId: 'export', field: label, ...(toolCallId ? { toolCallId } : {}) },
+  });
+  return { name, href: relativePath.replaceAll(' ', '%20') };
+}
+
+/** Applies the line policy to one text: the text to show, plus the note that links the full companion when there is one. */
+function limitText (text: string, options: { kind: CompanionKind; label: string; extension?: string; toolCallId?: string }) {
+  const plan = planToolText(text);
+  if (plan.companionText === null || overflow === null)
+    return { shown: text, linked: false, note: '' };
+  const saved = saveOverflow(plan.companionText, options.kind, options.label, options.extension ?? 'txt', options.toolCallId);
+  return {
+    shown: plan.preview,
+    linked: true,
+    note: `Showing the first 10 of ${thousands(plan.lineCount)} lines (${thousands(Buffer.byteLength(text, 'utf8'))} bytes). Full text: [${saved.name}](${saved.href}).`,
+  };
+}
+
+/**
+ * A collapsed block for tool text under the approved policy: text up to 300 lines or 15 KiB stays in the
+ * Markdown, longer text shows the first 10 and link a companion with the full text.
+ * With no companion folder (library callers) the full text stays inline; it is never clipped.
+ */
+function toolTextBlock (summary: string, text: string, language: string, options: { kind: CompanionKind; label: string; extension?: string; toolCallId?: string; tail?: string }) {
+  const limited = limitText(text, options);
+  const fence = fenceFor(limited.shown, language);
+  return [
+    `<details><summary>${mutedSummary(`${summary}${limited.linked ? ' - first 10 lines, full text linked' : ''}${options.tail ?? ''}`)}</summary>`,
+    '',
+    ...indentBlock([fence.open, limited.shown, fence.close, ...(limited.note ? ['', limited.note] : [])], NESTED_INDENT),
+    '',
+    '</details>',
+    '',
+  ];
+}
+
 // --- tool calls ---
 
 export function toolFriendly (toolId: string | undefined) {
@@ -218,6 +274,11 @@ function commandOneLiner (command: string, limit = 100) {
 
 // Capture often starts mid-way through the shell's echo of the command being run,
 // leaving a fragment like "ind -- DataSourceManager" above the real output.
+function isCommandEcho (input: string, command: string) {
+  const normalize = (value: string) => value.replace(/\r\n?/gu, '\n').trim();
+  return normalize(input) === normalize(command);
+}
+
 function trimCommandEcho (output: string, command: string) {
   const lines = output.split('\n');
   const first = (lines[0] ?? '').trim();
@@ -259,12 +320,59 @@ function unrenderedResultDetails (node: ToolNode): unknown | null {
   return Object.keys(remainder).length ? remainder : null;
 }
 
+// A delegated agent: labelled as such, with its task and the summary it returned in view and its
+// whole conversation (which may itself delegate) one click further.
+function renderSubagent (node: ToolNode, byCall: Map<string, Resource[]>) {
+  const sub = node.subagent!;
+  const title = sub.description || sub.displayName || sub.name || 'sub-agent';
+  const toolCalls = sub.turns.reduce((sum, turn) => sum + turn.toolNodes.length, 0);
+  const facts = [
+    sub.agentType ? `type ${sub.agentType}` : '',
+    sub.model ? modelName(sub.model) : '',
+    `${thousands(sub.totalToolCalls ?? toolCalls)} tool call${(sub.totalToolCalls ?? toolCalls) === 1 ? '' : 's'}`,
+    sub.durationMs != null ? humanDuration(sub.durationMs) : '',
+    sub.totalTokens != null ? `${thousands(sub.totalTokens)} tokens` : '',
+    sub.usage ? `${fmtAiCredits(sub.usage.nanoAiu)} credits in ${thousands(sub.usage.calls)} call${sub.usage.calls === 1 ? '' : 's'}` : '',
+    sub.cancelled ? 'cancelled' : '',
+    node.isComplete ? '' : 'not completed',
+  ].filter(Boolean).join(' · ');
+  const head = `${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">🤖 SUB-AGENT</code>: ${esc(clip(title, 120))} (${esc(facts)})`;
+  const body: string[] = [];
+  const block = (label: string, value: string) => {
+    const fence = fenceFor(value, 'text');
+    body.push(`**${label}:**`, '', fence.open, redact(value), fence.close, '');
+  };
+  node.intent && body.push(`**Intent:** ${esc(node.intent)}`, '');
+  const task = sub.turns[0]?.prompt || node.promptText;
+  task && block('Delegated task', task);
+  const returned = node.resultText || node.output;
+  returned && block('Summary returned to the main chat', returned);
+  node.detailText && block('Detailed result', node.detailText);
+  const conversation = sub.turns.flatMap((turn, index) => [
+    ...(index > 0 ? ['**Follow-up prompt:**', '', ...(() => { const fence = fenceFor(turn.prompt, 'text'); return [fence.open, redact(turn.prompt), fence.close]; })(), ''] : []),
+    ...renderTurnBody(turn, byCall, '', { heading: false }),
+    '',
+  ]);
+  body.push(
+    `<details><summary>${mutedSummary(`📜 Full sub-agent conversation (${sub.turns.length} message${sub.turns.length === 1 ? '' : 's'}, ${thousands(toolCalls)} tool call${toolCalls === 1 ? '' : 's'})`)}</summary>`,
+    '', ...indentBlock(conversation, NESTED_INDENT), '', '</details>', '',
+  );
+  return [
+    `<details><summary>${mutedSummary(head)}</summary>`,
+    '<div aria-hidden="true" style="height:0.35rem"></div>',
+    '',
+    ...indentBlock(body),
+    '',
+    '</details>',
+  ];
+}
+
 function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
+  if (node.subagent)
+    return renderSubagent(node, byCall);
   const resources = node.toolCallId ? (byCall.get(node.toolCallId) ?? []) : [];
   const rawInput = node.toolSpecificData?.kind === 'input' ? node.toolSpecificData.rawInput : null;
-  // Terminal `resultDetails.input` repeats the command, sometimes with minor serialization
-  // differences. Keep it in the parsed model, but render the dedicated Command block only.
-  const inputText = node.command ? '' : node.inputText;
+  const inputText = node.command && isCommandEcho(node.inputText, node.command) ? '' : node.inputText;
   // A completed call needs no marker; only the exceptions earn one.
   const icon = node.isComplete ? '' : '⏳ ';
   const summaryHtml = node.command
@@ -273,39 +381,32 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
   const head = `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: ${summaryHtml}`;
   const hasDetails = node.toolSpecificData && node.toolSpecificData.kind !== 'terminal' && node.toolSpecificData.kind !== 'todoList';
   const resultDetails = unrenderedResultDetails(node);
-  const hasBody = node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || resultDetails != null;
+  const hasBody = node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
   // Nothing to expand: render a plain line rather than an empty collapsible.
   if (!hasBody)
     return [`- ${mutedSummary(head)}`];
   const body = [];
+  node.intent && body.push(`**Intent:** ${esc(node.intent)}`, '');
   if (node.command) {
     const fence = fenceFor(node.command, 'powershell');
     body.push('**Command:**', '', fence.open, redact(node.command), fence.close, '');
   }
   if (node.promptText) {
-    const clipped = clipText(redact(node.promptText), MAX_TERMINAL_OUTPUT_BYTES);
-    const fence = fenceFor(clipped.text, 'text');
+    // A delegated task prompt is the agent's instructions, not tool output, so it is kept whole.
+    const prompt = redact(node.promptText);
+    const fence = fenceFor(prompt, 'text');
     body.push(
-      `<details><summary>${mutedSummary(`📝 Subagent prompt${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
+      `<details><summary>${mutedSummary('📝 Subagent prompt')}</summary>`,
       '',
-      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
+      ...indentBlock([fence.open, prompt, fence.close], NESTED_INDENT),
       '',
       '</details>',
       '',
     );
   }
-  if (inputText) {
-    const clipped = clipText(redact(inputText), MAX_TERMINAL_OUTPUT_BYTES);
-    const fence = fenceFor(clipped.text, node.inputLanguage || 'text');
-    body.push(
-      `<details><summary>${mutedSummary(`⌨️ Tool input${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
-      '',
-      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
-      '',
-      '</details>',
-      '',
-    );
-  } else if (rawInput != null) {
+  if (inputText)
+    body.push(...toolTextBlock('⌨️ Tool input', redact(inputText), node.inputLanguage || 'text', { kind: 'tool-input', label: 'tool-input', toolCallId: node.toolCallId }));
+  else if (rawInput != null) {
     const json = redact(JSON.stringify(rawInput, null, 2));
     const fence = fenceFor(json, 'json');
     body.push(
@@ -324,46 +425,22 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
       node.duration != null ? humanDuration(node.duration) : null,
       `${thousands(outputText.split('\n').length)} lines`,
     ].filter(Boolean).join(' · ');
-    const clipped = clipText(redact(outputText), MAX_TERMINAL_OUTPUT_BYTES);
-    const fence = fenceFor(clipped.text, 'text');
     const badge = node.exitCode ? ' ⚠️' : '';
-    body.push(
-      `<details><summary>${mutedSummary(`📟 Terminal output (${status})${clipped.clipped ? ' - clipped' : ''}${badge}`)}</summary>`,
-      '',
-      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
-      '',
-      '</details>',
-      '',
-    );
+    body.push(...toolTextBlock(`📟 Terminal output (${status})`, redact(outputText), 'text', { kind: 'tool-result', label: 'terminal-output', toolCallId: node.toolCallId, tail: badge }));
   }
-  if (node.resultText) {
-    const clipped = clipText(redact(node.resultText), MAX_TERMINAL_OUTPUT_BYTES);
-    const fence = fenceFor(clipped.text, 'text');
-    body.push(
-      `<details><summary>${mutedSummary(`📦 Tool result (${thousands(node.resultText.split('\n').length)} lines)${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
-      '',
-      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
-      '',
-      '</details>',
-      '',
-    );
+  if (node.resultText)
+    body.push(...toolTextBlock(`📦 Tool result (${thousands(node.resultText.split('\n').length)} lines)`, redact(node.resultText), 'text', { kind: 'tool-result', label: 'tool-result', toolCallId: node.toolCallId }));
+  if (node.resultError)
+    body.push(...toolTextBlock('⚠️ Tool error', redact(node.resultError), 'text', { kind: 'tool-result', label: 'tool-error', toolCallId: node.toolCallId }));
+  if (node.detailText) {
+    const detail = redact(node.detailText);
+    body.push(...toolTextBlock(`🧾 Detailed result (${thousands(node.detailText.split('\n').length)} lines)`, detail, /^(?:diff --git|@@|---|\*\*\* Begin Patch)/mu.test(detail) ? 'diff' : 'text', { kind: 'tool-result', label: 'detailed-result', extension: 'txt', toolCallId: node.toolCallId }));
   }
-  if (resultDetails != null) {
-    const source = redact(JSON.stringify(resultDetails, null, 2));
-    const clipped = clipText(source, MAX_TERMINAL_OUTPUT_BYTES);
-    const fence = fenceFor(clipped.text, 'json');
-    body.push(
-      `<details><summary>${mutedSummary(`📦 Tool result details${clipped.clipped ? ' - clipped' : ''}`)}</summary>`,
-      '',
-      ...indentBlock([fence.open, clipped.text, fence.close], NESTED_INDENT),
-      '',
-      '</details>',
-      '',
-    );
-  }
+  if (resultDetails != null)
+    body.push(...toolTextBlock('📦 Tool result details', redact(JSON.stringify(resultDetails, null, 2)), 'json', { kind: 'tool-result', label: 'tool-result-details', extension: 'json', toolCallId: node.toolCallId }));
   if (resources.length)
     body.push(`**Persisted output:** ${resources.map((resource) => `${resource.relative} (${thousands(resource.bytes)} bytes)`).join('; ')}.`, '');
-  else if (!node.output && !node.resultText)
+  else if (!node.output && !node.resultText && !node.detailText)
     body.push('**Output:** not persisted as a separate resource (returned inline).', '');
   for (const resource of resources)
     body.push(`<details><summary>${mutedSummary(`📦 Output body - ${esc(resource.relative)}`)}</summary>`, '', ...indentBlock([`- Resource path: \`${workspacePath(resource.filePath)}\``, '', ...resourceBody(resource)], NESTED_INDENT), '', '</details>', '');
@@ -386,6 +463,25 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
     ...indentBlock(body),
     '',
     '</details>',
+  ];
+}
+
+// A recorded event that is not prose, reasoning or a tool call. One line when it has no body.
+function renderNote (node: NoteNode) {
+  const link = node.link ? ` - [${esc(node.link.label)}](${node.link.href.replaceAll(' ', '%20')})` : '';
+  const image = node.image ? [`![${esc(node.image.alt)}](${node.image.href.replaceAll(' ', '%20')})`, ''] : [];
+  if (!node.text)
+    return [`> ${esc(node.title)}${link}`, '', ...image];
+  const text = closeUnbalancedFences(neutralizeStructuralHtml(redact(node.text)));
+  const fence = fenceFor(text, 'text');
+  return [
+    `<details><summary>${mutedSummary(`${esc(node.title)}${link}`)}</summary>`,
+    '',
+    ...indentBlock([fence.open, text, fence.close], NESTED_INDENT),
+    '',
+    '</details>',
+    '',
+    ...image,
   ];
 }
 
@@ -436,11 +532,12 @@ function renderFileDiffs (entry: FileTouch) {
     '',
   ];
   for (const [index, rawDiff] of entry.diffs.entries()) {
-    const clipped = clipText(redact(rawDiff), MAX_FILE_DIFF_BYTES);
-    const fence = tildeFenceFor(clipped.text, 'diff');
-    entry.diffs.length > 1 && lines.push(`<sub>Patch ${index + 1} of ${entry.diffs.length}${clipped.clipped ? ' - clipped' : ''}</sub>`, '');
-    entry.diffs.length === 1 && clipped.clipped && lines.push('<sub>Patch clipped to first and last 48 KiB</sub>', '');
-    lines.push(fence.open, clipped.text, fence.close, '');
+    const limited = limitText(redact(rawDiff), { kind: 'tool-result', label: 'file-patch', extension: 'diff' });
+    const fence = tildeFenceFor(limited.shown, 'diff');
+    entry.diffs.length > 1 && lines.push(`<sub>Patch ${index + 1} of ${entry.diffs.length}${limited.linked ? ' - first 10 lines, full text linked' : ''}</sub>`, '');
+    entry.diffs.length === 1 && limited.linked && lines.push('<sub>Patch: first 10 lines, full text linked</sub>', '');
+    lines.push(fence.open, limited.shown, fence.close, '');
+    limited.note && lines.push(limited.note, '');
   }
   lines.push('</details>', '');
   return lines;
@@ -484,8 +581,8 @@ function renderFilesTouched (filesTouched: FileTouch[], outputPath: string, opti
 // Walks `turn.body` in recorded order and interleaves prose runs, reasoning, tool calls, and
 // edit markers exactly as they streamed - never bucketed by type. `flush()`/`flushThoughts()`
 // close out the current run before a different node type starts.
-export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '') {
-  const lines = [MARK.assistantHeading, ''];
+export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '', options: { heading?: boolean } = {}) {
+  const lines = options.heading === false ? [] : [MARK.assistantHeading, ''];
   let run: string[] = [];
   let thoughts: string[] = [];
   // VS Code frames inline edit (textEditGroup) previews with bare ``` fences in
@@ -547,6 +644,11 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       flushThoughts();
       stripLeadFence = false;
       lines.push(...renderToolNode(node, byCall), '');
+    } else if (node.type === 'note') {
+      flush();
+      flushThoughts();
+      stripLeadFence = false;
+      lines.push(...renderNote(node), '');
     } else if (node.type === 'edit' && node.uri) {
       flush({ trailingEdit: node.inline });
       flushThoughts();
@@ -564,15 +666,51 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
   lines.push(...renderFilesTouched(turn.filesTouched, outputPath));
   lines.push(...renderTodos(turn.todos));
   turn.todos.length && lines.push('');
+  turn.requestError && lines.push(...renderNote({ type: 'note', title: 'Request error', text: turn.requestError }));
   return lines;
+}
+
+function sumFigures (left: UsageFigures, right: UsageFigures): UsageFigures {
+  return {
+    calls: left.calls + right.calls, inputTokens: left.inputTokens + right.inputTokens,
+    cacheReadTokens: left.cacheReadTokens + right.cacheReadTokens, cacheWriteTokens: left.cacheWriteTokens + right.cacheWriteTokens,
+    outputTokens: left.outputTokens + right.outputTokens, reasoningTokens: left.reasoningTokens + right.reasoningTokens,
+    nanoAiu: left.nanoAiu + right.nanoAiu, durationMs: left.durationMs + right.durationMs,
+  };
+}
+
+function usageTokens (figures: UsageFigures) {
+  return `${thousands(figures.inputTokens)} in (${thousands(figures.cacheReadTokens)} cached read, ${thousands(figures.cacheWriteTokens)} cache write) + ${thousands(figures.outputTokens)} out`;
+}
+
+function totalsSpan (totals: NonNullable<TurnScalars['usageTotals']>) {
+  return totals.fromTurn < totals.toTurn ? `; covers turns ${totals.fromTurn}-${totals.toTurn}, which the log did not separate` : '';
+}
+
+function usageCredits (scalar: TurnScalars) {
+  const usage = scalar.usage;
+  // Per-call rows stand in for the turn's cost only where they cover about every reply; otherwise the running total is the better figure.
+  if (!usage || (!usage.complete && scalar.usageTotals))
+    return scalar.usageTotals ? `💳 ${fmtAiCredits(scalar.usageTotals.nanoAiu)} credits (from running totals${totalsSpan(scalar.usageTotals)})` : null;
+  const all = sumFigures(usage.own, usage.agents);
+  if (!usage.complete)
+    return `💳 at least ${fmtAiCredits(all.nanoAiu)} credits (per-call rows are partial for this chat)`;
+  const split = usage.agents.calls
+    ? ` (${fmtAiCredits(usage.own.nanoAiu)} main + ${fmtAiCredits(usage.agents.nanoAiu)} in ${thousands(usage.agents.calls)} sub-agent call${usage.agents.calls === 1 ? '' : 's'})`
+    : '';
+  return `💳 ${fmtAiCredits(all.nanoAiu)} credits${split}`;
 }
 
 export function turnCost (scalar: TurnScalars) {
   const total = (scalar.promptTokens ?? 0) + (scalar.completionTokens ?? 0);
+  const recorded = scalar.usage ? sumFigures(scalar.usage.own, scalar.usage.agents) : null;
   const parts = [
     `⏱️ ${humanDuration(scalar.elapsedMs)}`,
-    `🔢 ${thousands(scalar.promptTokens ?? 0)} prompt + ${thousands(scalar.completionTokens ?? 0)} completion (=${thousands(total)})`,
-    scalar.copilotCredits != null ? `💳 ${fmtCredits(scalar.copilotCredits)} credits` : null,
+    // Unknown is not zero: an agent turn without recorded usage shows no token or credit figures at all.
+    scalar.agentTurn
+      ? (recorded ? `🔢 ${scalar.usage?.complete ? '' : 'at least '}${usageTokens(recorded)}` : scalar.messageOutputTokens !== undefined ? `🔢 ${thousands(scalar.messageOutputTokens)} output tokens (from message records; input not recorded)` : null)
+      : `🔢 ${thousands(scalar.promptTokens ?? 0)} prompt + ${thousands(scalar.completionTokens ?? 0)} completion (=${thousands(total)})`,
+    scalar.copilotCredits != null ? `💳 ${fmtCredits(scalar.copilotCredits)} credits` : usageCredits(scalar),
     `🤖 ${esc(modelName(scalar.modelId))}`,
   ].filter(Boolean);
   return `<sub>${parts.join(' · ')}</sub>`;
@@ -600,24 +738,62 @@ export function turnInfo (turn: Turn) {
   const rows = [
     ['Model', esc(modelName(scalar.modelId))],
     ...(scalar.autoModelResolutions?.length ? [['Auto resolved model', autoResolutionText(scalar.autoModelResolutions)]] : []),
-    ['Mode', esc(scalar.modeInfo?.modeId || scalar.modeInfo?.kind || 'unknown')],
-    ['Agent', esc(agent || 'unknown')],
-    ['Response ID', esc(scalar.responseId || 'n/a')],
-    ['Prompt tokens', thousands(scalar.promptTokens ?? 0)],
-    ['Completion tokens', thousands(scalar.completionTokens ?? 0)],
-    promptBreakdown
-      ? ['Prompt details', promptBreakdown]
-      : ['Cache read / write', legacyCache ? `${thousands(legacyCache.cacheReadTokens ?? 0)} / ${thousands(legacyCache.cacheWriteTokens ?? 0)}` : '0 / 0'],
-    ['Credits', scalar.copilotCredits != null ? fmtCredits(scalar.copilotCredits) : 'n/a'],
+    ...(scalar.reasoningKinds || scalar.opaqueReasoningBlocks ? [['Reasoning recorded', reasoningRecordedText(scalar)]] : []),
+    ...(scalar.attachments?.length ? [['Attachments', esc(scalar.attachments.map((item) => `${item.name} (${item.type})`).join('; '))]] : []),
+    ['Mode', esc(scalar.modeInfo?.modeId || scalar.modeInfo?.kind || (scalar.agentTurn ? 'not recorded' : 'unknown'))],
+    ...(scalar.agentTurn ? [] : [['Agent', esc(agent || 'unknown')], ['Response ID', esc(scalar.responseId || 'n/a')]]),
+    ...(scalar.agentTurn
+      ? (scalar.usage ? usageRows(scalar.usage) : [['Usage', 'no per-call usage recorded for this turn']])
+      : []),
+    ...(scalar.agentTurn && scalar.usageTotals
+      ? [['AI credits (from running totals)', `${fmtAiCredits(scalar.usageTotals.nanoAiu)}${totalsSpan(scalar.usageTotals)}`]]
+      : []),
+    ...(scalar.agentTurn && !scalar.usage && scalar.messageOutputTokens !== undefined
+      ? [['Output tokens (from message records)', thousands(scalar.messageOutputTokens)]]
+      : []),
+    ...(scalar.agentTurn
+      ? []
+      : [
+        ['Prompt tokens', thousands(scalar.promptTokens ?? 0)],
+        ['Completion tokens', thousands(scalar.completionTokens ?? 0)],
+        promptBreakdown
+          ? ['Prompt details', promptBreakdown]
+          : ['Cache read / write', legacyCache ? `${thousands(legacyCache.cacheReadTokens ?? 0)} / ${thousands(legacyCache.cacheWriteTokens ?? 0)}` : '0 / 0'],
+        ['Credits', scalar.copilotCredits != null ? fmtCredits(scalar.copilotCredits) : 'n/a'],
+      ]),
     ['Elapsed', humanDuration(scalar.elapsedMs)],
-    ['Sources (refs)', String(refs)],
-    ['Code citations', String(citations)],
-    ['Followups', String(followups)],
+    ...(scalar.agentTurn ? [] : [['Sources (refs)', String(refs)], ['Code citations', String(citations)], ['Followups', String(followups)]]),
     ['Requested', isoTimestamp(scalar.timestamp ?? turn.ts)],
     ['Responded', isoTimestamp(scalar.responseTimestamp)],
-    ['Canceled', scalar.isCanceled ? 'yes' : 'no'],
+    ...(scalar.agentTurn ? [] : [['Canceled', scalar.isCanceled ? 'yes' : 'no']]),
   ];
-  return [`<details><summary>${mutedSummary('ℹ️ Turn info')}</summary>`, '', ...indentBlock(['| Field | Value |', '|---|---|', ...rows.map(([key, value]) => `| ${key} | ${value} |`)]), '', '</details>'];
+  const injected = scalar.injectedContext
+    ? (() => {
+      const text = closeUnbalancedFences(neutralizeStructuralHtml(redact(scalar.injectedContext)));
+      const fence = fenceFor(text, 'text');
+      return ['', `<details><summary>${mutedSummary('📎 Injected context (what was sent to the model besides your text)')}</summary>`, '', ...indentBlock([fence.open, text, fence.close]), '', '</details>'];
+    })()
+    : [];
+  return [`<details><summary>${mutedSummary('ℹ️ Turn info')}</summary>`, '', ...indentBlock(['| Field | Value |', '|---|---|', ...rows.map(([key, value]) => `| ${key} | ${value} |`)]), '', '</details>', ...injected];
+}
+
+function usageRows (usage: NonNullable<TurnScalars['usage']>): string[][] {
+  const all = sumFigures(usage.own, usage.agents);
+  return [
+    ['Model calls with usage', `${thousands(usage.own.calls)} main${usage.agents.calls ? ` + ${thousands(usage.agents.calls)} in delegated agents` : ''}`],
+    ['Tokens', usageTokens(all)],
+    ...(all.reasoningTokens ? [['Reasoning tokens (inside output)', thousands(all.reasoningTokens)]] : []),
+    ['AI credits', `${fmtAiCredits(all.nanoAiu)}${usage.agents.calls ? ` (main ${fmtAiCredits(usage.own.nanoAiu)}, delegated agents ${fmtAiCredits(usage.agents.nanoAiu)})` : ''}`],
+  ];
+}
+
+function reasoningRecordedText (scalar: TurnScalars) {
+  const parts = [
+    scalar.reasoningKinds?.thinking ? `${scalar.reasoningKinds.thinking} readable thinking block(s)` : '',
+    scalar.reasoningKinds?.summary ? `${scalar.reasoningKinds.summary} model-written summary block(s)` : '',
+    scalar.opaqueReasoningBlocks ? `${scalar.opaqueReasoningBlocks} message(s) with reasoning recorded only as an encrypted token (not readable)` : '',
+  ].filter(Boolean);
+  return parts.join('; ');
 }
 
 // --- the whole document ---
@@ -637,10 +813,138 @@ export interface DocumentContext {
   outputPath: string;
   gitStatus: string;
   generatedAt: string;
+  /** Where over-long tool text is saved in full. Omit it to keep every text inline. */
+  overflow?: TextOverflow;
+  /** Where the conversation came from; changes only the descriptive wording. Default: the Local chat journal. */
+  source?: 'journal' | 'sdk-events';
+}
+
+const USAGE_SOURCE_TEXT: Record<SessionUsage['source'], string> = {
+  'session-store': 'the Copilot CLI session store (`session-store.db`, table `assistant_usage_events`)',
+  'event-log': '`model.model_call_success` events in the event log',
+  none: 'none',
+};
+
+function coverageText (usage: SessionUsage) {
+  const rows = usage.recorded.calls + usage.unattributed.calls;
+  const percent = usage.replies ? ` (${Math.min(100, Math.round((rows / usage.replies) * 100))}% of them)` : '';
+  return `${thousands(rows)} usage row${rows === 1 ? '' : 's'} for ${thousands(usage.replies)} assistant repl${usage.replies === 1 ? 'y' : 'ies'} in this log${percent}`;
+}
+
+function loggedText (usage: SessionUsage) {
+  const logged = usage.logged;
+  if (!logged)
+    return '';
+  const rowsNano = usage.recorded.nanoAiu + usage.unattributed.nanoAiu;
+  const share = usage.source !== 'none' && logged.nanoAiu > 0 ? ` The per-call rows add up to ${Math.round((rowsNano / logged.nanoAiu) * 100)}% of it.` : '';
+  return `Last logged total for the whole event log: ${fmtAiCredits(logged.nanoAiu)} credits (about $${(logged.nanoAiu / 1e11).toFixed(2)} at $0.01 per credit), from \`${logged.event}\`${logged.at ? ` at ${isoTimestamp(logged.at)}` : ''}; it is a running total, and the log has ${thousands(logged.shutdowns)} shutdown record${logged.shutdowns === 1 ? '' : 's'}.${share}`;
+}
+
+/** One line for the metadata list and the executive summary. */
+function usageHeadline (usage: SessionUsage) {
+  if (usage.source === 'none')
+    return `💳 ${fmtAiCredits(usage.logged?.nanoAiu ?? 0)} credits (last logged total; no per-call usage recorded)`;
+  const logged = usage.logged ? `; last logged total ${fmtAiCredits(usage.logged.nanoAiu)}` : '';
+  return `💳 ${fmtAiCredits(usage.recorded.nanoAiu)} credits recorded per call across ${thousands(usage.recorded.calls)} model call${usage.recorded.calls === 1 ? '' : 's'}${logged}`;
+}
+
+/** Credits per turn from the log's running totals: the most expensive turns up front, every turn in a collapsible table. */
+function totalsByTurn (usage: SessionUsage, turns: readonly Turn[]): string[] {
+  const rows = turns.filter((turn) => turn.scalar.usageTotals);
+  if (!rows.length)
+    return [];
+  const label = (turn: Turn) => `[Q${turn.number}](${userMessageHref(turn.number)})`;
+  const top = [...rows].sort((left, right) => right.scalar.usageTotals!.nanoAiu - left.scalar.usageTotals!.nanoAiu).slice(0, 5);
+  const share = (nano: number) => {
+    const sum = rows.reduce((total, turn) => total + turn.scalar.usageTotals!.nanoAiu, 0);
+    return sum > 0 ? ` (${Math.round((nano / sum) * 100)}%)` : '';
+  };
+  const lines = [
+    `**Credits by turn, from the log's running totals** (${thousands(rows.length)} of ${thousands(turns.length)} turns hold a total; the log writes one at the end of most turns, not all):`,
+    '',
+    `Most expensive: ${top.map((turn) => `${label(turn)} ${fmtAiCredits(turn.scalar.usageTotals!.nanoAiu)}${share(turn.scalar.usageTotals!.nanoAiu)}`).join(' · ')}`,
+    '',
+    `<details><summary>${mutedSummary('📈 Credits for every turn')}</summary>`,
+    '',
+    '| Turn | Request | AI credits | Note |',
+    '|---:|---|---:|---|',
+    ...rows.map((turn) => {
+      const totals = turn.scalar.usageTotals!;
+      const note = totals.fromTurn < totals.toTurn ? `covers turns ${totals.fromTurn}-${totals.toTurn}` : '';
+      return `| ${turn.number} | ${esc(clip(turn.prompt, 70)).replaceAll('|', '\\|')} | ${fmtAiCredits(totals.nanoAiu)} | ${note} |`;
+    }),
+    '',
+    '</details>',
+    '',
+    '> A running-total difference is everything the turn cost, including delegated agents, which cannot be separated here. It can differ from the per-call rows, which cover only the calls the CLI store or log recorded.',
+    '',
+    ...(usage.beforeFirstTurnNanoAiu ? [`> ${fmtAiCredits(usage.beforeFirstTurnNanoAiu)} credits were added to the running total before the first prompt of this conversation.`, ''] : []),
+  ];
+  return lines;
+}
+/** The agent version of the cost table plus the notes a reader needs to judge the figures. */
+function agentCostSection (usage: SessionUsage, turns: readonly Turn[]): string[] {
+  const row = (label: string, figures: UsageFigures) =>
+    `| ${label} | ${thousands(figures.calls)} | ${thousands(figures.inputTokens)} | ${thousands(figures.cacheReadTokens)} | ${thousands(figures.cacheWriteTokens)} | ${thousands(figures.outputTokens)} | ${fmtAiCredits(figures.nanoAiu)} |`;
+  const lines: string[] = [];
+  if (usage.source === 'none') {
+    lines.push('Per-call usage is not recorded for this chat, so no per-turn, per-agent or per-model figures can be shown.', '');
+  } else {
+    lines.push(
+      '| Model | Calls | Input tokens | Cache read | Cache write | Output tokens | AI credits |',
+      '|---|---:|---:|---:|---:|---:|---:|',
+      ...usage.byModel.map(([model, figures]) => row(`\`${modelName(model)}\``, figures)),
+      row('**Recorded total**', usage.recorded),
+      ...(usage.unattributed.calls ? [row('Not matched to a turn or agent of this conversation', usage.unattributed)] : []),
+      '',
+    );
+  }
+  lines.push(
+    '> **AI credits** are the recorded nano-AIU divided by 1,000,000,000 (1 credit = 1 AIU = $0.01). They are never estimated from token counts. Input tokens include cached ones, and each call re-sends its context, so input tokens are not additive across turns as a measure of text.',
+    '',
+    ...(usage.source === 'none' ? [] : [`> Per-call source: ${USAGE_SOURCE_TEXT[usage.source]}. It holds ${coverageText(usage)}. Turns and agents without a recorded call show no usage figures.`, '']),
+    ...(usage.logged ? [`> ${loggedText(usage)}`, ''] : []),
+    ...totalsByTurn(usage, turns),
+  );
+  return lines;
+}
+
+function subagentSummaryLine (toolNodes: ToolNode[]): string[] {
+  let agents = 0;
+  let calls = 0;
+  const walk = (turns: Turn[]) => {
+    for (const turn of turns)
+      for (const node of turn.toolNodes) {
+        calls += node.subagent ? 0 : 1;
+        if (node.subagent) {
+          agents += 1;
+          walk(node.subagent.turns);
+        }
+      }
+  };
+  for (const node of toolNodes)
+    if (node.subagent) {
+      agents += 1;
+      walk(node.subagent.turns);
+    }
+  return agents ? [`- **Sub-agents:** ${agents} (${thousands(calls)} tool calls inside them, shown nested at the call that started each)`] : [];
 }
 
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
+  overflow = context.overflow ?? null;
+  try {
+    return buildDocumentBody(session, context);
+  } finally {
+    overflow = null;
+  }
+}
+
+function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
   const { location, resources, versions, memory, outputPath, gitStatus, generatedAt } = context;
+  const sdk = context.source === 'sdk-events';
+  const usageHidden = sdk && session.turns.length > 0 && session.turns.every((turn) => turn.scalar.agentTurn) && !session.usage;
+  const usage = sdk ? session.usage : undefined;
+  const usageCell = (value: string | number) => usageHidden ? 'not recorded' : typeof value === 'number' ? thousands(value) : value;
   const turns = session.turns;
   const toolNodes = turns.flatMap((turn) => turn.toolNodes);
   const reasoningTurns = turns.filter((turn) => turn.reasoning.length).length;
@@ -681,7 +985,9 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '',
     `# Copilot Chat Export: ${redact(title)}`,
     '',
-    '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',
+    sdk
+      ? '> Conversation archive sourced from the Copilot SDK event log (Agent Host / Copilot CLI): prompts, readable reasoning, assistant messages, tool calls with inputs, outputs and errors, code blocks and timing.'
+      : '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',
     '',
     '## Session Metadata',
     '',
@@ -696,9 +1002,14 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     `- **User requests:** ${turns.length}`,
     `- **Assistant reasoning turns:** ${reasoningTurns} (${totalThoughts} recovered thought(s))`,
     `- **Tool calls:** ${toolNodes.length}`,
+    ...subagentSummaryLine(toolNodes),
     `- **Persisted result resources:** ${resources.resources.length}`,
     `- **Models used:** ${modelsUsed.map((model) => `\`${modelName(model)}\``).join(', ') || 'unknown'}`,
-    `- **Total cost:** ⏱️ ${humanDuration(totalElapsed)} · 🔢 ${thousands(totalCompletion)} completion tokens · 💳 ${fmtCredits(totalCredits)} credits · 🤖 ${modelsUsed.length} model(s)`,
+    usage
+      ? `- **Total cost:** ⏱️ ${humanDuration(totalElapsed)} · ${usageHeadline(usage)} · 🤖 ${modelsUsed.length} model(s)`
+      : usageHidden
+        ? `- **Total cost:** ⏱️ ${humanDuration(totalElapsed)} · tokens and credits not recorded for this chat · 🤖 ${modelsUsed.length} model(s)`
+        : `- **Total cost:** ⏱️ ${humanDuration(totalElapsed)} · 🔢 ${thousands(totalCompletion)} completion tokens · 💳 ${fmtCredits(totalCredits)} credits · 🤖 ${modelsUsed.length} model(s)`,
     '',
     backToContents(),
     '',
@@ -728,13 +1039,19 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '',
     '## Cost and Timing Summary',
     '',
-    '| Model | Turns | Prompt tokens | Completion tokens | Credits | Elapsed |',
-    '|---|---:|---:|---:|---:|---:|',
-    ...[...byModel.entries()].map(([model, entry]) => `| \`${modelName(model)}\` | ${entry.turns} | ${thousands(entry.prompt)} | ${thousands(entry.completion)} | ${fmtCredits(entry.credits)} | ${humanDuration(entry.elapsed)} |`),
-    `| **Total** | ${turns.length} | ${thousands(totalPrompt)} | ${thousands(totalCompletion)} | ${fmtCredits(totalCredits)} | ${humanDuration(totalElapsed)} |`,
-    '',
-    '> Prompt-token counts are per-request context sizes (they include prior conversation and cached tokens), so they are not additive across turns; completion tokens and credits are the per-turn incremental cost.',
-    '',
+    ...(usage
+      ? [...agentCostSection(usage, turns), `Elapsed: ${humanDuration(totalElapsed)} across ${turns.length} turn${turns.length === 1 ? '' : 's'}.`, '']
+      : [
+        '| Model | Turns | Prompt tokens | Completion tokens | Credits | Elapsed |',
+        '|---|---:|---:|---:|---:|---:|',
+        ...[...byModel.entries()].map(([model, entry]) => `| \`${modelName(model)}\` | ${entry.turns} | ${usageCell(entry.prompt)} | ${usageCell(entry.completion)} | ${usageCell(fmtCredits(entry.credits))} | ${humanDuration(entry.elapsed)} |`),
+        `| **Total** | ${turns.length} | ${usageCell(thousands(totalPrompt))} | ${usageCell(thousands(totalCompletion))} | ${usageCell(fmtCredits(totalCredits))} | ${humanDuration(totalElapsed)} |`,
+        '',
+        usageHidden
+          ? '> Tokens and credits are not recorded for this chat (no per-call usage and no logged total were found), so they are shown as "not recorded", never as zero.'
+          : '> Prompt-token counts are per-request context sizes (they include prior conversation and cached tokens), so they are not additive across turns; completion tokens and credits are the per-turn incremental cost.',
+        '',
+      ]),
     backToContents(),
     '',
     '<a id="executive-summary"></a>',
@@ -743,7 +1060,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '',
     `This archive captures "${redact(title)}" - ${turns.length} user request(s) recorded from ${isoTimestamp(firstTs)} through ${isoTimestamp(lastTs)}.`,
     '',
-    `The agent produced ${toolNodes.length} tool call(s) and ${totalThoughts} recovered reasoning note(s) across ${reasoningTurns} turn(s), using ${modelsUsed.length} model(s) (${modelsUsed.map((model) => `\`${modelName(model)}\``).join(', ') || 'unknown'}). Total recorded output: ${thousands(totalCompletion)} completion tokens, ${fmtCredits(totalCredits)} credits, ${humanDuration(totalElapsed)} of processing.`,
+    `The agent produced ${toolNodes.length} tool call(s) and ${totalThoughts} recovered reasoning note(s) across ${reasoningTurns} turn(s), using ${modelsUsed.length} model(s) (${modelsUsed.map((model) => `\`${modelName(model)}\``).join(', ') || 'unknown'}). ${usage ? `Usage: ${usageHeadline(usage)}; ${humanDuration(totalElapsed)} of processing.` : usageHidden ? `Tokens and credits are not recorded for this chat; ${humanDuration(totalElapsed)} of processing.` : `Total recorded output: ${thousands(totalCompletion)} completion tokens, ${fmtCredits(totalCredits)} credits, ${humanDuration(totalElapsed)} of processing.`}`,
     '',
     backToContents(),
     '',
@@ -868,13 +1185,19 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     '',
     '## Export Provenance',
     '',
-    `- Source journal (definitive): \`${workspacePath(location.sessionPath)}\``,
-    `- Resource root: \`${workspacePath(resources.resourceRoot)}\``,
-    '- Single source: conversation order, reasoning, tool calls, and code blocks come from the native `chatSessions` journal. Optional transcript records enrich matching tool calls with submitted patch arguments; raw tool-output bodies come from `chat-session-resources`.',
+    sdk
+      ? `- Source event log (definitive): \`${location.sessionPath.replaceAll('\\', '/')}\``
+      : `- Source journal (definitive): \`${workspacePath(location.sessionPath)}\``,
+    ...(sdk ? [] : [`- Resource root: \`${workspacePath(resources.resourceRoot)}\``]),
+    sdk
+      ? '- Single source: conversation order, reasoning, tool calls and results come from the Copilot SDK `events.jsonl`. Permission prompts, hook records and model request copies were counted and left out; system prompts, skill files and images are saved as linked companion files.'
+      : '- Single source: conversation order, reasoning, tool calls, and code blocks come from the native `chatSessions` journal. Optional transcript records enrich matching tool calls with submitted patch arguments; raw tool-output bodies come from `chat-session-resources`.',
     '- Redaction masks common authorization, token, API-key, password, and client-secret assignment forms.',
     '- Rendering: colored badges use inline HTML and render in the VS Code Markdown preview; GitHub strips inline styles and shows the text without color.',
-    '- Reasoning shown is the journal\'s recorded `thinking` text (the agent\'s own notes); no hidden model chain-of-thought is reconstructed.',
-    `- Parse validated against: ${VALIDATED_AGAINST}.`,
+    sdk
+      ? '- Reasoning shown is the readable thinking text or model-written summary the SDK recorded. Reasoning stored only as an encrypted token is counted but cannot be read and is not reconstructed.'
+      : '- Reasoning shown is the journal\'s recorded `thinking` text (the agent\'s own notes); no hidden model chain-of-thought is reconstructed.',
+    ...(sdk ? [] : [`- Parse validated against: ${VALIDATED_AGAINST}.`]),
     ...session.errors.map((error) => `- Parse warning: ${redact(error)}`),
     ...(session.census.unhandled.length
       ? [
@@ -889,4 +1212,3 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
 
   return `${lines.join('\n')}\n`;
 }
-

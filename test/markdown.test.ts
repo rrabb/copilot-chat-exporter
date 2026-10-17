@@ -89,6 +89,23 @@ test('a failing command earns a warning badge', () => {
   assert.match(output, /⚠️/);
 });
 
+test('request, response, and tool errors remain visible in their turn', () => {
+  const output = render([
+    { type: 'note', title: 'Warning', text: 'Copilot failed to get ready' },
+    { type: 'note', title: 'Confirmation: Continue?', text: 'The task is still running.' },
+    { type: 'note', title: 'Copilot questions', text: 'Delivery scope\nWhich option?\n- Local only (local)' },
+    testTool({ resultError: 'Healed error: the command failed.' }),
+  ], { requestError: 'The service could not complete this request.' });
+  assert.match(output, /Warning/);
+  assert.match(output, /Copilot failed to get ready/);
+  assert.match(output, /Confirmation: Continue\?/);
+  assert.match(output, /Which option\?/);
+  assert.match(output, /Tool error/);
+  assert.match(output, /Healed error: the command failed\./);
+  assert.match(output, /Request error/);
+  assert.match(output, /The service could not complete this request\./);
+});
+
 test('tool input renders before output and leaves vertical space around the tool', () => {
   const output = render([testTool({
     toolId: 'run_playwright_code',
@@ -125,6 +142,20 @@ test('terminal result input does not duplicate the command block', () => {
   })]);
   assert.equal(output.match(/npm test/g)?.length, 2, 'once in the title and once in Command');
   assert.ok(!output.includes('⌨️ Tool input'));
+});
+
+test('terminal result input is rendered when it contains more than the command', () => {
+  const input = '{"command":"npm test","timeout":5000}';
+  const output = render([testTool({
+    toolId: 'run_in_terminal',
+    toolCallId: 'call_terminal_input_details',
+    command: 'npm test',
+    inputText: input,
+    inputLanguage: 'json',
+    output: 'ok',
+  })]);
+  assert.ok(output.includes('⌨️ Tool input'));
+  assert.ok(output.includes(input));
 });
 
 test('an unseen tool renders structured, reference, and binary result output', () => {

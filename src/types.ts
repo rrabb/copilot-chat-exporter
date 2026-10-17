@@ -131,13 +131,114 @@ export interface ToolNode {
   duration: number | null;
   /** Model-facing result text, from `resultDetails.output` or a subagent's report. */
   resultText: string;
+  /** Textual tool failure, when the journal records one. */
+  resultError?: string;
+  /** Richer result some tools record beside the model-facing text (for example a diff), shown in its own block. */
+  detailText?: string;
+  /** The model's one-line statement of why it made this call (agent chats). */
+  intent?: string;
+  /** Agent chats: the delegated sub-agent's own conversation, when this call started one. */
+  subagent?: SubagentInfo;
   /** Recovered from the invocation message, not from a structured field. */
   fileUri: string;
   /** Optional edit details recovered from the sibling transcript by tool-call identity. */
   patchFiles: PatchFileChange[];
 }
 
-export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode;
+export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode | NoteNode;
+
+/** Recorded model usage, summed. Credits are nano-AIU / 1,000,000,000 (1 AIU = 1 AI credit = $0.01). */
+export interface UsageFigures {
+  calls: number;
+  /** Total prompt tokens, including cached ones. */
+  inputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  nanoAiu: number;
+  durationMs: number;
+}
+
+/** What one turn cost: its own model calls, and the calls of the agents it delegated to. */
+export interface TurnUsage {
+  own: UsageFigures;
+  agents: UsageFigures;
+  /** The chat's per-call rows cover about all of its assistant replies, so they can stand in for the turn's cost. */
+  complete: boolean;
+}
+
+/**
+ * Credits a turn added to the running total, from the difference between consecutive checkpoints.
+ * A checkpoint can cover several turns (not every turn writes one); the credits are then
+ * shown on the turn that holds the checkpoint, with the range it covers, never split.
+ */
+export interface TurnUsageTotals {
+  nanoAiu: number;
+  /** Turn numbers (1-based) the credits cover: this turn, or the range since the previous checkpoint. */
+  fromTurn: number;
+  toTurn: number;
+}
+
+/** The last cumulative total a log recorded for the whole event log. */
+export interface LoggedUsageTotal {
+  nanoAiu: number;
+  event: string;
+  at: string | null;
+  /** `session.shutdown` events seen: the log was resumed that many times. */
+  shutdowns: number;
+}
+
+export interface SessionUsage {
+  /** Where the per-call figures came from; 'none' when only the logged total exists. */
+  source: 'session-store' | 'event-log' | 'none';
+  /** Assistant replies in the log, for judging how much of the work the per-call figures cover. */
+  replies: number;
+  recorded: UsageFigures;
+  /** Calls that fit no turn and no delegated agent of this conversation. */
+  unattributed: UsageFigures;
+  byModel: Array<[string, UsageFigures]>;
+  logged: LoggedUsageTotal | null;
+  /** Credits written to the running total before the first prompt of this conversation. */
+  beforeFirstTurnNanoAiu: number;
+  /** Turns that hold a running-total difference. */
+  turnsWithTotals: number;
+  /** Per-call rows cover about all of the log's assistant replies. */
+  complete: boolean;
+}
+
+/** A delegated agent: what it was asked, how it ran, and everything it did. May nest. */
+export interface SubagentInfo {
+  agentId: string;
+  name: string;
+  displayName: string;
+  description: string;
+  agentType: string;
+  model: string;
+  durationMs: number | null;
+  totalToolCalls: number | null;
+  totalTokens: number | null;
+  cancelled: boolean;
+  /** Recorded model usage of this agent alone; unset when none was recorded. */
+  usage?: UsageFigures;
+  /** Its own conversation. The first turn's prompt is the delegated task. */
+  turns: Turn[];
+}
+
+/**
+ * A recorded event that is neither prose, reasoning nor a tool call: a compaction summary, a model
+ * change, a resumed session, a used skill, a system-prompt change, an image. Rendered collapsed when
+ * it has a body and as one line otherwise.
+ */
+export interface NoteNode {
+  type: 'note';
+  title: string;
+  /** Full text shown in a collapsed block under the title. */
+  text?: string;
+  /** A saved companion file the note points to. `href` is relative to the Markdown file. */
+  link?: { label: string; href: string };
+  image?: { href: string; alt: string };
+}
 
 /** The model Auto resolved to for one request. Kept on the turn scalars, never in the body. */
 export interface AutoModelResolution {
@@ -185,6 +286,22 @@ export interface TurnScalars {
   isCanceled?: boolean;
   /** From `autoModeResolution` response items, in recorded order. */
   autoModelResolutions?: AutoModelResolution[];
+  /** Agent chats: assistant messages whose reasoning was recorded only as an encrypted token. */
+  opaqueReasoningBlocks?: number;
+  /** Agent chats: how many of this turn's reasoning blocks were readable thinking versus a model-written summary. */
+  reasoningKinds?: { thinking: number; summary: number };
+  /** Agent chats: files and selections the user attached to the message. */
+  attachments?: Array<{ type: string; name: string; mimeType?: string }>;
+  /** Agent chats: usage is not recorded for this turn, so renderers must show it as unknown rather than zero. */
+  agentTurn?: boolean;
+  /** Agent chats: recorded model usage attributed to this turn; unset when none was recorded. */
+  usage?: TurnUsage;
+  /** Agent chats: credits this turn added to the log's running total, from the checkpoint differences. */
+  usageTotals?: TurnUsageTotals;
+  /** Agent chats: output tokens summed from `outputTokens` on this turn's assistant messages (only some logs record it). */
+  messageOutputTokens?: number;
+  /** Agent chats: the text actually sent to the model when it differs from what the user typed. */
+  injectedContext?: string;
   [field: string]: unknown;
 }
 
@@ -194,6 +311,8 @@ export interface Turn {
   requestId: string;
   ts: number | null;
   prompt: string;
+  /** Request-level failure text, when the journal records one. */
+  requestError?: string;
   /** Deduplicated thoughts, shorter prefixes of a longer thought removed. */
   reasoning: string[];
   /** The `text` and `ref` subset of `body`, in order. */
@@ -242,6 +361,8 @@ export interface ParsedSession {
   workingDirectory?: string;
   turns: Turn[];
   rawRequests: RawRequest[];
+  /** Agent chats: recorded model usage; unset when none was recorded. */
+  usage?: SessionUsage;
   census: Census;
   editedFiles: string[];
   /** Non-fatal parse problems, surfaced in the export rather than thrown. */

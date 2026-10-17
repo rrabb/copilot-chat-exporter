@@ -32,6 +32,100 @@ test('detailed plus no-html warns without failing the console listing or creatin
   assert.doesNotMatch(result.stdout, /HTML report:/u);
 });
 
+test('an Agent Host chat is exported by prefix, with companions, left-out counts and an independent content check', async (context) => {
+  const { home, root, workspace, invoke } = await fixture(context);
+  const chat = 'aaaaaaaa-1111-4111-8111-111111111111';
+  const database = new DatabaseSync(path.join(workspace, 'state.vscdb'));
+  try {
+    const row = database.prepare('SELECT value FROM ItemTable WHERE key = ?').get('chat.ChatSessionStore.index') as { value: string };
+    const index = JSON.parse(String(row.value));
+    index.entries[`agent-host-copilotcli:/${chat}`] = { title: 'Agent title', lastMessageDate: 1700000000000 };
+    database.prepare('UPDATE ItemTable SET value = ? WHERE key = ?').run(JSON.stringify(index), 'chat.ChatSessionStore.index');
+  } finally {
+    database.close();
+  }
+  const metadata = new DatabaseSync(await (async () => {
+    const file = path.join(root, 'agentSessionData', chat, 'session.db');
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    return file;
+  })());
+  try {
+    metadata.exec('CREATE TABLE session_metadata (key TEXT PRIMARY KEY, value TEXT)');
+  } finally {
+    metadata.close();
+  }
+  const events = [
+    { id: 'start', type: 'session.start', data: { sessionId: chat, version: 1, producer: 'synthetic-test', copilotVersion: '9.9.9' } },
+    { id: 'sys', type: 'system.message', data: { role: 'system', content: 'You are a test assistant.' } },
+    { id: 'u1', type: 'user.message', timestamp: '2026-10-14T10:00:00.000Z', data: { content: 'Why is the build red?', messageId: 'm1' } },
+    { id: 'a1', type: 'assistant.message', timestamp: '2026-10-14T10:00:02.000Z', data: { model: 'claude-test', reasoningText: 'The compiler error points at the parser.', content: 'It is the parser.', toolRequests: [{ toolCallId: 't1', name: 'view', arguments: { path: 'p.ts' }, intentionSummary: 'Open the parser' }] } },
+    { id: 't1s', type: 'tool.execution_start', data: { toolCallId: 't1', toolName: 'view', arguments: { path: 'p.ts' } } },
+    { id: 't1c', type: 'tool.execution_complete', data: { toolCallId: 't1', success: true, result: { content: 'parser source line' } } },
+    { id: 'perm', type: 'permission.requested', data: {} },
+  ];
+  const file = path.join(home, 'copilot', 'session-state', chat, 'events.jsonl');
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, events.map((event) => JSON.stringify(event)).join('\n'));
+  const output = path.join(home, 'agent-export.md');
+  const result = invoke('aaaaaaaa', output, '--user-data-root', root);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Exported session agent-host-copilotcli:\/aaaaaaaa/u);
+  assert.match(result.stdout, /Left out \(counted, not exported\): permission prompts 1/u);
+  assert.match(result.stdout, /Every checked piece of recorded content appears in the export\./u);
+  const markdown = await fs.readFile(output, 'utf8');
+  assert.match(markdown, /The compiler error points at the parser\./u);
+  assert.match(markdown, /\*\*Intent:\*\* Open the parser/u);
+  assert.match(markdown, /Copilot SDK event log/u);
+  const assets = (await fs.readdir(home)).find((name) => name.startsWith('agent-export_assets_'));
+  assert.ok(assets, 'the system prompt is saved as a companion folder entry');
+  assert.deepEqual((await fs.readdir(path.join(home, assets))).map((name) => name.replace(/-[0-9a-f]{8}\.md$/u, '.md')), ['system-prompt-1.md']);
+  assert.match(markdown, new RegExp(`${assets}/system-prompt-1-[0-9a-f]{8}\\.md`, 'u'));
+  const verify = invoke('--verify', '--strict', 'aaaaaaaa', '--user-data-root', root);
+  assert.equal(verify.status, 0, verify.stdout + verify.stderr);
+  assert.match(verify.stdout, /Unhandled event types: none/u);
+});
+
+test('an unknown agent event type is schema drift that --verify --strict reports', async (context) => {
+  const { home, root, workspace, invoke } = await fixture(context);
+  const chat = 'bbbbbbbb-1111-4111-8111-111111111111';
+  const database = new DatabaseSync(path.join(workspace, 'state.vscdb'));
+  try {
+    const row = database.prepare('SELECT value FROM ItemTable WHERE key = ?').get('chat.ChatSessionStore.index') as { value: string };
+    const index = JSON.parse(String(row.value));
+    index.entries[`agent-host-copilotcli:/${chat}`] = { title: 'Drift' };
+    database.prepare('UPDATE ItemTable SET value = ? WHERE key = ?').run(JSON.stringify(index), 'chat.ChatSessionStore.index');
+  } finally {
+    database.close();
+  }
+  const metadata = path.join(root, 'agentSessionData', chat, 'session.db');
+  await fs.mkdir(path.dirname(metadata), { recursive: true });
+  const db = new DatabaseSync(metadata);
+  try {
+    db.exec('CREATE TABLE session_metadata (key TEXT PRIMARY KEY, value TEXT)');
+  } finally {
+    db.close();
+  }
+  const file = path.join(home, 'copilot', 'session-state', chat, 'events.jsonl');
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, [
+    { id: 'start', type: 'session.start', data: { sessionId: chat, version: 1 } },
+    { id: 'u', type: 'user.message', data: { content: 'Hello there' } },
+    { id: 'x', type: 'brand.new.kind', data: {} },
+  ].map((event) => JSON.stringify(event)).join('\n'));
+  const result = invoke('--verify', '--strict', 'bbbbbbbb', '--user-data-root', root);
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stdout, /UNHANDLED event types: brand\.new\.kind=1/u);
+});
+
+test('--verify prints the independent content check and --strict fails only when content is missing', async (context) => {
+  const { invoke } = await fixture(context);
+  const clean = invoke('--verify', UUID);
+  assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+  assert.match(clean.stdout, /Layer D - recorded content vs the Markdown this build would write/u);
+  assert.match(clean.stdout, /Every checked piece of recorded content appears in the export\./u);
+  assert.equal(invoke('--verify', '--strict', UUID).status, 0);
+});
+
 async function fixture (context: test.TestContext, multipleRoots = false) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-cli-'));
   context.after(() => fs.rm(home, { recursive: true, force: true }));

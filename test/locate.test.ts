@@ -30,7 +30,12 @@ test('looksLikeSessionArgument separates a session from an output path', () => {
   assert.equal(looksLikeSessionArgument(UUID.slice(0, 8)), true);
   assert.equal(looksLikeSessionArgument(UUID.slice(0, 7)), false);
   assert.equal(looksLikeSessionArgument(`some/dir/${UUID}.jsonl`), true);
+  assert.equal(looksLikeSessionArgument(`agent-host-copilotcli:/${UUID}#${UUID}`), true);
+  assert.equal(looksLikeSessionArgument(`copilotcli:/${UUID}`), true);
 
+  assert.equal(looksLikeSessionArgument('C:/chat-exports/out.md'), false);
+  assert.equal(looksLikeSessionArgument('agent-host-copilotcli:/not a key'), false);
+  assert.equal(looksLikeSessionArgument('agent-host-copilotcli:/12345678#subagent/call-1'), true);
   assert.equal(looksLikeSessionArgument('docs/chat-exports/out.md'), false);
   assert.equal(looksLikeSessionArgument('out.md'), false);
   assert.equal(looksLikeSessionArgument('not-a-uuid'), false);

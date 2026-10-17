@@ -33,10 +33,10 @@ test('count accounting does not count an already-redacted placeholder again', ()
 });
 
 test('preview and complete companion are derived from the same redacted text', () => {
-  const text = Array.from({ length: 101 }, (_, index) => `Line ${index}: password=fake-${index}`).join('\r\n');
+  const text = Array.from({ length: 301 }, (_, index) => `${'p'.repeat(60)} Line ${index}: password=fake-${index}`).join('\r\n');
   const result = redactContent(text, policy, location);
   const presentation = planToolText(result.text);
-  assert.equal(result.diagnostics[0].count, 101);
+  assert.equal(result.diagnostics[0].count, 301);
   assert.doesNotMatch(presentation.preview, /fake-/);
   assert.doesNotMatch(presentation.companionText!, /fake-/);
   assert.equal(presentation.companionText, result.text);

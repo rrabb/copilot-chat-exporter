@@ -917,6 +917,34 @@ Applying the three file operations now.
 
 > 📄 Created `c:/fixture/src/added.ts`
 
+<details><summary><sub><span style="color:#7d8590;font-weight:400">Confirmation: Continue to iterate?</span></sub></summary>
+
+<div style="margin-left:1em">
+
+```text
+Copilot has been working on this for a while.
+```
+
+</div>
+
+</details>
+
+
+<details><summary><sub><span style="color:#7d8590;font-weight:400">Copilot questions</span></sub></summary>
+
+<div style="margin-left:1em">
+
+```text
+Delivery scope
+Which option do you want?
+- Option A
+```
+
+</div>
+
+</details>
+
+
 <div style="border-left:3px solid #1f6feb;padding-left:14px;margin:10px 0;font-size:1.06em;line-height:1.6">
 
 Renamed, deleted, and created the three files.

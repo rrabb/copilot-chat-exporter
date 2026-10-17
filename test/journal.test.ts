@@ -51,6 +51,20 @@ test('kind 3 deletes a request property', () => {
   assert.equal('responseId' in session.rawRequests[0], false);
 });
 
+test('request-level error text reaches its parsed turn', () => {
+  const raw = journal({
+    kind: 0,
+    v: { version: 3, requests: [{
+      ...request('r1', 'question'),
+      result: { errorDetails: { message: 'The service could not complete this request.' } },
+    }] },
+  });
+
+  const session = parseChatSession('session.jsonl', raw);
+
+  assert.equal(session.turns[0].requestError, 'The service could not complete this request.');
+});
+
 test('autoModeResolution is request metadata: it reaches the scalars, not the body, and is not drift', () => {
   const resolution = { kind: 'autoModeResolution', resolved: { id: 'gpt-x', name: 'GPT X' } };
   const raw = journal({ kind: 0, v: { version: 3, requests: [request('r1', 'question', [{ value: 'answer' }, resolution])] } });

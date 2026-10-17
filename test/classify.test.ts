@@ -15,6 +15,12 @@ const SAMPLES = {
   inlineReference: { kind: 'inlineReference', inlineReference: { path: '/proj/src/b.ts' } },
   markdownContent: { kind: 'markdownContent', content: { value: 'named markdown' } },
   autoModeResolution: { kind: 'autoModeResolution', resolved: { id: 'gpt-x', name: 'GPT X' } },
+  warning: { kind: 'warning', content: { value: 'Copilot failed to get ready' } },
+  confirmation: { kind: 'confirmation', title: 'Continue?', message: { value: 'The task is still running.' } },
+  questionCarousel: {
+    kind: 'questionCarousel',
+    questions: [{ title: 'Delivery scope', message: 'Which option?', options: [{ label: 'Local only', value: 'local' }] }],
+  },
 };
 
 test('thinking becomes a think node, and empty partials become nothing', () => {
@@ -76,6 +82,28 @@ test('a Playwright tool call carries its submitted code and language', () => {
   assert.equal(node.inputLanguage, 'javascript');
   assert.equal(node.resultText, '"Example"');
   assert.deepEqual(node.resultDetails, resultDetails, 'the complete result envelope remains available');
+});
+
+test('warnings, confirmations, and question carousels become readable notes', () => {
+  assert.deepEqual(classifyNode(SAMPLES.warning), {
+    type: 'note', title: 'Warning', text: 'Copilot failed to get ready',
+  });
+  assert.deepEqual(classifyNode(SAMPLES.confirmation), {
+    type: 'note', title: 'Confirmation: Continue?', text: 'The task is still running.',
+  });
+  assert.deepEqual(classifyNode(SAMPLES.questionCarousel), {
+    type: 'note', title: 'Copilot questions', text: 'Delivery scope\nWhich option?\n- Local only (local)',
+  });
+});
+
+test('a textual tool result error reaches the parsed tool node', () => {
+  const node = classifyNode({
+    kind: 'toolInvocationSerialized',
+    toolId: 'run_in_terminal',
+    toolCallId: 'call_error',
+    resultError: 'Healed error: the command failed.',
+  });
+  assert.equal(node.resultError, 'Healed error: the command failed.');
 });
 
 test('an unknown tool id retains every official result-details family', () => {

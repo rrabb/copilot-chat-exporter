@@ -3,6 +3,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { setWorkspaceRoot } from '../src/host.ts';
 import { renderSession, sessionToJson, type LoadedSession } from '../src/index.ts';
+import type { CompanionArtifact } from '../src/export-policy.ts';
 import type { ParsedSession } from '../src/types.ts';
 import { testSession, testTool, testTurn } from './helpers.ts';
 
@@ -128,4 +129,21 @@ test('parse warnings reach the provenance section', () => {
   const loaded = loadedFixture();
   loaded.session.errors = ['line 4: unparseable'];
   assert.match(renderSession(loaded, renderOptions), /- Parse warning: line 4: unparseable/);
+});
+
+test('Local terminal output over 300 lines and 15 KiB is previewed with a companion; without a sink it stays whole', () => {
+  const output = Array.from({ length: 400 }, (_value, index) => `compiler line ${index + 1} ${'.'.repeat(40)}`).join('\n');
+  const tool = testTool({ toolCallId: 'c1', invocation: 'Run build', output });
+  const loaded = loadedFixture({
+    turns: [testTurn({ number: 1, ts: 1700000001000, body: [tool], toolNodes: [tool] })],
+  });
+  const overflow = { assetsDirectory: 'out_assets_1', companions: [] as CompanionArtifact[] };
+  const linked = renderSession(loaded, { ...renderOptions, overflow });
+  assert.equal(overflow.companions.length, 1);
+  assert.equal(Buffer.from(overflow.companions[0]!.bytes).toString('utf8'), output);
+  assert.match(linked, /Terminal output .* - first 10 lines, full text linked/u);
+  assert.ok(linked.includes('compiler line 10 ') && !linked.includes('compiler line 11 '));
+  assert.match(linked, /Full text: \[terminal-output-[0-9a-f]{8}\.txt\]\(out_assets_1\/terminal-output-[0-9a-f]{8}\.txt\)/u);
+  const inline = renderSession(loaded, renderOptions);
+  assert.ok(inline.includes('compiler line 400 ') && !/middle omitted|full text linked/u.test(inline));
 });

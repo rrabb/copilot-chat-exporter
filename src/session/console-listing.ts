@@ -75,6 +75,6 @@ export function formatSessionListing (
   lines.push('Prompt counts: main user prompts; child counts add one delegation plus recorded child user prompts.');
   lines.push('', 'Export a verified Local source: copilot-chat-export <sessionId> [outputPath] --user-data-root <path>');
   lines.push('Export current Local source: copilot-chat-export --current [outputPath] --user-data-root <path>');
-  lines.push('Verified SDK backing does not yet imply Markdown export support.');
+  lines.push('Export an Agent Host or Copilot CLI main chat: copilot-chat-export <chat id | backing id | 8+ character prefix> [outputPath] --user-data-root <path>. Sub-agent conversations are included in the parent chat export.');
   return lines.join('\n');
 }

@@ -7,6 +7,7 @@
 import { promises as fs } from 'node:fs';
 import { createHostContext, setWorkspaceRoot } from './host.ts';
 import { buildDocument } from './markdown.ts';
+import type { TextOverflow } from './markdown.ts';
 import { resolveSession } from './session/locate.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
 import {
@@ -42,7 +43,9 @@ export { listSessions, resolveSession } from './session/locate.ts';
 export type { SessionSelectionOptions } from './session/locate.ts';
 export { parseChatSession } from './session/journal.ts';
 export { buildDocument } from './markdown.ts';
+export type { TextOverflow } from './markdown.ts';
 export { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
+export { buildLossAccount } from './verify/loss-account.ts';
 export { VALIDATED_AGAINST } from './session/classify.ts';
 
 /**
@@ -138,7 +141,9 @@ export function renderSession (loaded: LoadedSession, options: {
   outputPath?: string;
   gitStatus?: string;
   generatedAt?: string;
+  /** Collects the full text of tool output over 300 lines and 15 KiB; omit to keep everything inline. */
+  overflow?: TextOverflow;
 } = {}) {
-  const { outputPath = '', gitStatus = '', generatedAt = new Date().toISOString() } = options;
-  return buildDocument(loaded.session, { ...loaded, outputPath, gitStatus, generatedAt });
+  const { outputPath = '', gitStatus = '', generatedAt = new Date().toISOString(), overflow } = options;
+  return buildDocument(loaded.session, { ...loaded, outputPath, gitStatus, generatedAt, ...(overflow ? { overflow } : {}) });
 }

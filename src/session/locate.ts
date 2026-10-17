@@ -16,6 +16,7 @@ import { assertLocalJournalSnapshot } from './journal-validation.ts';
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SESSION_ID_PREFIX_PATTERN = /^[0-9a-f]{8,32}$/i;
+const SDK_SESSION_KEY_PATTERN = /^(?:agent-host-copilotcli|copilotcli):\/[a-z0-9._~-]+(?:[/#][a-z0-9._~-]+)*$/i;
 const CHAT_INDEX_KEY = 'chat.ChatSessionStore.index';
 
 // A journal's first record is a full state snapshot, so it can be megabytes on a long session,
@@ -50,7 +51,8 @@ export async function readFirstLine (filePath: string) {
 export function looksLikeSessionArgument (value?: string) {
   return Boolean(value?.endsWith('.jsonl')
     || SESSION_ID_PATTERN.test(value ?? '')
-    || SESSION_ID_PREFIX_PATTERN.test(value ?? ''));
+    || SESSION_ID_PREFIX_PATTERN.test(value ?? '')
+    || SDK_SESSION_KEY_PATTERN.test(value ?? ''));
 }
 
 export function currentSessionFromEnv () {

@@ -27,6 +27,9 @@ export const HANDLED_RESPONSE_KINDS = new Set([
   'inlineReference',
   'markdownContent',
   'autoModeResolution',
+  'warning',
+  'confirmation',
+  'questionCarousel',
 ]);
 
 // Produce no export node ON PURPOSE: presentation, bookkeeping, or content already captured
@@ -38,8 +41,6 @@ export const IGNORED_RESPONSE_KINDS = new Set([
   'codeblockUri',
   'progressMessage',
   'progressTaskSerialized',
-  'confirmation',
-  'questionCarousel',
   'mcpServersStarting',
 ]);
 
@@ -47,7 +48,6 @@ export const IGNORED_RESPONSE_KINDS = new Set([
 // If one appears it is reported as unhandled, and only then does it earn a branch below or a
 // place in the ignored list.
 export const KNOWN_UNSEEN_KINDS = new Set([
-  'warning',
   'info',
   'command',
   'markdownVuln',
@@ -106,7 +106,31 @@ export function thinkingText (value: unknown) {
 function messageValue (message: unknown) {
   if (typeof message === 'string')
     return message;
-  return (message && (message as any).value) || '';
+  return (message && (message as any).value) || (message && (message as any).text) || '';
+}
+
+function questionCarouselText (questions: unknown) {
+  if (!Array.isArray(questions))
+    return '';
+  return questions.flatMap((question: any) => {
+    if (!question || typeof question !== 'object')
+      return [];
+    const lines = [messageValue(question.title), messageValue(question.message)].filter(Boolean);
+    for (const option of Array.isArray(question.options) ? question.options : []) {
+      const label = messageValue(option?.label);
+      const value = messageValue(option?.value);
+      if (label || value)
+        lines.push(`- ${label || value}${label && value && label !== value ? ` (${value})` : ''}`);
+    }
+    return lines;
+  }).join('\n');
+}
+
+function confirmationText (buttons: unknown) {
+  if (!Array.isArray(buttons))
+    return '';
+  return buttons.map((button: any) => messageValue(button?.label) || messageValue(button?.title) || messageValue(button?.value))
+    .filter(Boolean).map((label: string) => `- ${label}`).join('\n');
 }
 
 // Tool names are VS Code's vocabulary too, so the mapping lives beside the kind lists.
@@ -143,6 +167,9 @@ export function classifyNode (item: any) {
     const rawResultText = Array.isArray(item.resultDetails?.output)
       ? item.resultDetails.output.filter((part: any) => part?.isText && typeof part.value === 'string').map((part: any) => part.value).join('\n').trim()
       : '';
+    const resultError = typeof item.resultError === 'string'
+      ? item.resultError
+      : typeof item.resultError?.message === 'string' ? item.resultError.message : '';
     // A subagent's report is a plain string field on toolSpecificData, not in
     // resultDetails.output, so route it into the same Tool result slot other tools use.
     const resultText = rawResultText || (tsd?.kind === 'subagent' && typeof tsd.result === 'string' ? tsd.result.trim() : '');
@@ -166,9 +193,25 @@ export function classifyNode (item: any) {
       exitCode: state?.exitCode ?? null,
       duration: state?.duration ?? null,
       resultText,
+      ...(resultError ? { resultError } : {}),
       fileUri: extractUri(invocation) || extractUri(pastTense),
       patchFiles: [],
     };
+  }
+  if (item.kind === 'warning') {
+    const text = messageValue(item.content);
+    return { type: 'note', title: 'Warning', ...(text ? { text } : {}) };
+  }
+  if (item.kind === 'confirmation') {
+    const title = messageValue(item.title);
+    const message = messageValue(item.message);
+    const buttons = confirmationText(item.buttons);
+    const text = [message, buttons].filter(Boolean).join('\n');
+    return { type: 'note', title: title ? `Confirmation: ${title}` : 'Confirmation', ...(text ? { text } : {}) };
+  }
+  if (item.kind === 'questionCarousel') {
+    const text = questionCarouselText(item.questions);
+    return text ? { type: 'note', title: 'Copilot questions', text } : null;
   }
   if (item.kind === 'textEditGroup') {
     const uri = item.uri && (item.uri.path || item.uri.fsPath || item.uri);

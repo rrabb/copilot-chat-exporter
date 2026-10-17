@@ -70,10 +70,14 @@ function firstLines (text: string, limit: number): string {
   return text;
 }
 
+/** Text goes to a companion only when it is long in lines AND large in bytes, so many short file views stay inline. */
+export const COMPANION_MIN_LINES = 300;
+export const COMPANION_MIN_BYTES = 15 * 1024;
+
 /** Tool text follows the same policy in ordinary and high-fidelity exports. */
 export function planToolText (text: string): TextPresentation {
   const lineCount = recordedLineCount(text);
-  const companionText = lineCount > 100 ? text : null;
+  const companionText = lineCount > COMPANION_MIN_LINES && Buffer.byteLength(text, 'utf8') > COMPANION_MIN_BYTES ? text : null;
   return {
     lineCount,
     collapsed: lineCount > 10,

@@ -189,10 +189,8 @@
     },
     "dropped": {
       "codeblockUri": 1,
-      "confirmation": 1,
       "progressMessage": 1,
       "progressTaskSerialized": 1,
-      "questionCarousel": 1,
       "thinking": 1,
       "undoStop": 1
     },

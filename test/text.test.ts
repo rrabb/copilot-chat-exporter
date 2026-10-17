@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  assistantBlock, blockquote, clip, clipText, closeUnbalancedFences, esc, extractUri, fenceFor,
+  assistantBlock, blockquote, clip, closeUnbalancedFences, esc, extractUri, fenceFor,
   fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp, mutedSummary,
   neutralizeStructuralHtml, parseJson, reEscape, redact, stripAnsi, stripMarkdown, thousands,
 } from '../src/text.ts';
@@ -14,17 +14,6 @@ test('fenceFor outruns any backtick run inside the content', () => {
   assert.equal(fenceFor('a ````` b').close, '``````');
   const fence = fenceFor('x', 'text');
   assert.equal(fence.close, '```');
-});
-
-test('clipText keeps head and tail and reports clipping', () => {
-  assert.deepEqual(clipText('short', 1024), { text: 'short', clipped: false });
-
-  const long = `${'A'.repeat(50)}${'B'.repeat(50)}`;
-  const result = clipText(long, 20);
-  assert.equal(result.clipped, true);
-  assert.ok(result.text.startsWith('A'.repeat(10)), 'head is preserved');
-  assert.ok(result.text.endsWith('B'.repeat(10)), 'tail is preserved');
-  assert.ok(result.text.includes('[middle omitted]'));
 });
 
 test('clip truncates on characters and collapses whitespace', () => {

@@ -336,7 +336,11 @@ export function parseChatSession (
       emittedThoughts.add(node.text);
       return true;
     });
-      return { requestId, ts: request?.timestamp ?? null, prompt: promptText, reasoning, prose, body, toolNodes, todos, filesTouched, scalar };
+      const requestError = typeof request?.result?.errorDetails?.message === 'string' ? request.result.errorDetails.message : '';
+      return {
+        requestId, ts: request?.timestamp ?? null, prompt: promptText, reasoning, prose, body,
+        toolNodes, todos, filesTouched, scalar, ...(requestError ? { requestError } : {}),
+      };
     })
     .filter(Boolean)
     .map((turn: any, order: number) => ({ ...turn, number: order + 1 }));

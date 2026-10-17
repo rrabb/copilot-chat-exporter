@@ -164,14 +164,6 @@ export function clip (value: unknown, limit = 110) {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
-export function clipText (value: unknown, limit: number) {
-  const text = String(value ?? '');
-  if (Buffer.byteLength(text, 'utf8') <= limit)
-    return { text, clipped: false };
-  const half = Math.floor(limit / 2);
-  return { text: `${text.slice(0, half)}\n\n... [middle omitted] ...\n\n${text.slice(-half)}`, clipped: true };
-}
-
 // --- numbers, dates, durations ---
 
 export function thousands (value: number | null | undefined) {
@@ -180,6 +172,14 @@ export function thousands (value: number | null | undefined) {
 
 export function fmtCredits (value: unknown) {
   return Number.isFinite(Number(value)) ? Number(value).toFixed(2) : '0.00';
+}
+
+/** AI credits from recorded nano-AIU (1 credit = 1,000,000,000 nano-AIU): two decimals from 1 up, four below, so a cheap call is not shown as 0.00. */
+export function fmtAiCredits (nanoAiu: number) {
+  const credits = nanoAiu / 1_000_000_000;
+  return credits >= 1
+    ? credits.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : credits.toFixed(4);
 }
 
 export function isoTimestamp (value: string | number | null | undefined) {

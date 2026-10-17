@@ -16,11 +16,15 @@ import { collectListingEvidence } from './session/listing-evidence.ts';
 import { formatDetailedSessionListingHtml } from './session/detailed-listing.ts';
 import { defaultListingHtmlPath, writeListingHtml } from './session/listing-report.ts';
 import { writeArchive } from './archive-writer.ts';
+import type { CompanionArtifact } from './export-policy.ts';
 import {
   GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
   IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS, VALIDATED_AGAINST,
 } from './session/classify.ts';
 import { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
+import { buildLossAccount } from './verify/loss-account.ts';
+import { printLossAccount } from './verify/loss-report.ts';
+import { runSdkCommand } from './sdk-cli.ts';
 import {
   GOLDEN_DIGEST_PATH,
   GOLDEN_EXPECTED_RENDER_PATH,
@@ -47,6 +51,25 @@ import { clip, errorLabel, thousands } from './text.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(__dirname, '..');
+
+/** Text of the companion folders an export wrote next to `output` (`<name>_assets_<stamp>`); content saved there counts as exported. */
+async function siblingCompanionText (output: string): Promise<string> {
+  const directory = path.dirname(output);
+  const prefix = `${path.basename(output, path.extname(output))}_assets_`;
+  const parts: string[] = [];
+  try {
+    const folders = (await fs.readdir(directory, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix)).map((entry) => entry.name).sort();
+    // The newest folder only: an older export's companions must not hide a gap in this one.
+    const newest = folders.at(-1);
+    if (newest)
+      for (const file of await fs.readdir(path.join(directory, newest)))
+        /\.(?:txt|json|diff|md)$/iu.test(file) && parts.push(await fs.readFile(path.join(directory, newest, file), 'utf8'));
+  } catch {
+    // No readable companion folder: the check then scores the Markdown alone.
+  }
+  return parts.join('\n');
+}
 
 function printVerificationReport (report: ReturnType<typeof buildVerificationReport>) {
   console.log('Verifier summary');
@@ -250,6 +273,14 @@ try {
 }
 // The golden fixture's "workspace" is the package itself, so its committed render stays
 // byte-identical no matter where the package lives or which directory it is run from.
+if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefined && !sourceArgument.endsWith('.jsonl') && selectedRoot !== undefined) {
+  // Agent Host and Copilot CLI chats are not Local journals; the inventory decides which path applies.
+  const sdkExit = await runSdkCommand({
+    root: selectedRoot, selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
+    overwrite: overwriteMode, verify: verifyMode, strict: strictMode,
+  });
+  sdkExit !== null && process.exit(sdkExit);
+}
 let loaded: Awaited<ReturnType<typeof loadSession>>;
 try {
   loaded = await loadSession({
@@ -272,10 +303,12 @@ if (verifyMode) {
   const crossCheck = buildJournalCrossCheck(session, raw);
   printJournalCrossCheck(crossCheck);
   let renderFailed = false;
+  let renderedMarkdown: string | null = null;
   if (outputArgument) {
     const renderPath = path.resolve(getWorkspaceRoot(), outputArgument);
     try {
       const markdown = await fs.readFile(renderPath, 'utf8');
+      renderedMarkdown = markdown;
       const renderReport = buildRenderReport(session, markdown);
       printRenderReport(renderReport, workspacePath(renderPath));
       renderFailed = renderReport.failed;
@@ -285,8 +318,14 @@ if (verifyMode) {
   } else {
     console.log('Layer C - skipped: no output file given. Pass one to enable render checks: --verify <sessionId> <outputFile>');
   }
+  const overflow = { assetsDirectory: 'assets', companions: [] as CompanionArtifact[] };
+  const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown
+    ?? renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), overflow })}\n${renderedMarkdown === null
+    ? overflow.companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')
+    : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!))}`);
+  printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
   const failed = report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || renderFailed
-    || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0));
+    || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0 || lossAccount.failed));
   process.exit(failed ? 2 : 0);
 }
 
@@ -325,22 +364,31 @@ if (snapshotAction) {
 }
 
 const outputPath = resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
-const rendered = renderSession(loaded, {
-  outputPath,
-  gitStatus: loaded.host.gitStatus(),
-  generatedAt: new Date().toISOString(),
-});
+let rendered = '';
 
 let outputSize: number;
+let companionCount = 0;
+let assetsPath: string | null = null;
 try {
   const written = await writeArchive({
     outputPath, generatedAt: new Date().toISOString(), overwrite: goldenMode || overwriteMode,
-    plan: () => ({
-      markdown: rendered, companions: [], diagnostics: [],
-      policy: { highFidelity: false, redact: true },
-    }),
+    plan: (assetsDirectory) => {
+      const overflow = { assetsDirectory, companions: [] as CompanionArtifact[] };
+      rendered = renderSession(loaded, {
+        outputPath,
+        gitStatus: loaded.host.gitStatus(),
+        generatedAt: new Date().toISOString(),
+        overflow,
+      });
+      return {
+        markdown: rendered, companions: overflow.companions, diagnostics: [],
+        policy: { highFidelity: false, redact: true },
+      };
+    },
   });
   outputSize = written.markdownBytes;
+  companionCount = written.companionPaths.length;
+  assetsPath = written.assetsPath;
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
@@ -353,6 +401,7 @@ for (const line of formatExportSummary({
   outputSize,
 }))
   console.log(line);
+assetsPath && console.log(`Companion files: ${companionCount} in ${workspacePath(assetsPath)} (full text of tool output over 300 lines and 15 KiB)`);
 if (session.census.unhandled.length) {
   console.log(`Schema drift: ${session.census.unhandled.length} unhandled node kind(s) - ${session.census.unhandled.map(([kind, count]) => `${kind}=${count}`).join(', ')}. Run --verify for the full census.`);
   if (strictMode)
