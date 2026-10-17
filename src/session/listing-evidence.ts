@@ -5,6 +5,8 @@ import { redactText } from '../redaction.ts';
 import { parseChatSession, messageText } from './journal.ts';
 import { readChatIndex } from './inventory.ts';
 import { childScopes, eventsInScope, isRecord, readSdkEvents } from './sdk-events.ts';
+import { attachSdkListingUsage, readLogUsage } from './listing-sdk-usage.ts';
+import type { LogUsage } from './listing-sdk-usage.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import type { SessionOccurrence, SdkEventSource } from './sources.ts';
 import type { ListingEvidence, ListingTurnEvidence, ListingArtifactLocation } from './listing-evidence-types.ts';
@@ -307,6 +309,7 @@ export async function collectListingEvidence (occurrences: readonly SessionOccur
   const result = new Map<string, ListingEvidence>();
   const indexes = new Map<string, ReturnType<typeof readChatIndex>>();
   const logs = new Map<string, { log: Awaited<ReturnType<typeof readSdkEvents>>; size: number; mtime: number }>();
+  const logUsage = new Map<string, LogUsage>();
   for (const occurrence of occurrences) {
     const evidence = emptyEvidence();
     result.set(occurrence.occurrenceId, evidence);
@@ -423,6 +426,12 @@ export async function collectListingEvidence (occurrences: readonly SessionOccur
           && listingToolChanges(event.data.toolName, event.data.arguments, `line:${event.line}`).length === 0)
           && evidence.flags.push('incomplete-edit-evidence');
         evidence.turns = sdkListingTurns(log.events, source);
+        let usage = logUsage.get(source.path);
+        if (!usage) {
+          usage = readLogUsage(log.events, source);
+          logUsage.set(source.path, usage);
+        }
+        attachSdkListingUsage(evidence, log.events, scoped, source, usage);
         source.scope.kind === 'subagent' && !evidence.turns.some((turn) => turn.role === 'delegated')
           && evidence.flags.push('delegated-task-unavailable');
         evidence.bytes = scoped.reduce((sum, event) => sum + Buffer.byteLength(event.recordedLine, 'utf8'), 0);
@@ -460,6 +469,7 @@ export async function collectListingEvidence (occurrences: readonly SessionOccur
     } catch (error) {
       evidence.diagnostics.push({ path: source.path, description: describe(error) });
       evidence.turns = [];
+      delete evidence.usage;
       evidence.models = [];
       evidence.files = [];
       evidence.bytes = null;

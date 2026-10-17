@@ -10,6 +10,48 @@ export interface ListingFileChange {
   estimated: boolean;
   source: string;
 }
+/** Where an agent turn's credits come from. Credits are AI credits: recorded nano-AIU / 1,000,000,000. */
+export interface ListingTurnUsage {
+  basis: 'per-call' | 'per-call-partial' | 'running-total';
+  /** Running totals only: the turn numbers one checkpoint difference covers, when it covers several. */
+  span: { from: number; to: number } | null;
+  /** Per-call rows matched to this turn. */
+  calls: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** Basis running-total only: credits of the per-call rows this turn also has, which are incomplete. */
+  perCallCredits: number | null;
+}
+
+export interface ListingUsageModel {
+  model: string;
+  calls: number;
+  credits: number;
+  inputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  outputTokens: number;
+}
+
+/** Chat-level usage of an agent conversation, for the detailed listing. */
+export interface ListingSessionUsage {
+  scope: 'main' | 'subagent';
+  source: 'session-store' | 'event-log' | 'none';
+  perCallRows: number;
+  /** Assistant replies in the whole log, to judge how much of the work the per-call rows cover. */
+  replies: number;
+  complete: boolean;
+  /** Last running total of the whole log, in credits. */
+  loggedCredits: number | null;
+  loggedEvent: string | null;
+  shutdowns: number;
+  beforeFirstTurnCredits: number;
+  unmatchedCredits: number;
+  byModel: ListingUsageModel[];
+  /** Subagent scope only: this agent's own recorded calls. */
+  agent?: { calls: number; credits: number; inputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; outputTokens: number };
+}
+
 export interface ListingTurnEvidence {
   id: string;
   prompt: string;
@@ -23,6 +65,8 @@ export interface ListingTurnEvidence {
   credits?: number | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
+  /** Agent chats: how the credits above were obtained. Absent for Local chats. */
+  usage?: ListingTurnUsage;
   responsePresent: boolean | null;
   canceled: boolean;
   error: boolean;
@@ -39,6 +83,8 @@ export interface ListingArtifactLocation {
 }
 export interface ListingEvidence {
   storage?: StorageArtifact[];
+  /** Agent chats only. */
+  usage?: ListingSessionUsage;
   state: 'read' | 'unavailable' | 'changed';
   titles: ListingTitleEvidence[];
   dates: ListingDateEvidence[];

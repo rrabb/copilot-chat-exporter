@@ -8,7 +8,7 @@ import { escapeHtml as html, pathLink, chartRows, storageGuideHtml } from './lis
 import { renderDetailedSource, storageBytes } from './detailed-source.ts';
 import { attentionFlags, renderAttentionPanel } from './detailed-attention.ts';
 import { formatLocalListingDate as date, formatListingTurnDate, previewListingPrompt, listingModelLabel, sdkListingPromptOverview } from './listing-preview.ts';
-import type { ListingEvidence, ListingFileChange } from './listing-evidence-types.ts';
+import type { ListingEvidence, ListingFileChange, ListingSessionUsage, ListingTurnEvidence } from './listing-evidence-types.ts';
 import { listingRelationships } from './listing-relationships.ts';
 import type { ListingRelationship } from './listing-relationships.ts';
 import { detailedListingStyles } from './detailed-listing-styles.ts';
@@ -83,12 +83,12 @@ function usageValue (metric: ListingUsageMetric): string {
 function usageCoverage (metric: ListingUsageMetric): string {
   return `${metric.recorded}/${metric.turns} counted turns have a valid recorded counter`;
 }
-function usageTags (usage: ReturnType<typeof listingUsage>): string {
+function usageTags (usage: ReturnType<typeof listingUsage>, creditsNote = ''): string {
   const tokens = (metric: ListingUsageMetric, arrow: string) => metric.total === null ? ''
     : `${arrow}${metric.recorded < metric.turns ? '~' : ''}${compactTokenCount(metric.total)}`;
   return [
     usage.credits.total !== null ? tag(`💳 ${usageValue(usage.credits)}c`,
-      `Recorded incremental Copilot credits; ${usageCoverage(usage.credits)}. Partial values are prefixed with ~; rounded up to whole credits.`, 'credits') : '',
+      `Recorded incremental Copilot credits; ${usageCoverage(usage.credits)}. Partial values are prefixed with ~; rounded up to whole credits.${creditsNote ? ` ${creditsNote}` : ''}`, 'credits') : '',
     usage.promptTokens.total !== null || usage.completionTokens.total !== null
       ? tag([tokens(usage.promptTokens, '⬆️'), tokens(usage.completionTokens, '⬇️')].filter(Boolean).join(' '),
         `⬆️ prompt (input) tokens: ${usageCoverage(usage.promptTokens)}. ⬇️ completion (output) tokens: ${usageCoverage(usage.completionTokens)}. Partial values are prefixed with ~; compact counts are rounded to the nearest displayed unit. Token counts include repeated context.`, 'credits') : '',
@@ -97,15 +97,75 @@ function usageTags (usage: ReturnType<typeof listingUsage>): string {
 function hasUsage (usage: ReturnType<typeof listingUsage>): boolean {
   return usage.credits.total !== null || usage.promptTokens.total !== null || usage.completionTokens.total !== null;
 }
-const usageUnavailableTag = () => tag('Usage unavailable', 'No supported recorded credit/token counters for these counted turns; SDK correlation is not implemented.', 'neutral');
-function usageDisclosure (usage: ReturnType<typeof listingUsage>): string {
+const usageUnavailableTag = () => tag('Usage unavailable', 'No supported recorded credit/token counters for these counted turns.', 'neutral');
+/** Credits with enough digits for a cheap turn: whole numbers from 100, one decimal from 10, two below. */
+function creditText (value: number): string {
+  return value >= 100 ? Math.round(value).toLocaleString('en-US')
+    : value >= 10 ? value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : value.toFixed(2);
+}
+const tokenText = (value: number) => value.toLocaleString('en-US');
+
+/** What a turn's credits are, for agent chats: the basis, and the turns one checkpoint covers. */
+function sdkTurnUsageTags (turn: ListingTurnEvidence): string {
+  const usage = turn.usage;
+  if (!usage)
+    return '';
+  const also = usage.perCallCredits !== null ? ` The per-call rows for this turn add up to ${creditText(usage.perCallCredits)} credits, which is incomplete for this chat.` : '';
+  return [
+    usage.basis === 'running-total'
+      ? tag('from totals', `Credits are the difference between the log's running totals before and after this turn, including delegated agents. Not a per-call sum.${also}`, 'neutral') : '',
+    usage.basis === 'per-call-partial'
+      ? tag('partial rows', 'The per-call rows cover only part of this chat\'s replies, so these credits are a lower bound.', 'warning') : '',
+    usage.span
+      ? tag(`turns ${usage.span.from}-${usage.span.to}`, 'One checkpoint covers these turns; the log did not separate them, so the credits are shown once, on the last of them.', 'warning') : '',
+  ].join('');
+}
+
+function sdkUsageDisclosure (usage: ListingSessionUsage, shown: ReturnType<typeof listingUsage>): string {
+  const rows: string[][] = [];
+  if (usage.scope === 'subagent') {
+    rows.push(usage.agent
+      ? ['This agent\'s own recorded calls', `${creditText(usage.agent.credits)} credits`, `${usage.agent.calls.toLocaleString('en-US')} calls matched by agent ID. Agents it started itself are not included.`]
+      : ['This agent\'s own recorded calls', 'not recorded', 'No per-call rows carry this agent\'s ID. The log\'s running total below covers every conversation in the log.']);
+  } else {
+    rows.push(['Credits shown (sum of the turns)', shown.credits.total === null ? '?' : `${shown.credits.recorded < shown.credits.turns ? '~' : ''}${creditText(shown.credits.total)}`,
+      `${usageCoverage(shown.credits)}. Per turn: the per-call rows where they cover about every reply, otherwise the difference between running totals.`]);
+    usage.beforeFirstTurnCredits > 0 && rows.push(['Added before the first prompt', `${creditText(usage.beforeFirstTurnCredits)} credits`, 'In the running total before this conversation\'s first prompt; not in any turn.']);
+  }
+  usage.loggedCredits !== null && rows.push(['Last logged total (whole log)', `${creditText(usage.loggedCredits)} credits`,
+    `<code>${safe(usage.loggedEvent ?? '')}</code>; a running total for the whole event log, ${usage.shutdowns.toLocaleString('en-US')} shutdown record${usage.shutdowns === 1 ? '' : 's'}. Never added across resumes.`]);
+  usage.source !== 'none' && rows.push(['Per-call rows', `${usage.perCallRows.toLocaleString('en-US')} of ${usage.replies.toLocaleString('en-US')} replies${usage.complete ? '' : ' (partial)'}`,
+    usage.source === 'session-store' ? 'The Copilot CLI session store, <code>assistant_usage_events</code>' : '<code>model.model_call_success</code> events in the log']);
+  usage.unmatchedCredits > 0 && rows.push(['Not matched to a turn or agent', `${creditText(usage.unmatchedCredits)} credits`, 'Per-call rows that fit no turn of this conversation.']);
+  const tokens = usage.scope === 'main' ? usage.byModel.reduce((sum, item) => ({
+    input: sum.input + item.inputTokens, read: sum.read + item.cacheReadTokens, write: sum.write + item.cacheWriteTokens, output: sum.output + item.outputTokens,
+  }), { input: 0, read: 0, write: 0, output: 0 }) : usage.agent ? { input: usage.agent.inputTokens, read: usage.agent.cacheReadTokens, write: usage.agent.cacheWriteTokens, output: usage.agent.outputTokens } : null;
+  const partial = usage.complete ? '' : ' Partial: only the calls recorded.';
+  tokens && usage.source !== 'none' && rows.push(
+    ['⬆️ Input tokens', tokenText(tokens.input), `Includes cached tokens, and every call re-sends its context.${partial}`],
+    ['↳ Cache read / write', `${tokenText(tokens.read)} / ${tokenText(tokens.write)}`, `Cached input is billed at a lower rate, cache writes at a higher one.${partial}`],
+    ['⬇️ Output tokens', tokenText(tokens.output), `Includes reasoning.${partial}`],
+  );
+  const models = usage.scope === 'main' && usage.byModel.length
+    ? disclosure('By model (per-call rows only)', table(['Model', 'Calls', 'Credits', 'Input', 'Cache read', 'Cache write', 'Output'],
+      usage.byModel.map((item) => [safe(listingModelLabel(item.model)), tokenText(item.calls), creditText(item.credits), tokenText(item.inputTokens), tokenText(item.cacheReadTokens), tokenText(item.cacheWriteTokens), tokenText(item.outputTokens)]))) : '';
+  return disclosure('💳 Credits / 🔢 tokens', `<p>${usageTags(shown, usage.scope === 'main' ? sdkChatCreditsNote(usage) : '')}</p>${table(['Recorded metric', 'Value', 'Source / coverage'], rows)}${models}<p class="caption">AI credits are the recorded nano-AIU divided by 1,000,000,000 (1 credit = $0.01); they are never estimated from tokens. Missing figures are unknown, not zero. A "from totals" turn is the difference between the log's running totals and includes delegated agents. Token counts exist only where per-call rows exist.</p>`, 'usage-disclosure');
+}
+
+function sdkChatCreditsNote (usage: ListingSessionUsage): string {
+  return `Sum of the turns' credits: per-call rows where they cover about every reply, otherwise differences between the log's running totals.${usage.loggedCredits !== null ? ` The log's last total for the whole file is ${creditText(usage.loggedCredits)} credits.` : ''}`;
+}
+function usageDisclosure (usage: ReturnType<typeof listingUsage>, sdk?: ListingSessionUsage): string {
+  if (sdk && (hasUsage(usage) || sdk.loggedCredits !== null))
+    return sdkUsageDisclosure(sdk, usage);
   if (!hasUsage(usage))
     return '';
   return disclosure('💳 Credits / 🔢 tokens', `<p>${usageTags(usage)}</p>${table(['Recorded metric', 'Counted-turn sum', 'Coverage / source'], [
     ['Copilot credits', safe(usageValue(usage.credits)), `${usageCoverage(usage.credits)} · <code>request.copilotCredits</code>`],
     ['⬆️ Prompt tokens (input)', safe(usageValue(usage.promptTokens)), `${usageCoverage(usage.promptTokens)} · <code>request.promptTokens</code>`],
     ['⬇️ Completion tokens (output)', safe(usageValue(usage.completionTokens)), `${usageCoverage(usage.completionTokens)} · <code>request.completionTokens</code>`],
-  ])}<p class="caption">Sums cover counted Local requests only, once per conversation, not per workspace reference. Missing counters are unknown, not zero; partial sums are not complete session totals. SDK model-call usage, child completion totals and cumulative checkpoints are not yet correlated here. No conversion to credits or attribution of parent usage to children is performed. Token counts can include repeated context and are not unique text size.</p>`, 'usage-disclosure');
+  ])}<p class="caption">Sums cover counted Local requests only, once per conversation, not per workspace reference. Missing counters are unknown, not zero; partial sums are not complete session totals. No conversion to credits or attribution of parent usage to children is performed. Token counts can include repeated context and are not unique text size.</p>`, 'usage-disclosure');
 }
 
 /** Pure renderer: supplied evidence is a snapshot; no storage, network or machine reads here. */
@@ -259,11 +319,14 @@ export function formatDetailedSessionListingHtml (
     const edges = edgesFor(group);
     const local = row.backing.status === 'verified' && row.backing.source.kind === 'local-journal';
     const exact = (workspaceCounts.get(row.sessionId) ?? 0) > 1;
-    const selector = local && exact && row.backing.status === 'verified' ? row.backing.source.path : ids.get(row.sessionId) ?? row.sessionId;
+    const sdkMain = row.backing.status === 'verified' && row.backing.source.kind === 'sdk-events' && row.backing.source.scope.kind === 'main';
+    const selector = local && exact && row.backing.status === 'verified' ? row.backing.source.path
+      : sdkMain && row.backing.status === 'verified' ? row.backing.source.sessionId : ids.get(row.sessionId) ?? row.sessionId;
     const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
     const command = `copilot-chat-export ${quote(selector)} --user-data-root ${quote(row.provenance.userDataRoot)}`;
-    const readiness = !local ? row.backing.status === 'verified' ? 'Verified SDK source; MD export not implemented' : 'No verified export backing'
-      : data?.state === 'changed' ? 'Source changed; refresh before export' : exact ? 'Local export: exact path required' : 'Local MD export supported';
+    const readiness = sdkMain ? data?.state === 'changed' ? 'Source changed; refresh before export' : 'Agent MD export supported (main conversation)'
+      : !local ? row.backing.status === 'verified' ? 'Sub-agent: exported inside its parent chat' : 'No verified export backing'
+        : data?.state === 'changed' ? 'Source changed; refresh before export' : exact ? 'Local export: exact path required' : 'Local MD export supported';
     const workspace = detailedWorkspace(group, parentOf(group), data);
     // Headline values are ?? when the source was read, ??? when it could not be read or verified at all.
     const headline: 2 | 3 = row.backing.status === 'verified' && data?.state === 'read' ? 2 : 3;
@@ -275,11 +338,15 @@ export function formatDetailedSessionListingHtml (
     const workspaceIds = [...new Set(group.occurrences.map((item) => path.basename(item.provenance.workspaceStoragePath)))];
     const children = edges.filter((edge) => edge.kind === 'parent' && edge.to === group.key).length;
     const forks = edges.filter((edge) => edge.kind === 'fork' && edge.to === group.key).length;
-    const usage = listingUsage(data?.state === 'read' ? data.turns : []);
+    const sdkUsage = data?.state === 'read' ? data.usage : undefined;
+    const usage = sdkUsage?.scope === 'subagent' && sdkUsage.agent
+      ? { credits: { total: sdkUsage.agent.credits, recorded: 1, turns: 1 }, promptTokens: { total: sdkUsage.agent.inputTokens, recorded: 1, turns: 1 }, completionTokens: { total: sdkUsage.agent.outputTokens, recorded: 1, turns: 1 } }
+      : listingUsage(data?.state === 'read' ? data.turns : []);
+    const usageNote = sdkUsage?.scope === 'main' ? sdkChatCreditsNote(sdkUsage) : sdkUsage?.scope === 'subagent' ? 'This delegated agent\'s own recorded calls, matched by agent ID.' : '';
     const modelTags = modelTag(data?.models ?? [], true);
     const top = `<summary class="session-summary"><span class="title-line"><span class="index-circle" title="Position in this generated snapshot">${groups.indexOf(group) + 1}</span>${typeTag(row)}<strong class="session-title">${safe(titleFor(group))}</strong>${children ? tag(`↳ ${plural(children, 'subagent')}`, 'Recorded immediate child conversations', 'child') : ''}${forks ? tag(`🌿 ${plural(forks, 'fork')}`, 'Recorded fork children', 'fork') : ''}${edges.some((edge) => edge.kind === 'fork' && edge.from === group.key) ? tag('🌿 Forked', 'Persisted fork metadata', 'fork') : ''}${workspaceIds.length > 1 ? tag(`${workspaceIds.length} w/s refs · 1 conv`, 'One verified conversation referenced from distinct workspace stores', 'refs') : ''}${edges.some((edge) => edge.kind === 'likely-fork') ? tag('⑂? Likely fork', 'Unproven content-based hint; not identity evidence', 'hint') : ''}${edges.some((edge) => edge.kind === 'likely-copy') ? tag('⑂? Likely copy', 'Unproven content-based hint; not identity evidence', 'hint') : ''}</span>
-<span class="subtitle"><strong title="Recorded prompts/delegated tasks including child follow-ups, not assistant iterations">${known(metrics.turns, headline)} ${metrics.turns === 1 ? 'turn' : 'turns'}</strong><span class="workspace-name" title="${safe(workspace.uri)}${workspace.inherited ? ' (from recorded parent)' : ''}">📁 ${workspace.known ? safe(workspace.name) : unk(2, 'workspace/project not recorded')}</span><span title="Created: recorded creation evidence${sameMoment ? '; last updated in the same minute' : ''}" aria-label="Created">🌅 <span class="datetime">${createdText}</span></span>${sameMoment ? '' : `<span title="Updated: recorded latest scoped activity" aria-label="Updated">🔄 <span class="datetime">${when(metrics.updated, headline, 'no recorded activity evidence')}</span></span>`}${modelTags}${usageTags(usage)}${data?.files.length ? editTag(data.files) : ''}</span>
-<span class="subtitle status-line">${tag(`${row.backing.status === 'verified' ? '✅' : row.backing.status === 'unsupported' ? '⛔' : '❓'} ${row.backing.status}`, 'Backing identity status, not a completeness guarantee', row.backing.status === 'verified' ? 'success' : 'warning')}${tag(readiness, 'Markdown (MD) export support is independent of source verification', local ? 'success' : 'neutral')}${group.visibility.status === 'hidden' ? tag(`🙈 Ignored: ${group.visibility.reason}`, 'Hidden by default inventory rules', 'warning') : ''}${group.childWarnings ? tag(`❓ ${plural(group.childWarnings, 'ambiguous child scope')}`, 'Main identity remains separate', 'warning') : ''}${group.occurrences.some((item) => item.diagnostics.some((diagnostic) => diagnostic.category === 'ambiguous')) ? tag('🟠 Ambiguous mapping', 'Source mapping is not uniquely established; see Why/source', 'warning') : ''}${data?.errors ? tag(`🚨 ${plural(data.errors, 'error')}`, 'Recorded request/session errors, not all tool failures', 'danger') : ''}${data?.canceled ? tag(`🚫 ${data.canceled} canceled`, 'Recorded cancellation/abort indicators', 'warning') : ''}${data?.flags.length ? tag(`🔎 ${plural(new Set(data.flags).size, 'audit note')}`, data.flags.join(', '), 'warning') : ''}<span title="${safe(workspaceIds.join(', '))}">wsID: <code>${safe(workspaceIds.join(', '))}</code></span><span title="${safe(headerId.title)}">${headerIdLabel}: <code>${safe(headerId.value)}</code></span></span></summary>`;
+<span class="subtitle"><strong title="Recorded prompts/delegated tasks including child follow-ups, not assistant iterations">${known(metrics.turns, headline)} ${metrics.turns === 1 ? 'turn' : 'turns'}</strong><span class="workspace-name" title="${safe(workspace.uri)}${workspace.inherited ? ' (from recorded parent)' : ''}">📁 ${workspace.known ? safe(workspace.name) : unk(2, 'workspace/project not recorded')}</span><span title="Created: recorded creation evidence${sameMoment ? '; last updated in the same minute' : ''}" aria-label="Created">🌅 <span class="datetime">${createdText}</span></span>${sameMoment ? '' : `<span title="Updated: recorded latest scoped activity" aria-label="Updated">🔄 <span class="datetime">${when(metrics.updated, headline, 'no recorded activity evidence')}</span></span>`}${modelTags}${usageTags(usage, usageNote)}${data?.files.length ? editTag(data.files) : ''}</span>
+<span class="subtitle status-line">${tag(`${row.backing.status === 'verified' ? '✅' : row.backing.status === 'unsupported' ? '⛔' : '❓'} ${row.backing.status}`, 'Backing identity status, not a completeness guarantee', row.backing.status === 'verified' ? 'success' : 'warning')}${tag(readiness, 'Markdown (MD) export support is independent of source verification', local || sdkMain ? 'success' : 'neutral')}${group.visibility.status === 'hidden' ? tag(`🙈 Ignored: ${group.visibility.reason}`, 'Hidden by default inventory rules', 'warning') : ''}${group.childWarnings ? tag(`❓ ${plural(group.childWarnings, 'ambiguous child scope')}`, 'Main identity remains separate', 'warning') : ''}${group.occurrences.some((item) => item.diagnostics.some((diagnostic) => diagnostic.category === 'ambiguous')) ? tag('🟠 Ambiguous mapping', 'Source mapping is not uniquely established; see Why/source', 'warning') : ''}${data?.errors ? tag(`🚨 ${plural(data.errors, 'error')}`, 'Recorded request/session errors, not all tool failures', 'danger') : ''}${data?.canceled ? tag(`🚫 ${data.canceled} canceled`, 'Recorded cancellation/abort indicators', 'warning') : ''}${data?.flags.length ? tag(`🔎 ${plural(new Set(data.flags).size, 'audit note')}`, data.flags.join(', '), 'warning') : ''}<span title="${safe(workspaceIds.join(', '))}">wsID: <code>${safe(workspaceIds.join(', '))}</code></span><span title="${safe(headerId.title)}">${headerIdLabel}: <code>${safe(headerId.value)}</code></span></span></summary>`;
     const first = data?.turns[0]?.prompt;
     const last = data?.turns.at(-1)?.prompt;
     const displayPrompt = (prompt: string) => row.backing.status === 'verified'
@@ -328,7 +395,7 @@ export function formatDetailedSessionListingHtml (
       // Whitespace-only differences (trailing newline, line breaks) are not worth a second copy of the same words.
       const sameWords = previewListingPrompt(overview).text === previewListingPrompt(turn.prompt).text && previewListingPrompt(overview).wordCount === fullWords;
       const needsFull = preview.clipped || !sameWords;
-      return `<li class="turn-card" id="${anchor}-turn-${index + 1}"><div class="turn-meta">${tag(turn.role === 'human' ? '👤' : turn.role === 'delegated' ? '↳ delegated' : '💬 follow-up', turn.role, turn.role === 'human' ? 'human' : 'child')}<span class="datetime">${turn.timestamp == null ? unk(1, 'no recorded timestamp for this turn') : formatListingTurnDate(turn.timestamp, metrics.created)}</span>${turn.models.length ? modelTag(turn.models) : ''}${turn.auto ? tag(turn.role === 'human' ? 'Auto' : 'Session Auto', 'Recorded automatic model selection, not an answering-model ID', 'auto') : ''}${turn.selectedModel && !turn.auto && !turn.models.some((model) => listingModelLabel(model) === listingModelLabel(turn.selectedModel!)) ? tag(`${choiceLabel}: ${listingModelLabel(turn.selectedModel)}`, turn.selectedModel, 'neutral') : ''}${turn.effort ? tag(`🧠 ${effortLabel}: ${turn.effort}`, 'Recorded reasoning effort setting', 'effort') : ''}${usageTags(listingUsage([turn]))}${turn.canceled ? tag('🚫 Canceled', 'Recorded cancellation', 'warning') : ''}${turn.error ? tag('🚨 Request error', 'Recorded error evidence', 'danger') : ''}${turn.files.length ? editTag(turn.files) : ''}</div>
+      return `<li class="turn-card" id="${anchor}-turn-${index + 1}"><div class="turn-meta">${tag(turn.role === 'human' ? '👤' : turn.role === 'delegated' ? '↳ delegated' : '💬 follow-up', turn.role, turn.role === 'human' ? 'human' : 'child')}<span class="datetime">${turn.timestamp == null ? unk(1, 'no recorded timestamp for this turn') : formatListingTurnDate(turn.timestamp, metrics.created)}</span>${turn.models.length ? modelTag(turn.models) : ''}${turn.auto ? tag(turn.role === 'human' ? 'Auto' : 'Session Auto', 'Recorded automatic model selection, not an answering-model ID', 'auto') : ''}${turn.selectedModel && !turn.auto && !turn.models.some((model) => listingModelLabel(model) === listingModelLabel(turn.selectedModel!)) ? tag(`${choiceLabel}: ${listingModelLabel(turn.selectedModel)}`, turn.selectedModel, 'neutral') : ''}${turn.effort ? tag(`🧠 ${effortLabel}: ${turn.effort}`, 'Recorded reasoning effort setting', 'effort') : ''}${usageTags(listingUsage([turn]))}${sdkTurnUsageTags(turn)}${turn.canceled ? tag('🚫 Canceled', 'Recorded cancellation', 'warning') : ''}${turn.error ? tag('🚨 Request error', 'Recorded error evidence', 'danger') : ''}${turn.files.length ? editTag(turn.files) : ''}</div>
 <p class="prompt-preview${needsFull ? ' clipped-preview' : ''}">${safe(preview.text)}</p>${!sameWords ? '<p class="caption">Derived SDK overview omits recognized context/reminder wrappers; full recorded text is preserved below.</p>' : ''}${needsFull ? disclosure(`Full ${turn.role === 'delegated' ? 'delegated task' : 'prompt'} · ${fullWords} words${preview.clipped ? ' · middle clipped in preview' : ''}`, `<pre>${safe(turn.prompt)}</pre>`, 'full-prompt') : ''}
 ${turn.files.length ? disclosure('✏️ Files changed by this turn', fileTable(turn.files)) : ''}</li>`;
     }).join('')}</ol>` : `<p class="warning">Conversation evidence is ${safe(data?.state ?? 'unavailable')}. Unknown is not empty. Source diagnostics below explain what could not be read.</p>`;
@@ -347,13 +414,13 @@ ${turn.files.length ? disclosure('✏️ Files changed by this turn', fileTable(
     const timelineSection = timeline.length > 1
       ? disclosure('🤖 Model-switch timeline', `<p class="caption">${timelineCaption}</p><div class="timeline">${timeline.join('')}</div>`)
       : fieldLine('🤖 Model-switch timeline', timeline[0] ?? unk(headline, 'no recorded model evidence'), timeline.length ? `No model switch recorded. ${timelineCaption}` : timelineCaption);
-    const copyable = local && data?.state !== 'changed';
+    const copyable = (local || sdkMain) && data?.state !== 'changed';
     const exportSection = fieldLine('📋 Export selector / command',
       `<code class="selector">${safe(selector)}</code>${copyable ? ` <button type="button" title="Copy the exact supported export selector" class="enhanced-only" data-copy="${html(selector)}">📋 Copy selector</button> <button type="button" title="Copy quoted PowerShell export command" class="enhanced-only" data-copy="${html(command)}">💻 Copy command</button>` : ''}`,
       copyable ? `Command: ${command}` : `${readiness}. The selector is shown for reference only.`);
     return `<details class="session-card chat-${detailedChatType(row).key}" id="${anchor}" data-main="${main}" ${attributes(group, data)}${main && !selected.has(group.key) ? ' hidden' : ''}>
 ${top}<div class="session-body">${titleList}
-${notes ? `<div class="card-notes">${notes}</div>` : ''}${usageDisclosure(usage)}
+${notes ? `<div class="card-notes">${notes}</div>` : ''}${usageDisclosure(usage, sdkUsage)}
 ${disclosure(`🗨️ Ordered prompts / delegated tasks (${data?.state === 'read' ? data.turns.length : unk(headline, 'conversation evidence was not read')})`, turns)}
 ${familySection}
 ${timelineSection}
