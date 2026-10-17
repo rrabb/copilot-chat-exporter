@@ -13,6 +13,14 @@ for the title fields, storage locations, precedence, and VS Code source referenc
 When a sibling transcript retains an `apply_patch` request, the Markdown links each touched file,shows submitted `+added` and `-deleted` operation counts, and includes the recorded patch in a collapsible `~~~diff` block. The journal remains authoritative for turn order and tool identity. Repeated edits count repeatedly, so these values are not a reconstruction of the final Git diff.
 When patch arguments are unavailable, the export keeps the journal-derived file path and labels the change details unavailable instead of reporting the current file's total line count.
 
+## Project goal
+
+Capture every Copilot chat session on a machine, whatever its type or location, and export each one to a rich review artifact (Markdown first, HTML later) that keeps as much of what the Copilot chat shows as the stored data allows: prompts, readable reasoning, tool calls with inputs and outputs, file changes, models, credits, tokens, timing and code blocks. The purpose is review and playback (why and how something was done, including the human's and the model's reasoning) and confidence before a chat is deleted.
+
+There are two stages. The listing reports (`--list`, basic and detailed HTML) identify every session and where its data lives. The export turns one session into the review artifact. The listing is complete for the stores the tool reads; export supports Local chats and Agent Host/Copilot CLI conversations, with Local fidelity work in progress. See [docs/SPEC.md](docs/SPEC.md) for scope, the source capability matrix and non-goals.
+
+Principles: evidence before inference, unknown is never shown as zero, every omission is reported with a reason instead of hidden, and the tool only reads local files and never writes native VS Code or Copilot storage.
+
 ## Install
 
 Zero runtime dependencies - Node built-ins only. Drop the folder into any repo, or add it as a
@@ -94,9 +102,9 @@ SDK files are read from explicit library `copilotHome`, otherwise `COPILOT_HOME`
 
 `createProviderSourceResolver({ copilotHome })` resolves an exact provider index key into `SdkEventSource` plus child scopes and evidence. Its per-inventory cache retains only scope/integrity metadata and rejects size/mtime changes; use a fresh resolver for a later inventory. `readSdkEvents(path, sdkSessionId)` retains complete event fields plus original `recordedLine` JSON text, including values JavaScript numbers cannot represent exactly. `eventsInScope(events, scope)` selects the verified main/child scope without moving or clipping records. These APIs verify backing identity, not semantic fidelity or complete Markdown support; later loaders must revalidate identity and SHA-256.
 
-`planToolText` and `planMetadataText` implement the approved presentation thresholds without writing files or changing the existing renderer. Tool text up to 10 recorded lines stays inline, 11-100 lines collapses, and over 100 lines provides a 10-line preview and complete companion text. A terminating newline does not add an extra line. Extra metadata always collapses. `PlannedArchive` separates pending companion bytes and diagnostics from Markdown; callers must not treat a planned link as a persisted file.
+`planToolText` and `planMetadataText` implement the approved presentation thresholds without writing files or changing the existing renderer. Tool text up to 10 recorded lines stays inline, longer text collapses, and text over 300 lines and over 15 KiB provides a 10-line preview and complete companion text. A terminating newline does not add an extra line. Extra metadata always collapses. `PlannedArchive` separates pending companion bytes and diagnostics from Markdown; callers must not treat a planned link as a persisted file.
 
-These additive contracts support the staged implementation; fidelity flags and companion-producing renderers are not yet wired into the CLI. Existing Local Markdown exports now use the staged writer for safe publication. See [work-log.md](work-log.md) for current phase and validation.
+These additive contracts support the staged implementation; companion files for tool text over 300 lines and 15 KiB are written by both export commands, while `--high-fidelity`, `--no-redact` and the fidelity flags are not yet wired into the CLI. Exports use the staged writer for safe publication. See [work-log.md](work-log.md) for current phase and validation.
 
 `writeArchive({ outputPath, generatedAt, overwrite, plan })` persists a planned archive. Its pure `plan(assetsDirectory)` callback may run again after a folder-name collision; construct companion paths and relative Markdown links using that assigned name. It creates a timestamped sibling folder only when companions exist, saves/verifies their bytes, then stages/verifies/publishes Markdown. Ordinary publication refuses an existing file; explicit overwrite replaces it only after staging succeeds. Previous companions are never deleted. On failure it cleans only files created by that attempt and reports cleanup failures. Filesystems without hard-link support fail ordinary publication explicitly; there is no unsafe overwrite fallback. This is not a power-loss-proof multi-file transaction.
 
@@ -163,7 +171,7 @@ The listing has a `TYPE` column (`local`, `agent`, `sub-agent`, or `CLI agent`) 
 
 `verified` means the corresponding journal/event backing was found and its identity checked; it does not necessarily mean that Markdown export is implemented for that provider. `unresolved` means the listing has an index/reference but no verified conversation backing. `ambiguous` / `🟠 ❓` means the inventory could not safely identify one backing or child scope. Unknown creation dates or prompt counts mean no trustworthy source value was available, not zero. To reduce placeholders, `New Chat` rows with both creation date and prompt count unknown are hidden by default and restored by `--show-ignored`.
 
-Multiple discovered roots prompt for a numbered selection only in an interactive terminal. Non-interactive use fails with candidate paths and `--user-data-root` remediation; it never picks the first root. Explicit journal paths validate Local format/identity without scanning unrelated roots. Current Agent Host/SDK selection and SDK Markdown export remain pending; listing distinguishes verified backing identity from unresolved sources and does not export guessed conversations.
+Multiple discovered roots prompt for a numbered selection only in an interactive terminal. Non-interactive use fails with candidate paths and `--user-data-root` remediation; it never picks the first root. Explicit journal paths validate Local format/identity without scanning unrelated roots. Current Agent Host/SDK main-conversation export is available by chat ID, backing ID or prefix (see "Exporting an Agent Host or Copilot CLI chat"); the detailed listing marks each exportable agent chat and shows its copy-ready export command. Listing distinguishes verified backing identity from unresolved sources and does not export guessed conversations.
 > ```
 > node ./dist/cli.js --list   
 > node ./src/cli.ts ef6eb63d-269b-4166-aac8-34df2a71ae49 docs/temp/Migration-vite-svelte5.md
@@ -208,6 +216,16 @@ If a journal node kind is unrecognised, or a render check fails, the run reports
 passing silently - for example `Schema drift: 1 unhandled node kind(s)` or `Layer C self-check:
 2 of 9 render checks FAILED`, with each failed check named. `--strict` turns any of those into a
 non-zero exit code, and `--verify` prints the full schema census.
+
+`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Under `--strict`, absent text fails; source-safe message order and repeated occurrences are checked only for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent streams grouped by agent scope. Other text is presence-only. See `docs/SPEC.md` section 9 for its limits.
+
+### Exporting an Agent Host or Copilot CLI chat
+
+```
+npm run export -- <chat id | backing id | prefix of 8+ characters> [outputPath] [--user-data-root <path>]
+```
+
+The selector is matched against the verified agent chats of the selected root. The command exports the main conversation: your prompts, readable reasoning (thinking text or the model-written summary; reasoning stored only as an encrypted token is counted but cannot be read), assistant messages, tool calls with readable arguments, outputs, errors and diffs, compaction summaries and model changes. System prompts, skill files and images are written as linked files in a sibling `_assets_<timestamp>` folder. Local and agent exports both save tool text over 300 lines and 15 KiB the same way: the Markdown shows the first 10 lines and links a file with the full text, so nothing is clipped. Permission prompts, hook records and model request copies are counted and left out; the closing "Left out of this export" section lists the counts. Sub-agent conversations are nested inline at their delegation point, collapsed and labelled. Usage is shown as AI credits (recorded nano-AIU divided by 1,000,000,000; 1 credit = $0.01) per model, per turn and per sub-agent, from the Copilot CLI session store (`~/.copilot/session-store.db`) or the log's own usage events, with the number of usage rows against the assistant replies and the last logged session total. Credits are never estimated from token counts; where nothing was recorded the export says "not recorded", never zero. Chats without per-call rows still get credits per turn, taken from the differences between the log's running totals (labelled "from running totals"; a difference that covers several turns is shown as a range), with the most expensive turns listed in the Cost section. The exporter only reads the event log; it never deletes or changes it. Policy and rationale: `docs/SPEC.md`, "Agent chat export policy".
 
 ### Package shortcuts
 

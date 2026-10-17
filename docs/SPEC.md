@@ -6,15 +6,80 @@ Copilot chat session into a single human-readable Markdown archive with visual a
 This document is the contract. When you change the script, keep this spec and the on-disk output
 in agreement, then follow the Verification section before considering the change done.
 
+## Project goal and scope
+
+Capture every Copilot chat session, whatever its type or location, and export each to a rich review artifact (Markdown first, HTML later) that preserves as much of what the chat shows as the stored data allows: prompts, readable reasoning, tool calls with inputs and outputs, file changes, models, credits, tokens, timing and code blocks. The purpose is review and playback of why and how something was done, including the human's and the model's reasoning, and confidence before a chat is deleted. Section 1 below is the contract for the single-session Markdown file.
+
+| Stage | Role | State |
+| --- | --- | --- |
+| Listing (`--list`, basic and detailed HTML) | Identify every session, its type, project, backing and storage artifacts; never export | Implemented for the stores the tool reads |
+| Export | Turn one session into the review artifact with a reported loss account | Local chats and the main conversation of Agent Host and Copilot CLI chats; the Local fidelity gaps are in progress |
+
+Source capability matrix (examples of counts come from one development machine and are not guarantees):
+
+| Source | Listed | Exportable | Reasoning in the stored data | Notes |
+| --- | --- | --- | --- | --- |
+| Local journal (`chatSessions`, including empty-window chats) | Yes | Yes, with known fidelity gaps | Readable `thinking` blocks | Journal replay is authoritative |
+| Agent Host (SDK events, main and sub-agent scopes) | Yes | Main conversation and sub-agent conversations (nested inline at the delegation point): yes | Mixed: in one 10,436-message corpus 37% of assistant messages carry readable reasoning (`reasoningText`, plus `reasoningBlocks` thinking for Claude models) and the rest carry only an encrypted continuation token or none. GPT models mostly give a model-written summary, Claude models give thinking text | Per-call usage ledger in `~/.copilot/session-store.db` for some sessions |
+| Copilot CLI (SDK events) | Yes | Main conversation: yes | Same as Agent Host | Same store layout |
+| Claude (`claude-code:/`, `agent-host-claude:/`) and Codex | As unsupported | No, out of scope for now | Unknown | Not planned; no local transcript was found |
+| Cloud sessions | No local transcript | No | Not applicable | Needs network and authentication, which this tool does not use |
+
+Non-goals: the tool never deletes, moves or modifies anything related to sessions and does not recommend deletion; Claude and Codex provider chats are out of scope for now; cloud sessions; fetching remote data; decrypting or inferring opaque reasoning; converting tokens to credits; and any write to native storage. A verbatim raw-source bundle and HTML playback are possible later phases that need separate approval.
+
+Fidelity principles: every omission is reported with a reason and a count, unknown is never zero, text redaction is best effort, and "near-lossless" never means the Markdown is the only copy: the raw source remains the lossless record.
+
+### Agent chat export policy (approved October 14)
+
+Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backing id>/events.jsonl`. The export is selected like a Local chat (`copilot-chat-export <id>`), by the chat UUID, the backing ID, a unique prefix of at least 8 hex characters, or the exact qualified chat key shown by `--list`. The main conversation is exported, and each sub-agent conversation is nested inline at the delegation point (collapsed, always labelled as a sub-agent with its title, a summary line and a collapsible full conversation). Nesting is followed up to 8 levels; child events with no matching delegation in the conversation are counted under "Left out of this export". Usage is exported as AI credits (see "Agent usage and credits" below); where none was recorded it shows "not recorded", never zero.
+
+| Record | Decision | Where it appears |
+| --- | --- | --- |
+| User prompts and attachment names (`user.message`) | Keep | Turn prompt; attachments in Turn info |
+| Injected context (`transformedContent` when it differs from what was typed) | Keep, collapsed | "Injected context" under Turn info |
+| Assistant text, readable reasoning (`reasoningText`, falling back to thinking or summary blocks), one-line tool intent | Keep | Reasoning block, assistant text, "Intent" line in the tool call |
+| Reasoning recorded only as an encrypted token | Count, never reconstruct | Turn info and the closing "Left out" section |
+| Tool calls with arguments (shown as readable lines, not escaped JSON), output, errors, exit codes, duration and detailed results such as diffs | Keep | Tool call blocks |
+| Compaction summaries, model and effort changes, Auto model choice, mode changes, plan changes, resume markers, task-complete summary, aborts, errors, notifications | Keep | Notes in the turn |
+| Turn and model-call boundary records | Used only for turn timing | Turn info elapsed time |
+| System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at the turn where it changed |
+| Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note in the turn |
+| Images | Keep | Companion file `image-<id>.<ext>`, shown inline |
+| Other binary attachments | Left out | A one-line note with type, MIME type and size |
+| Permission prompts and results, permission-change records | Left out, counted | "Left out of this export" |
+| Hook records | Left out, counted | Same |
+| Model request/response snapshots and copies | Left out, counted | Same |
+| External-tool request duplicates | Left out, counted | Same |
+| Usage and cache checkpoints | Left out, counted; the last running total is shown in the Cost section | Same |
+
+An event type outside both the kept and the left-out lists is reported as schema drift and fails `--verify --strict`, so a new SDK record cannot be dropped in silence. Nothing here deletes or modifies session data.
+### Agent usage and credits (approved October 14)
+
+GitHub documents the per-call `assistant.usage` event as ephemeral and not replayed on resume, so the event log carries no per-call usage. Three recorded sources are used, most detailed first; the first one with rows wins and they are never added together.
+
+| Source | What it gives | Limits |
+| --- | --- | --- |
+| `~/.copilot/session-store.db`, table `assistant_usage_events` (read-only) | One row per model call: time, agent id, model, input, cache read and write, output and reasoning tokens, nano-AIU, duration | Private, version-dependent CLI database; present for 11 of the 26 sessions on the development machine, and for some only a fraction of the calls |
+| `model.model_call_success` events in the log (`copilot_usage.total_nano_aiu`) | The same per call, in the log itself | Present in only a few logs; also includes helper calls such as permission checks that are not assistant replies |
+| Last `totalNanoAiu` on `session.shutdown` or `session.usage_checkpoint` | A running total for the whole event log | Not additive across resumes; covers every conversation in the log, not only the exported one |
+
+**Unit.** credits = nano-AIU / 1,000,000,000. Verified on 247 of 247 real logged calls: the recorded token counts times the recorded per-batch rates equal the recorded nano-AIU, and the implied per-million-token prices equal GitHub's published rates (GPT-6 Luna $0.10 / $0.01 / $0.125 / $0.50, GPT-6 Astra $10 / $1 / $12.50 / $50, GPT-5.5 $5 / $0.50 / $30 for input / cached input / cache write / output); GitHub defines 1 AI credit = $0.01. Credits are never derived from token counts.
+
+**Attribution.** A call belongs to the turn whose prompt is the last one at or before the call's time, and to a delegated agent by its agent id (checked: the stored parent tool call id equals the delegation's tool call id for every delegated row on the development machine). Calls that fit neither are shown as "Not matched to a turn or agent of this conversation", with their credits. A turn's credits are its own calls plus the calls of the agents it delegated to, shown split.
+
+**Credits by turn from running totals.** Every log with checkpoints also gets credits per turn: each `session.usage_checkpoint` or `session.shutdown` total minus the previous total goes to the turn that holds it. Not every turn writes a checkpoint, so one difference can cover several turns; it is then shown on the last of them with the range ("covers turns 24-25, which the log did not separate"), never split. A difference includes delegated agents. Credits written before the first prompt are reported separately. This is shown next to per-call figures (Turn info) and alone where there are none (turn line, Cost section: the five most expensive turns and a collapsible table of all turns). Checked on the chats where the CLI store has every call: identical per turn when each turn wrote a checkpoint (4 chats), within 4-9% in the two largest, and visibly different where the store holds only some calls. Tokens: the log has no per-turn input tokens; only some logs carry `outputTokens` on assistant messages (3 of 27), shown as "from message records". Shutdown `tokenDetails` and `modelMetrics` are not used: they stopped updating while the credit total kept growing.
+
+**Honesty rules.** Where a source has no rows, the turn, agent or chat shows "not recorded", never zero. The Cost section states the source, the number of usage rows against the assistant replies in the log, and the last logged total with the share the rows add up to (it can exceed 100%: the logged total is written at shutdown, before later calls). Real data (24 agent chats): 9 use the CLI store (5 of them cover about 100% of the replies, one covers 7%), 4 use log events, 11 show only the logged total.
+
 ## Approved upgrade: staged implementation
 
-The approved upgrade is tracked in [the work log](../work-log.md). Root-scoped journal/index inventory now supplies CLI listing, with explicit source/current selection and no newest fallback in the library or CLI. Offline HTML listing is implemented and tested; SDK backing identity and child-scope verification are implemented, while SDK Markdown rendering and full fidelity/artifact policy integration remain pending. Existing renderer behavior described below remains the baseline until each surface is wired and tested. Do not claim that fidelity flags or SDK export are available merely because backing identities can be verified.
+The approved upgrade is tracked in [the work log](../work-log.md). Root-scoped journal/index inventory now supplies CLI listing, with explicit source/current selection and no newest fallback in the library or CLI. Offline HTML listing is implemented and tested; SDK backing identity and child-scope verification are implemented and the main conversation of an Agent Host or Copilot CLI chat can be exported with its sub-agents nested inline (see "Agent chat export policy" below); usage and credits are exported for agent chats; full fidelity/artifact policy integration remains pending. Existing renderer behavior described below remains the baseline until each surface is wired and tested. Do not claim that fidelity flags or SDK export are available merely because backing identities can be verified.
 
 | Contract | Approved behavior |
 | --- | --- |
 | Sources and scope | Local journal and SDK event formats have independent versions/identities. Keep workspace occurrences separate and verify SDK main/child bindings with persisted evidence. Unknown/unreadable/index-only rows remain explicit, not empty. |
-| Substantive text | In both modes, retain full recorded prompts, answers and readable reasoning. Tool text up to 10 lines is inline, 11-100 lines collapsed, over 100 lines previewed by 10 lines and linked to complete companion text. A terminating CR/LF/CRLF ends a line without creating another empty line. |
-| Extra fields | `--high-fidelity` preserves extra fields as collapsed JSON; over 100 formatted lines uses a 10-line preview and complete JSON companion. Default mode reports omissions with a linked introductory notice and end paragraph/table. |
+| Substantive text | In both modes, retain full recorded prompts, answers and readable reasoning. Tool text up to 10 lines is inline, longer text is collapsed, and text over 300 lines AND over 15 KiB (`COMPANION_MIN_LINES`, `COMPANION_MIN_BYTES`) is previewed by 10 lines and linked to complete companion text. Many short file views stay inline; a few very wide lines also stay inline. A terminating CR/LF/CRLF ends a line without creating another empty line. |
+| Extra fields | `--high-fidelity` preserves extra fields as collapsed JSON; over the same 300-line and 15 KiB threshold uses a 10-line preview and complete JSON companion. Default mode reports omissions with a linked introductory notice and end paragraph/table. |
 | Redaction | Default redaction covers every textual artifact with category/count/location accounting. `--no-redact` disables it everywhere. Diagnostics never reveal secret values; regex detection does not guarantee comprehensive protection. |
 | Images and opaque data | Preserve all available original images in both modes without an exporter size cap or resizing; text redaction does not sanitize images. Other binary/encrypted/opaque payloads are metadata-only with exclusion reasons. Do not fetch remote originals or infer decrypted reasoning. |
 | Planned artifacts | `PlannedArchive` contains Markdown, pending `CompanionArtifact` byte payloads, diagnostics and policy. Render-only callers receive a plan, not proof of persistence. A later writer must ensure relative links target saved files before reporting success. |
@@ -231,7 +296,7 @@ For each turn, in order:
     ```text fence. Source: `toolSpecificData.terminalCommandOutput.text`, with status from
     `toolSpecificData.terminalCommandState` (`exitCode`, `duration`). Strip ANSI/VT escape sequences
     (SGR colors, cursor moves, OSC title writes), normalize CRLF, and drop the leading fragment of
-    the shell's own command echo. Clip to `MAX_TERMINAL_OUTPUT_BYTES` (24 KiB) head+tail. Badge ⚠️ on
+    the shell's own command echo. Over 300 lines and 15 KiB, show the first 10 lines and link a companion file with the full text (nothing is clipped). Badge ⚠️ on
     a non-zero exit, nothing on exit 0.
   - `📦 Tool result` collapsible from `resultDetails.output[]` entries where `isText` is true (MCP
     tools and some terminal calls carry the model-facing result here). A subagent call has no
@@ -241,7 +306,7 @@ For each turn, in order:
     This preserves URI/location arrays, binary or non-text embeds, references, `isError: true`,
     MCP metadata, serialized `{type: 'data', mimeType, base64Data}` output, malformed values, and
     future fields. Input and text output already rendered above are removed to avoid duplication.
-    Apply normal redaction and the 24 KiB low-level-details clipping limit.
+    Apply normal redaction and the same 300-line and 15 KiB companion rule.
   - `**Persisted output:**` line plus one `📦 Output body` collapsible per persisted resource.
   - `Tool details` collapsible with pretty-printed `toolSpecificData` JSON for non-terminal,
     non-todoList tools. For a `subagent` call this JSON has `prompt` and `result` removed - they
@@ -410,7 +475,7 @@ literal text, not live HTML.
 
 `<div style="border:1px solid #d0d7de;border-radius:6px;padding:2px 16px;margin:8px 0"> ... </div>`.
 The border shows in the VS Code preview; GitHub strips the style but still renders the Markdown.
-Large resources (> `MAX_EMBEDDED_RESOURCE_BYTES`, 96 KiB) are clipped to first+last 48 KiB in a fence.
+Large resources (> `MAX_EMBEDDED_RESOURCE_BYTES`, 96 KiB) are still clipped to first+last 48 KiB in a fence, with the path of the full resource; moving them to companions is open (work log).
 
 ### 6.6 Copy affordances
 
@@ -530,7 +595,7 @@ Every turn must carry each element below whenever the journal holds it.
 | A7 | Model-facing tool result | `resultDetails.output[]` where `isText`, or `toolSpecificData.result` for a subagent call | `📦 Tool result (N lines)` collapsible | `**Output:** not persisted as a separate resource (returned inline).` |
 | A8 | Persisted output bodies | `chat-session-resources/<toolCallId>/` | `**Persisted output:**` line + one `📦 Output body` collapsible per resource | omitted - the store rotates, so absence is normal and is covered by the Recorded Output Limitation note |
 | A9 | Remaining tool payload | `toolSpecificData` (non-terminal, non-todoList) | `⚙️ Tool details` JSON collapsible | n/a |
-| A10 | Unconsumed tool result structure | complete `resultDetails` envelope after readable input/text output fields are removed | `📦 Tool result details` redacted, clipped JSON collapsible | omitted when no remainder exists |
+| A10 | Unconsumed tool result structure | complete `resultDetails` envelope after readable input/text output fields are removed | `📦 Tool result details` redacted JSON collapsible (over 300 lines and 15 KiB: 10-line preview plus companion) | omitted when no remainder exists |
 | A11 | Files changed | `textEditGroup.uri` + create/edit tool URIs, optionally enriched by transcript V4A patches matched on `toolCallId` | three places: inline `> 📄 Edited <path>` marker at the point of edit, per-turn linked `📄 Files touched (n)` digest with operation counts and collapsible diffs, and the session-level `## Files Modified` roll-up | paths remain visible and counts say unavailable when patch evidence is absent; digest omitted only when no file is known |
 | A12 | Todo state | `toolSpecificData.kind === 'todoList'` | `🗒️ Todo list at this turn (n)` with `[x]` / `[~]` / `[ ]` | omitted |
 | A13 | Cost and timing | `promptTokens`, `completionTokens`, `copilotCredits`, `elapsedMs`, `promptTokenDetails` | `ℹ️ Turn info` table + `<sub>` cost footer; credits always 2dp | zeros or `n/a`, never blank |
@@ -640,9 +705,38 @@ a self-referential transcript quotes these markers in both fenced tool results a
 pastes. Catches stage C regressions (escaping, placement, mislabeling, dropped prose); misses upstream
 correctness (garbage in, faithfully-rendered garbage out).
 
-**CLI mapping.** `--verify <sessionId>` runs Layers A/B (source-side truth). `--verify <sessionId>
-<outputFile>` additionally runs Layer C against that file, and a normal export runs Layer C in-process
-on the content it just rendered. The output file is optional; the layers are complementary.
+**Layer D - recorded-content-vs-rendered-text (IMPLEMENTED, `buildLossAccount`, `src/verify/loss-account.ts`).** The first layer
+that does not share code with the parser or renderer. It reads the RAW replayed requests, picks out every piece of
+recorded content by its own small taxonomy (prompt, request error, assistant text, reasoning, tool input, tool output,
+terminal output, tool error, sub-agent prompt and result, and the text of any response kind it has no taxonomy for),
+undoes the Markdown wrapping (escapes, entities, blockquotes, whitespace) and asks whether that text is in the
+rendered Markdown, after applying the same best-effort redaction. Each piece is `present`, `partial` (only the start or
+end, or some of its lines, appear) or `absent`. Multi-line categories are scored per line, so a trimmed command echo or a
+clipped middle shows as "N of M lines". Order and exact-repeat checks apply only to source-distinct message text whose
+rendered sequence is preserved: Local prompts/prose across final replayed requests, and SDK prompts, reasoning, prose
+and tool intent within each `agentId` scope. Local reasoning snapshots, tool progress/results, notes and companion text
+still receive presence accounting but are not assumed to be separate inline messages for order or multiplicity.
+`--verify` prints the totals and never changes the exit code, except that `--verify --strict` fails when text is absent,
+eligible message text is out of order, or an identical eligible occurrence is missing. Partial pieces remain reported but
+are not failures by themselves.
+
+Layer D does not infer that adjacent text needs a separator: VS Code 1.141.2's version-matched
+[`chatModel.ts`](https://github.com/microsoft/vscode/blob/16507d91be0dc1ce4f94c04d4d0430210b8685d9/src/vs/workbench/contrib/chat/common/model/chatModel.ts)
+joins Markdown response parts with an empty separator. Persisted records do not retain enough provenance to decide
+whether any particular boundary needs a separator. The check also cannot see non-text content such as images or opaque
+data, and a distinct block whose text is a prefix of another remains ambiguous. Treat `absent` as proof of loss and
+`present` as necessary, not sufficient. Real-data baseline for the Local export, before the companion rule (82 journals,
+26,258 pieces on one development machine): assistant text and reasoning 100% present; 54 absent (request-error messages
+30, warnings 1, a few single huge output lines) and 141 partial (clipped tool and terminal output and 9 prompts). After
+the rule at its first 100-line setting and again at 300 lines AND 15 KiB (83 journals, 26,255 pieces; same result both
+times): 50 absent (request errors 30, `confirmation` text 13, "Healed error" tool errors 3, tool inputs 3, warning 1) and
+43 partial (tool inputs whose command echo is shown differently). The committed golden session shows two known absent
+pieces, the text of a `confirmation` response item that `IGNORED_RESPONSE_KINDS` still drops by policy.
+
+**CLI mapping.** `--verify <sessionId>` runs Layers A/B (source-side truth) and Layer D against the Markdown this
+build would write. `--verify <sessionId> <outputFile>` additionally runs Layer C against that file and runs Layer D against
+it too, and a normal export runs Layer C in-process on the content it just rendered. The output file is optional; the
+layers are complementary.
 
 **Driftless vs stale Layer C.** Layer C must check the rendered file that corresponds to the *current*
 journal snapshot. The export's in-process self-check is driftless (same parse produced both the file

@@ -578,6 +578,13 @@ is intentionally called out because official source names it while the current j
 serializes ordinary Markdown to a kind-less value object. That is an observed persistence detail,
 not a promise that the wrapper can never appear.
 
+**Version-matched source evidence:** VS Code 1.141.2's
+[`chatModel.ts`](https://github.com/microsoft/vscode/blob/16507d91be0dc1ce4f94c04d4d0430210b8685d9/src/vs/workbench/contrib/chat/common/model/chatModel.ts)
+concatenates Markdown response parts without inserting a separator. Therefore, adjacent persisted
+text records do not by themselves prove that Markdown was lost or that a separator belongs between
+them. Layer D checks text content and ordering, but does not guess separator intent from record
+boundaries.
+
 ### Current persisted kinds not observed here
 
 Current VS Code source permits these additional named kinds in a serialized response:
