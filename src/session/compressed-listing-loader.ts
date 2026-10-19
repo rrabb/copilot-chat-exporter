@@ -22,7 +22,7 @@ export function createListingCompressionLoader (codec: ReportCompression, decode
   const target = document.getElementById('compressed-content');
   const payload = document.getElementById('report-payload');
   const fromBase64 = text => {
-    const packed = text;
+    const packed = text.replace(/\s/g,'');
     return typeof Uint8Array.fromBase64 === 'function'
       ? Uint8Array.fromBase64(packed) : Uint8Array.from(atob(packed),character=>character.charCodeAt(0));
   };
@@ -72,6 +72,23 @@ CONTROLLER
       if(decoded.byteLength !== expected) throw new Error('The decompressed byte count does not match this report.');
 INTEGRITY
       const html = new TextDecoder('utf-8',{fatal:true}).decode(decoded);
+      if(/<script[\s/>]/i.test(html)) throw new Error('Compressed evidence must not contain script elements.');
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      const validate = root => {
+        for(const element of root.querySelectorAll('*')) {
+          if(element.localName === 'script') throw new Error('Compressed evidence must not contain script elements.');
+          for(const attribute of element.attributes) {
+            if(/^on/i.test(attribute.localName)) throw new Error('Compressed evidence must not contain event-handler attributes.');
+            if(/^(href|src|action|formaction|poster|background|data|cite|longdesc|usemap|profile|codebase|manifest)$/i.test(attribute.localName)
+              && /^javascript:/i.test(attribute.value.replace(/[\u0000-\u0020\u007f-\u009f]/g,'')))
+              throw new Error('Compressed evidence must not contain javascript: URLs.');
+          }
+          if(element.localName === 'template') validate(element.content);
+        }
+      };
+      validate(template.content);
+      template.content.replaceChildren();
       target.innerHTML = html;
       payload.remove();
       unqueue();

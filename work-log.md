@@ -2,6 +2,8 @@
 
 ## Current status
 
+October 19 report update: **task #35 and its optional gzip/Brotli follow-up are done**. The user authorized four separate commits: phase-one search/tooltips (`e058cad`), gzip `--compressed` (`29dd23a`), Brotli/generator/assets/notices (`e1d874b`), and re-save hardening/generated verification (this completion commit). The report work is no longer held for staging. The October 17 snapshot below remains historical context for other workstreams; this update and the report rows supersede its earlier report-only uncommitted status. No push was requested.
+
 Snapshot: October 17, 2026 (EDT), at the user-approved four-commit checkpoint. This section, the [numbered backlog](#numbered-todo-and-backlog), [priorities](#prioritized-next-items), and [next action](#next-action) are authoritative. Dated implementation notes below retain historical plans and measurements; their older pending/deferred statements do not override these sections.
 
 SDK Markdown export, nested sub-agent conversations, SDK usage attribution in exports/listings, the approved Local text-fidelity fixes, companion tool text, and source-aware Layer D checks are implemented and committed. The latest full shared-worktree verification passed both typechecks, **379 tests**, the golden digest/render (1,024 normalized lines), and build. Isolated staged snapshots also passed: 367 tests for commit 1 and 373 for commit 2, each with both typechecks, golden and build, without the held report changes. The fidelity-policy flags and comprehensive omission/metadata policy remain deferred, not complete. There is no losslessness claim.
@@ -14,19 +16,21 @@ Read-only real-data validation used 83 verified Local journals and 25 SDK main s
 | Root selection and safe CLI | #5, #6 | Implemented; acceptance and one selection gap remain | Explicit roots, chooser, safe defaults/current selection, Local UUID/prefix/path selectors, SDK UUID/backing/prefix/exact qualified keys. Local ID lookup still scans workspace storage only: use an exact path for the observed empty-window journal. No behavior change made in this reconciliation |
 | Console and basic HTML listing | #8, #17, #18, #19 | Complete | Compact console output (169 lines vs the 1,146-line baseline), offline HTML with filters, full-width source panels, ignored section, ignored-session controls, reports kept in `temp-tool-output` |
 | Detailed HTML report | #23, #25, #26, #29, #30 and earlier rounds | Complete | TOC with project line, project filter and chart, collapsed type-colored cards, ordered turns, usage chips, family links, consolidated Why/source with storage composition, Needs attention panel with filter buttons, evidence table without the constant Field column. 21 Edge checks per report, light/dark/narrow screenshots reviewed |
-| HTML listing report size reduction | #35 | Done | [Implementation and measurements](#html-listing-report-size-reduction-task-35): DOM-backed cached investigative search, occurrence-scoped evidence, supplemental-only metadata and redundant-title removal. Same-input reports are 19.53% / 19.60% smaller; compact records/browser rendering deferred |
+| HTML listing report size reduction | #35 | Done | [Implementation and measurements](#html-listing-report-size-reduction-task-35): DOM-backed cached investigative search, occurrence-scoped evidence, supplemental-only metadata and redundant-title removal, committed as `e058cad`. Same-input reports are 19.53% / 19.60% smaller; compact records/browser rendering deferred |
 | Documentation | #12, #24, #27, #28 | Approved export docs committed; final consistency review pending | October 17 reconciliation corrects current status and validation claims; export docs are in `ee22a4c`. Broader README/SPEC/CLI/help/skill consistency review and a design-guide sample/reference render remain |
 | SDK Markdown export | #9 | Complete for approved scope, committed | `58039ea`: main/peer chats selected through verified scopes, nested delegated conversations (up to 8 levels), text/system-prompt/skill/image companions, explicit left-out counts and staged writing |
 | Local fidelity and export policy | #15, #16 | Approved text fixes complete; policy work deferred | Request errors, warnings, confirmation/question-carousel text, tool errors and distinct tool inputs preserved; tool text overflow uses over 300 lines AND over 15 KiB. `--high-fidelity`, `--no-redact`, extra metadata and comprehensive omission/companion-redaction integration are not wired; the separate 96 KiB persisted-resource cap remains |
 | Source-aware verification and schema drift | #10, #11 | Implemented and committed | `58039ea` adds SDK census/strict drift checks, independent Local/SDK content accounting, source-safe order/repeat checks and regressions. Non-text content and ambiguous stream/message boundaries remain outside the guarantee; two unrelated Local strict exceptions remain |
 | SDK usage correlation | #20 | Complete for approved recorded-source policy, committed | `58039ea` and `7491042`: read-only per-call ledger/event fallback and running totals, source/completeness, per-turn/per-model/delegated usage in Markdown and listings. Missing usage stays unknown; credits are recorded nano-AIU / 1,000,000,000, never inferred from tokens |
-| Deferred/skipped work | #21, #35 follow-ups | Not active in this chat | Model icon skipped by user. Further HTML report-size work belongs to another chat; no implementation changes here |
+| Deferred/skipped work | #21, #35 follow-ups | #35 follow-up done | Model icon skipped by user. Explicit `--compression gzip|brotli`, gzip alias `--compressed`, re-save hardening and generated verification are complete in the ordered commit series. Batching and records/rendering remain deferred. See [follow-up](#follow-up-optional-compressed-detailed-report) |
 | Acceptance | #13 | Automated/export corpus checks passed with explicit exceptions; final acceptance open | Latest full verify/build passed. Interactive terminal acceptance and final cross-surface/manual review remain; the empty-window selector gap is recorded, not fixed |
-| Repository state | #31, #32 | Approved checkpoint complete with this log commit; report work held | Export/code `58039ea`, listing `7491042`, docs `ee22a4c`, followed by this log commit. After this checkpoint, 10 report-owner paths remain unstaged (8 tracked modifications, 2 untracked); no push. Graph was last re-indexed October 14 and is not current for later modules |
+| Repository state | #31, #32 | Approved checkpoint and authorized report commit series complete | Earlier export/code `58039ea`, listing `7491042`, docs `ee22a4c` and log `d67ee94` are followed by the four authorized report commits. Generator/assets/notices are included, not left untracked. No push. Graph was last re-indexed October 14 and is not current for later modules |
 
 The prioritized next items are in "Prioritized next items" below.
 
 ## Next action
+
+October 19 report directive: task #35 is complete in the four authorized commits. Do not restart the deferred records/renderer redesign or batching. Earlier report-owner staging restrictions below describe the October 17 checkpoint and do not override this authorization.
 
 The user approved groups 1-4 of the October 17 proposal; they are checkpointed as export code/tests, listing usage/tests, related documentation, and this work log. Shared renderer/docs hunks were separated and staged snapshots verified independently. The other chat's HTML search/report-size implementation, tests and documentation remain unstaged for owner coordination; do not stage the entire worktree.
 
@@ -289,7 +293,7 @@ Validation: `npm run verify` passed production/test typechecks, 318 tests and un
 
 Private, Git-ignored evidence: [results analysis](temp-tool-output/html-size-audit-261014/phase1-analysis.md), [comparison JSON](temp-tool-output/html-size-audit-261014/phase1-comparison.json), [browser results](temp-tool-output/html-size-audit-261014/phase1-browser-validation.json), [verification log](temp-tool-output/html-size-audit-261014/phase1-final-verify.txt), [build log](temp-tool-output/html-size-audit-261014/phase1-build.txt), [final normal report](temp-tool-output/html-size-audit-261014/phase1-after-final-normal.html) and [final show-ignored report](temp-tool-output/html-size-audit-261014/phase1-after-final-ignored.html). The folder also contains the preserved snapshot, before/intermediate reports, four exact audit JSON files and reproducible capture/audit/comparison/browser-check scripts.
 
-**Deferred experiment, not an expansion of this completed phase:** store compact evidence records and use one reusable browser evidence-table renderer. The nested table is not inherently a blocker, but template reuse alone does not reduce DOM nodes; lazy rendering or virtualization does. Prototype a report-level shared-artifact catalog and deduplicated records, search those records independently of open panels, render details on demand, then consider embedded compressed JSON. Compare plain compact JSON before adding compression. The user previously favored a compact JavaScript-required report with an optional conventional HTML archive, but that is not the current output contract and requires separate implementation/acceptance. Preserve exact paths, workspace attribution, diagnostics, table navigation, accessibility, offline CSP, copy behavior and clear no-JavaScript/failure behavior. Measure delivered bytes, startup/decompression time, query latency, peak memory and expanded DOM, not just a compressed payload. No external library was added in phase one.
+**Deferred experiment, not an expansion of this completed phase:** store compact evidence records and use one reusable browser evidence-table renderer. The nested table is not inherently a blocker, but template reuse alone does not reduce DOM nodes; lazy rendering or virtualization does. Prototype a report-level shared-artifact catalog and deduplicated records, search those records independently of open panels, render details on demand, then consider embedded compressed JSON. Compare plain compact JSON before adding compression. This redesign remains deferred; the optional `--compressed` follow-up wraps conventional HTML instead. Preserve exact paths, workspace attribution, diagnostics, table navigation, accessibility, offline CSP, copy behavior and clear no-JavaScript/failure behavior. Measure delivered bytes, startup/decompression time, query latency, peak memory and expanded DOM, not just a compressed payload. No external library was added in phase one.
 
 #### Agreed direction and scope
 
@@ -364,7 +368,7 @@ Use the narrowest existing tests after each substantive slice, then run `npm run
 
 #### Acceptance criteria
 
-- A standalone local HTML file searches without network access or extra fetchable assets. No-JavaScript reading still exposes the detailed evidence.
+- The default conventional standalone HTML searches without network access or extra fetchable assets, and no-JavaScript reading still exposes detailed evidence. The optional `--compressed` follow-up has a separate JS-required detailed-evidence contract below; it does not replace the default or introduce the deferred records/renderer redesign.
 - Required fixtures cover title aliases, exact session/occurrence IDs, full prompt text beyond previews, changed-file/artifact paths, workspace/source references, model/effort/context values and diagnostic evidence. Newly searchable artifact/diagnostic terms are tested explicitly.
 - Grouped and occurrence searches retain correct identities and workspace/backing attribution. Multiword queries can match different approved content fragments. Tests include negative cases for unrelated workspaces, relationship labels and generic disclaimers.
 - Empty queries, case/whitespace normalization, missing supplemental attributes, unknown metadata, ignored/limited records, combined numeric/date/type/status/project/model/chip filters, counts, sorting, reset and deep-link reveal behave correctly.
@@ -383,9 +387,161 @@ Use the narrowest existing tests after each substantive slice, then run `npm run
 | Simplify Why/source tables, wrappers and repeated classes | Largest later presentation opportunity; do not remove identifying evidence for a byte target |
 | Comprehensive structured model and client rendering | Defer unless targeted work leaves justified size/startup problems; replacing duplicate HTML with duplicate JSON is not a solution |
 | CSS/whitespace minification | Low payoff in this audit |
-| Gzip/Brotli distribution | Separate optional packaging optimization; does not reduce expanded element count and is not a directly openable HTML replacement |
+| Gzip/Brotli distribution | Implemented explicit `--compression gzip|brotli`, with `--compressed` retained as the gzip alias: see [compressed follow-up](#follow-up-optional-compressed-detailed-report). Opens directly with supported browser JS; raw `.gz`/`.br` files are different. Conventional HTML remains the default. Expanded DOM is unchanged. |
 
 Ask about new material ambiguities rather than silently changing search scope or evidence representation. Original #35 is implemented and verified above. Numeric size/latency targets and the detailed design/acceptance of the deferred client-rendered architecture remain undecided.
+
+#### Follow-up: optional compressed detailed report
+
+Current status: the original gzip-first plan below was completed, then the user approved the [production Brotli extension](#production-brotli-extension) after quality, compatibility, memory, corruption and packaging checks. Historical benchmark-only statements below apply to the first phase, not the current supported flags.
+
+Status (October 19 completion): done in the authorized ordered commit series. Conventional HTML remains the default; original #35 is retained. The requirements and sequence below record the approved plan; dated implementation results follow them.
+
+Benchmarks and the private reconstruction fixture are in `temp-tool-output/report-performance-261014/` (`REPORT.md`). Do not commit that folder.
+
+Decisions (user, this chat):
+
+- Flag: `--compressed`. Valid only with `--detailed`; reject it without `--detailed` and with `--no-html`. Conventional HTML stays the default.
+- Encoding: gzip with native `DecompressionStream`; no CDN or dependency, fully offline.
+- Brotli: separate benchmark only, not shipped. Measure decoder size, decode time and CSP needs before any decision.
+- Do not start the records/renderer redesign.
+
+Measured on the 405-occurrence snapshot (current report 17,751,839 B):
+
+| Encoding | Payload after base64 | Notes |
+| --- | ---: | --- |
+| gzip level 9 | 2,592,164 B | Native decode about 76 ms; prototype ready time 1,244 ms vs 1,012 ms same-batch control |
+| deflate-raw level 9 | 2,592,140 B | Header saving is negligible |
+| Brotli quality 6 | 808,452 B | Raw payload about 3.2x smaller than gzip |
+| Brotli quality 11, window 24 | 652,892 B | About 4x smaller than gzip, before adding a decoder (estimated 70-150 KB, unmeasured) |
+
+Chrome 155 `DecompressionStream` supports gzip, deflate and deflate-raw only; brotli and zstd are rejected.
+
+Requirements from review:
+
+| Area | Requirement | Reason |
+| --- | --- | --- |
+| No iframe | Insert the decompressed cards into the main document. Do not use `iframe` or `srcdoc`. | The benchmark prototype used an iframe: the outer URL hash did not drive inner deep links, and print, clipboard and accessibility were not validated. Same-document insertion keeps the hash, browser Find, print and copy working. |
+| Single renderer | Generate the conventional HTML, then compress only its card section. | The two outputs cannot drift apart; there is no second rendering path to test. |
+| Shell first | Keep the complete Session TOC (including its expandable contents) and everything above it uncompressed: header, generation metadata, navigation, privacy notice, count cards, graph sections (Backing status, Chat types, Answering models), and Chats per project (including its expandable full list). Preserve their order and presentation. Paint this complete shell before starting card decompression, with a separate "Loading N conversations" state. | The overview and TOC must be available without waiting for chat cards. Render their initial counts, chart data and index entries during generation; do not rebuild them from decompressed cards. Only card-dependent actions need to wait. |
+| Shell interactions | Allow static disclosures, including the TOC and full project list, to expand while cards load. Queue the latest card-dependent filter/search state and session-link target until the cards and controller are ready; clearly indicate pending actions. | The shell is useful immediately, but a project/model filter or link to a session cannot finish before its cards exist. Do not describe the entire overview as unavailable during loading. |
+| Search queue | While loading, keep only the most recent query (not every keystroke). After insertion, build the search index, run that query, show a ready state and then apply the URL hash. | Avoids replaying stale queries and reports when search is ready. |
+| Loader comparison | Compare `innerHTML` and `Range.createContextualFragment`. Exclude `document.write`; batching is a deferred low-priority evaluation, not an implementation requirement. | Do not add card-offset tables or sentinels without a demonstrated benefit. Safe batching needs complete fragments and their correct parent containers. |
+| Timing | Measure shell first paint and full ready separately, with long tasks, peak memory and a same-batch control run of the conventional report. | Shell-first loading can paint sooner while becoming fully ready later; a single ready time hides that. |
+| Payload check | Fully consume native gzip decoding (which validates CRC32 and ISIZE), then verify the expected UTF-8 byte count before inserting any evidence. No mandatory runtime SHA-256 or Web Crypto dependency. | Detects accidental corruption without partial evidence or a redundant hash dependency. Embedded hashes would not authenticate the report. Keep SHA-256 for external fixture comparisons. |
+| Recoverable failure | When JS is off, `DecompressionStream` is unavailable or the payload check fails, show a clear message that says to regenerate the report without `--compressed`. | The compressed file has no usable fallback for archival readers. |
+| CSP | Hash the loader and controller scripts; no `unsafe-eval`. Inserted HTML must not contain executable scripts. | Keeps the current security policy. |
+| Repository tests | Add tests to the repository suite, not only the private benchmark harness. | The private folder is ignored and cannot guard regressions. |
+
+Implementation sequence:
+
+1. Compare simple loaders against the fixture and benchmark a bundled Brotli decoder separately. Record complete-shell readiness as well as first contentful paint and full ready. Do not add numeric shipping thresholds or an experimental flag (user dropped that proposal).
+2. Add `--compressed` argument validation.
+3. Preserve the complete TOC and all preceding overview sections as the uncompressed shell; wrap the conventional card section with the chosen loader, including the payload check and failure message.
+4. Defer controller initialization until insertion, then add the search queue, ready state and hash handling.
+5. Add repository tests and run the acceptance checks below.
+6. Update the README, CHANGELOG and CLI help.
+
+Deferred low-priority todo: evaluate whether batched insertion offers a worthwhile responsiveness improvement over the simple loader. Only if justified, define complete card/section boundaries and container handling; do not split arbitrary HTML strings or add offset metadata now.
+
+Acceptance and report:
+
+- Reuse the JSONL fixture and the 19 synthetic checks. Copy and prompt values must be byte-identical to the conventional report.
+- Hold decompression pending and verify that the header, count cards, all overview graphs, Chats per project and complete Session TOC are already rendered with the conventional report's initial values. Verify that static disclosures expand, and that card-dependent actions show a pending state and are applied after readiness.
+- Also check:
+  - cold-load deep links
+  - browser Find after ready
+  - print
+  - no-JS, unsupported and corrupt-payload messages
+  - CSP
+  - peak memory
+- Report bytes, shell first paint, full ready (5 trials, median and range, same-batch control), long tasks, DOM nodes and regressions.
+- The old 2.59 MB wrapper compressed the whole report. Remeasure final bytes with the overview and complete TOC left uncompressed. Same-document insertion enables preservation of navigation/copy/print but does not prove it; acceptance must test them.
+
+Known limits:
+
+- DOM size is unchanged, so full ready time will probably be slower than the conventional report.
+- Cards cannot be found with browser Find, or opened from a deep link, until loading finishes.
+- Without JavaScript only the shell is visible.
+- A compressed report tracked in Git has no readable diffs.
+- When reports are served over HTTP, server-side gzip already gives most of this saving; in-file compression mainly helps file shares, attachments and storage.
+
+##### Follow-up implementation and verification (October 19)
+
+The CLI accepts detailed-only `--compressed` and rejects `--no-html` or non-listing combinations. `compressDetailedListingHtml` is exported for library callers and packages the conventional renderer output. Header, counts, overview graphs, project chart, Needs attention, complete TOC, filters and comparison controls remain uncompressed. The grouped section and all subsequent sections through the footer are one gzip payload, not a records rewrite. The loader inserts once into the main document with `innerHTML`; no iframe, batching, external assets or production dependency was added.
+
+Paint Timing gates decoding after first contentful paint where supported; the fallback uses two animation frames and a timer. Complete native gzip validation, expected byte count and fatal UTF-8 decoding precede insertion. Pending filter values, project/attention/chip choices, view, density, sort and show-all intent survive initialization. Hash navigation retains its established precedence of resetting filters and revealing the target. Failures show an alert with regeneration instructions and disable enhancement controls. Default conventional no-JS evidence reading is unchanged.
+
+Private evidence: [measurement report](temp-tool-output/report-compression-261019/REPORT.md), [Chrome results](temp-tool-output/report-compression-261019/results-chrome.json), [Edge results](temp-tool-output/report-compression-261019/results-edge.json), [benchmark script](temp-tool-output/report-compression-261019/measure.mjs), [production compressed report](temp-tool-output/report-compression-261019/compressed.html), [current conventional report](temp-tool-output/report-compression-261019/current.html), [verification log](temp-tool-output/report-compression-261019/verify.log) and [build log](temp-tool-output/report-compression-261019/build.log). Reuses the private JSONL snapshot; captured session content and isolated benchmark dependencies must not be committed. The later production extension intentionally adds public generated decoder assets and a pinned build dependency.
+
+| Variant | File bytes | Chrome full-ready median (range), ms | Sampled peak JS heap median |
+| --- | ---: | ---: | ---: |
+| Conventional default | 17,748,324 | 984 (950-1,067) | 13.9 MiB |
+| Gzip, `innerHTML` (shipped option) | 2,818,640 | 938 (902-1,129) | 51.4 MiB |
+| Gzip, contextual fragment (benchmark only) | 2,818,944 (instrumented) | 969 (908-1,033) | 51.3 MiB |
+| Brotli Q11/window 24 with bundled WASM decoder (benchmark only) | 1,182,732 (instrumented) | 918 (877-1,021) | 61.8 MiB, excludes WASM memory |
+
+Five rotated trials per variant in Chrome 155.0.8059.80 and Edge 155.0.4283.62, fresh context per trial, reused browser/filesystem cache, 1440x1000, Intel Ultra 7 366H, Node 24.18.0. Full-ready is a common two-animation-frame rendering opportunity after controller initialization, not a physical-presentation guarantee. Production bytes exclude timing instrumentation. Gzip saves 84.12% against the same-input current conventional report; no DOM reduction (about 591,800 nodes). Chrome FCP median improved from 220 to 172 ms; Edge full-ready medians were 922 ms conventional and 909 ms gzip. Timing ranges overlap: do not claim a general speedup. The median longest task increased from about 272 to 579 ms in Chrome, so the early shell does not prevent later main-thread blocking. Sampled heap is not total process memory or an exact peak.
+
+`innerHTML` and fragment results overlap and reverse slightly in Edge; retain the simpler `innerHTML`. The actual bundled Brotli decoder (`brotli-dec-wasm@2.3.2`, MIT OR Apache-2.0) adds 208,439 wasm bytes and 9,579 JS bytes, with base64 increasing the embedded WASM to 277,920 bytes. The complete Brotli file is about 2.38x smaller than gzip, not the raw-payload 4x estimate. Q11 encoding took about 10.9 seconds. It required `wasm-unsafe-eval` in its private CSP; none of this decoder or allowance ships.
+
+Both browsers passed 19 exact synthetic search cases, held-decompression shell/TOC checks, latest queued search, queued project/link handling, cold hash reveal, native-base64 fallback, comparison, exact equality of 6,890 copy values and 1,994 prompt blocks, copy-handler payload checks, browser Find approximation over visible card text, PDF generation and no-JS/unsupported/corrupt/truncated/checksum/byte-count failures without partial evidence. No external requests or normal-load CSP/script errors. Clipboard checks stubbed the OS clipboard; actual Ctrl+F UI and Firefox remain manual/unverified, rather than being inferred from `window.find`.
+
+Repository validation: `npm run verify` passed both typechecks, all 388 tests and unchanged golden digest/render; `npm run build` passed. All 15 CLI integration tests also passed against `dist/cli.js` ([log](temp-tool-output/report-compression-261019/bundled-cli.log)). Portable compression tests include exact nonempty/escaped-HTML round trips, unchanged static overview/TOC markup, paint scheduling, UTF-8, checksum/truncation/byte-count failures and pending controller state. A brittle pre-existing controller-source assertion was updated for pending-attention initialization and supplemented with a behavioral test. The async loader test now waits for completion with a bounded wall-clock timeout instead of racing 500 event-loop turns. The three task-created browser profiles were removed; evidence and isolated decoder files remain for reproduction. No numeric shipping threshold or experimental flag was introduced. Batched insertion remains deferred low priority, despite the measured long task; records/renderer work remains deferred.
+
+##### Follow-up review: verification failures and settled heap
+
+Direct diff review confirms that the two earlier failures were corrected in tests, not by fixing two production bugs. The attention test had asserted the exact old combined variable declaration; only that assertion changed to pending-attention initialization, preserving predicate/Reset/binding checks. The async loader fixture switched from a racy 500-event-loop-turn wait to a bounded 10-second completion wait without relaxing exact-content, initialization, corruption or no-partial-insertion assertions.
+
+Review also found the new queued-attention behavioral test nested inside another test. It is now top-level, with an additional conventional attention-button test for clearing existing filters, matching the intended condition and resetting to all candidates. Private mutation checks reject three actual regressions: missing pending-attention initialization, missing attention filtering and Reset failing to clear attention. No production changes were needed.
+
+Three fresh Chrome contexts per uninstrumented production variant, at 1440x1000, measured heap about two seconds after readiness and immediately after CDP `HeapProfiler.collectGarbage`. Conventional median settled JS heap was 7.551 MiB; compressed was 7.640 MiB, a 92,956-byte difference (about 91 KiB). Before-GC medians were already 7.592/7.645 MiB: the previous roughly 51 MiB compressed startup sample is transient in this experiment, not a persistent decoded-string retention. All 283 cards and report search remained available after GC. This does not measure total process/native DOM memory or eliminate the startup allocation and long-task cost. No loader memory rewrite is justified by these results.
+
+Saved [heap measurement script](temp-tool-output/report-compression-261019/retained-heap.mjs), [raw heap results](temp-tool-output/report-compression-261019/retained-heap.json), [mutation script](temp-tool-output/report-compression-261019/review-mutations.mjs), [mutation results](temp-tool-output/report-compression-261019/review-mutations.json) and updated [analysis](temp-tool-output/report-compression-261019/REPORT.md). Full [review verification](temp-tool-output/report-compression-261019/review-verify.log) passed both typechecks, 389 tests and unchanged golden output. The owned browser profile and temporary mutation modules were removed. Nothing staged or committed.
+
+##### Production Brotli extension
+
+Added `--compression gzip|brotli`, preserving `--compressed` as a gzip alias and conventional HTML as the default. An explicit gzip selector agrees with the alias; an explicit Brotli selector conflicts with it. Both codecs require detailed HTML listing. Invalid/duplicate values and incompatible flags fail explicitly. Library callers use `compressDetailedListingHtml(html, codec = 'gzip')`.
+
+Quality 8/window 24 is fixed after comparing levels 4/6/8/9/10/11 across empty, one-occurrence, ten-occurrence and full captured payloads. The full evidence tail compressed to 537,841 bytes in 225 ms at quality 8 versus 473,912 bytes in 11,085 ms at quality 11. Final complete report: conventional 17,748,324 bytes, gzip 2,818,865 bytes, Brotli 1,271,385 bytes. Brotli is about 55% smaller than gzip here, but its fixed decoder overhead makes small reports larger: a ten-occurrence report was about 167 KB gzip versus 412 KB Brotli. No automatic codec choice was introduced.
+
+Pinned `brotli-dec-wasm@2.3.2` is a development dependency only. [Asset generation](scripts/generate-brotli.mjs) verifies the pinned WASM SHA-256 and bundles the required API into [generated assets](src/generated/brotli-decoder.ts); build regenerates them. Reports embed the package MIT license and [upstream notices](docs/BROTLI-NOTICES.txt). Only Brotli adds CSP `wasm-unsafe-eval`, not general JavaScript evaluation. No runtime decoder dependency, CDN, fetch, iframe, batching or records redesign was added.
+
+The codecs share the loader lifecycle, shell, queued interactions, insertion and controller. Brotli uses the streaming API to require final success and complete input consumption, rejects truncation/trailing bytes and excess output, then checks byte count, separate CRC32 and strict UTF-8 before insertion. CRC32 is accidental-corruption detection, not authenticity. Decoder resources are freed and WASM state is scoped to decoding.
+
+Five fresh-context trials per codec in Chrome/Edge: observed-ready medians were 926/979 ms (Chrome gzip/Brotli) and 913/944 ms (Edge). These are polling-observed controller readiness, not the earlier post-render metric; no speedup is claimed. Two seconds after readiness and forced GC, settled JS heap was about 7.63-7.64 MiB and no live WASM memory remained in any trial. Peak WASM/native DOM/process memory is not established.
+
+Chrome/Edge passed the 19 exact synthetic searches, complete held shell, queued query/project/link, cold hash, exact copy/prompt content, stubbed clipboard, comparison, PDF, no-JS and base64 fallback. All tested malformed/truncated/trailing/length/CRC/UTF-8/WASM/CSP failures inserted no cards. No HTTP(S) requests or uncaught script exceptions were observed. Firefox 158 passed a smaller independent compatibility/failure suite; actual Ctrl+F UI, real clipboard permissions and low-end devices remain unverified.
+
+`npm run verify`: both typechecks, 394 tests and unchanged golden output. Build and 17 bundled CLI tests passed. An extracted `npm pack` library generated byte-identical Brotli HTML while a module hook forbade bare runtime imports. The audit reports an existing low-severity esbuild dev-server advisory, not a new decoder advisory; it was not upgraded incidentally.
+
+Private [analysis and tradeoffs](temp-tool-output/report-compression-261019/REPORT.md), [Chrome results](temp-tool-output/report-compression-261019/brotli-production-chrome.json), [Edge results](temp-tool-output/report-compression-261019/brotli-production-edge.json), [Firefox results](temp-tool-output/report-compression-261019/brotli-firefox-checks.json), [quality measurements](temp-tool-output/report-compression-261019/brotli-levels.json), [verification](temp-tool-output/report-compression-261019/brotli-verify.log), [packed-package smoke check](temp-tool-output/report-compression-261019/brotli-pack-smoke.log) and [production Brotli example](temp-tool-output/report-compression-261019/production-brotli.html) preserve reproduction evidence. Nothing staged or committed.
+
+##### Compressed-report re-save hardening
+
+The nonce and ASCII protections were not present at the start of this follow-up. They are now implemented for both production codecs: a fresh 192-bit CSP nonce on every inline script, retained loader/controller hashes, minified single-line ASCII executable scripts, numeric-entity shell text, CSS Unicode escapes preserving disclosure arrows, and whitespace-normalized payload/WASM base64. Evidence containing script elements is rejected at generation and before `innerHTML` insertion. No script-evaluation insertion path, iframe or CSP bypass was added.
+
+Both codecs passed original/CRLF/trailing-trim/Windows-1252/76-column-base64/combined re-saves, changed-script-hash nonce fallback, native-base64 fallback, corrupt payloads, script-containing payload rejection and actual-CSP negative controls in Chrome 155 and Edge 155 (23 tests each including the parent). Successful format-only re-saves preserve Unicode evidence, TOC text, disclosure glyphs and report search, with zero CSP violations and uncaught script errors. Firefox 158 passed a separate 18-case BiDi check for both codecs, including format-only re-saves, nonce fallback, corrupt payload and negative CSP controls; this is not the complete Chromium suite.
+
+The CLI compares complete Brotli and gzip output sizes and warns when Brotli is larger, retaining the explicitly selected codec. Library calls stay silent. `verify:generated`, now first in `verify`, checks the installed decoder version, pinned WASM hash and regenerated assets without rewriting them. Negative tests detect stale loader code, altered embedded WASM and a mismatched expected WASM hash. The generator is documented and reproducibility-checked, but remains untracked/uncommitted with the generated assets and notices; nothing has been staged or committed.
+
+Final verification passed both typechecks, 420 tests with no skips, unchanged golden output, build, 17 bundled CLI tests and packed-library smoke with bare runtime imports forbidden. Packed/source output matches after normalizing only the per-report nonce. One full verification attempt exposed a transient Windows `EBUSY` reading the browser debugger-port file; bounded startup retries were corrected, not acceptance expectations. Private command retries also corrected an absolute CLI-path requirement and PowerShell's default UTF-16 JSON redirection; these were harness/command issues, not production fixes.
+
+The final captured report is 17,748,324 bytes conventional, 2,820,285 gzip and 1,272,571 Brotli; both compressed outputs are ASCII-only and decompress to exact evidence. Large Chrome acceptance still passes held shell/queued interactions, deep links, exact prompts/copy, comparison, PDF, 19 synthetic searches and failure handling, with no external requests or uncaught errors. Five trials retained about 7.63/7.65 MiB settled JS heap after two seconds and forced GC, with zero live WASM memory. These runs overlapped independent Firefox acceptance and are not a controlled timing comparison.
+
+Evidence: [full verify](temp-tool-output/report-compression-261019/resave-verify.log), [Chrome re-saves](temp-tool-output/report-compression-261019/resave-chrome.log), [Edge re-saves](temp-tool-output/report-compression-261019/resave-edge.log), [Firefox](temp-tool-output/report-compression-261019/resave-firefox.json), [final sizes](temp-tool-output/report-compression-261019/resave-final-bytes.json), [large Chrome acceptance](temp-tool-output/report-compression-261019/brotli-production-resave-chrome.json), [build](temp-tool-output/report-compression-261019/resave-build.log) and [bundled CLI](temp-tool-output/report-compression-261019/resave-bundled-cli.log).
+
+##### Final authorized commit and verification pass
+
+Completed the four requested commits in order: `e058cad` phase-one search/tooltips, `29dd23a` optional gzip, `e1d874b` explicit Brotli plus generator/assets/notices, then this hardening/generated-verification completion. The first three isolated snapshots passed both typechecks, 380/387/394 tests respectively and builds. The nested snapshot's golden render has directory-relative fixture-link differences; no committed golden expectations were changed. The final repository's full `verify` passed both typechecks, 430 tests with no skips, generated-asset checks and the unchanged 1,024-line golden baseline.
+
+Replaced the random nonce with base64 SHA-256 of `compressed-listing-v1\0`, codec, NUL, complete conventional HTML, NUL and executable loader. Identical input, codec and toolchain now produce byte-identical compressed files, including packed-library output; timestamps/inventory changes still change output. The nonce is predictable, so it is not a secret or web-application injection boundary. This is acceptable for self-contained offline reports whose CSP is already editable with the file; it provides re-save allowlisting, not authenticity.
+
+Script detection now has two checks. Generation and decoding reject literal case-insensitive `<script[\s/>]`. Escaped prompts containing `&lt;script&gt;` remain readable. Before live insertion, the browser parses evidence in an inert template, checks every element and nested template content, and rejects `script` elements, `on*` attributes and javascript URLs in URL-bearing attributes after browser entity decoding and control/whitespace removal. Harmless `javascript:` text in `title`/`data-copy` stays intact. Tests cover literal script examples, image/SVG handlers, ordinary/entity/control-obfuscated javascript links and handlers in nested templates. Chromium browser tests passed 33 cases including parent in both Chrome and Edge, under actual CSP with no bypass. Invalid evidence inserts no cards and runs no handlers. This is a targeted guard, not a general-purpose sanitizer.
+
+Final captured file bytes: 17,748,324 conventional; 2,821,024 gzip; 1,273,322 Brotli. Five alternating fresh-context trials per codec in Chrome 155, without concurrent test/browser commands: gzip ready-time median **1,474.6 ms**, range **1,444.3-1,735.1 ms**; Brotli **1,407.2 ms**, range **1,371.7-1,455.9 ms**. These are polling-observed controller readiness (20 ms polling), not first paint or a speed guarantee. The extra inert-template validation adds parsing work; older pre-validation timings are not directly comparable. Settled JS heap remains near 7.7 MiB with no retained WASM memory after forced GC. Final build, 17 bundled CLI tests, 18 Firefox re-save cases and the packed-library smoke test passed; full-file equality was verified across separate source processes and the packed library without nonce normalization. Full methodology, individual trials and limitations are in the [measurement report](temp-tool-output/report-compression-261019/REPORT.md).
+
+Evidence: [final verification](temp-tool-output/report-compression-261019/commit-final-verify.log), [Edge validation](temp-tool-output/report-compression-261019/commit-final-edge.log), [Chrome trials/acceptance](temp-tool-output/report-compression-261019/brotli-production-deterministic-chrome.json), [deterministic exact-evidence checks](temp-tool-output/report-compression-261019/resave-final-check.mjs), [final sizes](temp-tool-output/report-compression-261019/resave-final-bytes.json), [phase-one snapshot checks](temp-tool-output/report-compression-261019/commit-a-verify.log), [gzip snapshot tests](temp-tool-output/report-compression-261019/commit-b-tests.log) and [Brotli snapshot tests](temp-tool-output/report-compression-261019/commit-c-tests.log). All private fixtures, measurements and assembly scripts remain ignored and are not committed.
 
 ### Approved source redesign implementation plan
 
@@ -993,7 +1149,3 @@ During validation a concurrent change added a terminology preference to `.github
 | Persistence/error boundary | Writer saves/byte-checks companions and staged Markdown before publication. Cleanup removes only exclusively created files and the attempt's empty assets folder, reports cleanup failures, and never deletes prior companions. It is not a power-loss-proof multi-file transaction; a crash may leave attempt artifacts. Planner owns link encoding, supported-content selection and policy application; the writer does not falsely claim that an arbitrary supplied plan is safely redacted or semantically complete. |
 
 The attached work-log snapshot was not edited. Documentation updates describe working writer/overwrite behavior separately from pending fidelity flags/companion renderers. Current graph tools remain unavailable; implementation reused known files with scoped source reads rather than claiming fresh graph coverage.
-
-Optional detailed report packaging: `--detailed --compressed` uses gzip level 9 with native `DecompressionStream`, no network, iframe or runtime dependency. Conventional HTML remains the default and retains detailed no-JS reading. The complete overview/TOC and controls remain static; decoding starts after first paint where supported. Cards use same-document `innerHTML`; pending filters, attention actions and links apply after initialization. Unsupported/corrupt output shows an explicit regeneration message. Compression reduces file bytes, not expanded DOM. See [the work log](work-log.md) for acceptance and measurement context.
-
-Brotli extension: `--detailed --compression gzip|brotli` selects a codec; `--compressed` stays a gzip alias and conflicts with explicit Brotli. Brotli quality 8/window 24 embeds the pinned build-only `brotli-dec-wasm@2.3.2` decoder, WASM, MIT license and upstream notices. Only Brotli permits CSP `wasm-unsafe-eval`; there is no general JavaScript eval or runtime npm dependency. The streaming decoder requires successful completion, full input consumption, expected output length, CRC32 and strict UTF-8. Checksums are not authentication. Fixed decoder overhead can make small reports larger; no automatic codec selection occurs. `scripts/generate-brotli.mjs` checks the pinned WASM hash and generates the assets; build regenerates them. Keep the generator, generated assets, notices and lockfile together.

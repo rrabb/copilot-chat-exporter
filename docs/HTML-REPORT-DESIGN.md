@@ -18,7 +18,7 @@ The reports help a person find a remembered chat, distinguish conversations from
 | One home for each detailed fact | Combine repeated titles; consolidate source/audit/artifact sections | Repetition makes differences harder to notice and increases report size |
 | Color has meaning | Match card borders/titles to type; separate status and warning tones | Help recognition without requiring every chip to be read |
 | Color is not the only signal | Pair colors with labels, icons and tooltips | Preserve meaning across themes and for users who cannot distinguish colors |
-| Read-only, offline and portable | Self-contained HTML, no automatically opened browser, native disclosures | Remains useful without JS; filters/copy are enhancements |
+| Read-only, offline and portable | Self-contained HTML, no automatically opened browser, native disclosures | Conventional reports remain fully readable without JS; optional compressed reports retain the static overview/TOC but require JS for detailed evidence |
 | No cleanup verdicts from size alone | Qualified removal impacts; explicit sharing and measurement limits | Large files and multiple references are not proof of safely removable data |
 
 ## Two report levels
@@ -29,6 +29,18 @@ The reports help a person find a remembered chat, distinguish conversations from
 | Detailed listing (`--detailed`) | TOC, filters/charts, collapsed conversation cards, ordered prompts, relationships and enriched evidence | Remembering a chat and investigating its content, identity and storage |
 
 The two reports share discovery and grouping, but not every presentation rule. In particular, compact UUID selectors belong to the basic/console listing; the detailed card's identity chips intentionally retain full identifiers. Detailed turn counts and SDK activity dates use rich scope evidence and may differ from compact inventory metrics.
+
+### Optional compressed detailed HTML
+
+`--detailed --compression gzip|brotli` packages the same detailed evidence rather than introducing another report level. `--compressed` remains a gzip alias; conventional HTML is the default. The complete TOC and all sections above it (header, metadata/navigation/privacy notice, count cards, overview graphs, Chats per project and Needs attention) remain static and keep their existing order. Filter controls also remain static. Native disclosures work during loading; a visible status explains pending filter/link actions. Card decoding starts after first paint where supported.
+
+The card section and subsequent sections are decoded once into the main document, never an iframe. Report search initializes afterward, using the same DOM-backed index; only the latest filter state is applied. Hash navigation retains its normal behavior of resetting filters and revealing its target. Browser Find cannot find card content until it is inserted. Decoding errors leave the shell with a clear regeneration message; no-JS reading of detailed evidence remains a reason to choose the conventional default.
+
+Gzip uses native browser decoding. Brotli embeds a pinned WASM decoder, base64 WASM and license notices, requiring CSP `wasm-unsafe-eval`. Both reuse the same lifecycle, insertion and search initialization. Brotli validates complete stream consumption, decoded byte count, CRC32 and strict UTF-8 before insertion; decoder resources are scoped to decoding, not retained by controller event handlers. It reduces distributed bytes, not DOM complexity, and adds fixed overhead for small reports.
+
+Both compressed encodings retain CSP hashes and add a content-derived nonce to all inline scripts. Identical conventional HTML, codec and toolchain produce byte-identical output. The predictable nonce is for offline format-edit resilience, not a secret or authentication. Executable scripts are ASCII-only minified single lines; shell Unicode uses HTML entities, except style raw text which requires CSS escapes to preserve disclosure glyphs. Base64 decoding strips whitespace from evidence and WASM. Repository browser tests exercise CRLF, trailing-whitespace trimming, Windows-1252 re-saves and 76-column base64 wrapping under actual CSP, plus nonce fallback and a negative CSP control. Corrupt payloads and evidence containing script elements, event-handler attributes or javascript URLs must insert no cards; escaped literal script examples still load. Evidence is validated using an inert template before live insertion, not evaluated. Arbitrary editor rewrites are not guaranteed safe. The CLI warns if explicitly selected Brotli is larger than gzip, but does not switch codecs.
+
+Generated loaders and decoder/WASM assets are reproducibility-checked by `verify:generated`, the first step of `verify`, against the pinned package version and WASM hash. It fails rather than rewriting stale or modified assets. Build regenerates them separately.
 
 ## Detailed page outline
 
@@ -402,7 +414,7 @@ This section is the checklist for another engineer or AI to rebuild the detailed
 | Link reveal | Any `#anchor` click resets filters, shows the grouped view, lifts the newest-25 limit for the target, opens every ancestor `details`, highlights the card briefly and focuses the target |
 | Comparison | At most two cards can be pinned; each shows a clone of the card's summary panels; a third pin is refused with a message |
 | Copy | Copy buttons carry the exact value in `data-copy`; failures are stated, never silent |
-| No JavaScript | All main cards and detailed evidence remain readable. Filters, sort, pinning and copy are unavailable. |
+| No JavaScript | Conventional cards/disclosures remain readable; compressed output retains only the overview/TOC with a regeneration notice. Filters, sort, pinning and copy are unavailable. |
 
 ### Chip catalog
 
@@ -465,7 +477,3 @@ Before changing the design, check the basic/detailed distinction, density at des
 - [detailed-listing-styles.ts](../src/session/detailed-listing-styles.ts) and [detailed-listing-controller.ts](../src/session/detailed-listing-controller.ts): themes, typography and interactions.
 
 Recorded design and validation history is in the [work log](../work-log.md). The local [reference archive index](../temp-tool-output/reference-archive-261013_1844/index.html) is an optional ignored comparison collection, not a shipped dependency.
-
-Optional detailed report packaging: `--detailed --compressed` uses gzip level 9 with native `DecompressionStream`, no network, iframe or runtime dependency. Conventional HTML remains the default and retains detailed no-JS reading. The complete overview/TOC and controls remain static; decoding starts after first paint where supported. Cards use same-document `innerHTML`; pending filters, attention actions and links apply after initialization. Unsupported/corrupt output shows an explicit regeneration message. Compression reduces file bytes, not expanded DOM. See [the work log](work-log.md) for acceptance and measurement context.
-
-Brotli extension: `--detailed --compression gzip|brotli` selects a codec; `--compressed` stays a gzip alias and conflicts with explicit Brotli. Brotli quality 8/window 24 embeds the pinned build-only `brotli-dec-wasm@2.3.2` decoder, WASM, MIT license and upstream notices. Only Brotli permits CSP `wasm-unsafe-eval`; there is no general JavaScript eval or runtime npm dependency. The streaming decoder requires successful completion, full input consumption, expected output length, CRC32 and strict UTF-8. Checksums are not authentication. Fixed decoder overhead can make small reports larger; no automatic codec selection occurs. `scripts/generate-brotli.mjs` checks the pinned WASM hash and generates the assets; build regenerates them. Keep the generator, generated assets, notices and lockfile together.

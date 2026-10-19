@@ -260,7 +260,11 @@ try {
         : formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString());
       const output = compressionMode ? compressDetailedListingHtml(html, compressionMode) : html;
       htmlPath = await writeListingHtml(destination, output, overwriteMode);
-
+      if (compressionMode === 'brotli') {
+        const brotliBytes = Buffer.byteLength(output);
+        const gzipBytes = Buffer.byteLength(compressDetailedListingHtml(html, 'gzip'));
+        brotliBytes > gzipBytes && console.warn(`Brotli output (${brotliBytes.toLocaleString('en-US')} bytes) is larger than gzip would be (${gzipBytes.toLocaleString('en-US')} bytes); consider --compression gzip.`);
+      }
     }
     console.log(`VS Code user-data root: ${inventory.userDataRoot}\n`);
     console.log(formatSessionListing(inventory.occurrences, listingOptions));

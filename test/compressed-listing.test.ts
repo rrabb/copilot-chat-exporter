@@ -34,6 +34,36 @@ test('compression rejects unexpected renderer boundaries instead of dropping con
   assert.throws(() => compressDetailedListingHtml('<!doctype html><main>Other report</main>'), /boundaries/u);
 });
 
+test('compressed output is byte-reproducible with content-derived nonces, retained hashes and ASCII scripts', () => {
+  const html = formatDetailedSessionListingHtml([], new Map(), {}, '2026-10-19T12:00:00Z');
+  for (const codec of ['gzip', 'brotli'] as const) {
+    const first = compressDetailedListingHtml(html, codec);
+    const second = compressDetailedListingHtml(html, codec);
+    const nonce = first.match(/'nonce-([^']+)'/u)![1]!;
+    assert.equal(first, second);
+    assert.equal(nonce, createHash('sha256').update('compressed-listing-v1\0').update(codec).update('\0').update(html).update('\0').update(listingCompressionLoader(codec)).digest('base64'));
+    assert.equal(Buffer.from(nonce, 'base64').length, 32);
+    const changed = compressDetailedListingHtml(html.replace('<header>', '<header>Changed shell'), codec);
+    assert.notEqual(nonce, changed.match(/'nonce-([^']+)'/u)![1]);
+    assert.doesNotMatch(first, /[^\x00-\x7f]/u);
+    const scripts = [...first.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gu)];
+    assert.equal(scripts.length, codec === 'gzip' ? 2 : 3);
+    for (const [, attributes] of scripts)
+      assert.ok(attributes!.includes(`nonce="${nonce}"`));
+    const loader = scripts.at(-1)![2]!;
+    assert.doesNotMatch(loader, /[^\x20-\x7e]/u);
+    assert.equal(loader, listingCompressionLoader(codec));
+    for (const script of [loader, detailedListingController])
+      assert.ok(first.includes(`'sha256-${createHash('sha256').update(script).digest('base64')}'`));
+  }
+});
+
+test('generation rejects actual script elements but keeps escaped script text', () => {
+  const html = formatDetailedSessionListingHtml([], new Map(), {}, '2026-10-19T12:00:00Z');
+  for (const codec of ['gzip', 'brotli'] as const)
+    assert.throws(() => compressDetailedListingHtml(html.replace('<section id="grouped-view">', '<section id="grouped-view"><script>alert(1)</script>'), codec), /must not contain script/u);
+});
+
 test('nonempty cards round-trip exactly while all overview and TOC markup stays static', () => {
   const row = detailedOccurrence('compressed-fixture');
   const evidence = detailedEvidence();
@@ -41,7 +71,7 @@ test('nonempty cards round-trip exactly while all overview and TOC markup stays 
   const html = formatDetailedSessionListingHtml([row], new Map([[row.occurrenceId, evidence]]), {}, '2026-10-19T12:00:00Z');
   const report = compressDetailedListingHtml(html);
   const overview = html.slice(html.indexOf('<header>'), html.indexOf('<section class="panel"><h2>Find the chat'));
-  const asciiOverview = overview;
+  const asciiOverview = overview.replace(/[^\x00-\x7f]/gu, character => `&#x${character.codePointAt(0)!.toString(16)};`);
   assert.ok(overview.length > 0 && report.includes(asciiOverview));
   const payload = report.match(/id="report-payload"[^>]*>([^<]+)<\/script>/u)![1]!;
   const content = gunzipSync(Buffer.from(payload, 'base64')).toString('utf8');

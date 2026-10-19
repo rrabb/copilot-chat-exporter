@@ -54,6 +54,10 @@ for (const codec of ['gzip', 'brotli']) {
     assert.match(report, /id="report-payload"/u);
     assert.equal(report.includes('id="report-decoder"'), codec === 'brotli');
     assert.equal(report.includes("'wasm-unsafe-eval'"), codec === 'brotli');
+    if (codec === 'brotli')
+      assert.match(result.stderr, /Brotli output \([\d,]+ bytes\) is larger than gzip would be \([\d,]+ bytes\); consider --compression gzip/u);
+    else
+      assert.doesNotMatch(result.stderr, /Brotli output/u);
   });
 }
 

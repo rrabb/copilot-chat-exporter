@@ -6,13 +6,8 @@ All notable changes to this project are documented here.
 
 ### Added
 
-- Explicit `--compression gzip|brotli` selector; pinned build-only Brotli decoder, generated WASM assets/notices and quality-8 encoding with stream/length/CRC/UTF-8 validation.
-
-
-
-- Optional `--detailed --compressed` gzip HTML output, preserving the complete static overview/TOC, queued filters and links, and conventional HTML as the default.
-
-
+- Optional `--detailed --compression gzip|brotli` output, with `--compressed` preserved as a gzip alias: standalone compressed HTML with the complete overview/Session TOC visible before evidence decoding, queued filters/links, same-document insertion and explicit unsupported/corrupt-file messages. Brotli uses quality 8, embeds a build-only WASM decoder and notices, and checks stream completion, byte count, CRC32 and UTF-8. Conventional HTML remains the default and retains no-JS evidence reading. No runtime npm dependency, iframe, CDN or records/renderer redesign; basic HTML is unchanged.
+- Compressed-report re-save resilience: deterministic content-derived CSP nonces with retained hashes, single-line ASCII loader/decoder scripts, correctly encoded Unicode shell/CSS and whitespace-tolerant payload/WASM base64. Actual-CSP Chrome/Edge regression tests cover format-only re-saves, literal script text, corruption and rejection of script elements, event handlers and javascript URLs; generated-asset verification checks the pinned decoder/WASM without rewriting stale output. The CLI warns when explicitly requested Brotli is larger than gzip without switching codecs.
 
 - Detailed listing: agent chats (Agent Host, delegated agents, Copilot CLI) now show credits and tokens like Local chats do: per-turn and per-chat chips with the basis stated (per-call rows, `from totals`, `turns a-b`, `partial rows`), a disclosure with the last logged total, per-call coverage and a by-model table. The console listing no longer says agent export is unsupported.
 - Agent credits per turn from running totals: for chats with no per-call usage rows (most of them), each turn gets the difference between consecutive checkpoint totals, labelled "from running totals", with a range when one checkpoint covers several turns; the Cost section lists the five most expensive turns and a table of all turns, and output tokens are shown where messages record them. Example: the turn that cost 81.57 credits is now visible in this chat's export.
