@@ -30,9 +30,27 @@ class Element {
   removeAttribute (name: string) { this.attributes.delete(name); name === 'id' && (this.id = ''); }
   focus () { this.focused = true; }
   scrollIntoView () {}
-  closest (_selector: string): Element | null { return this.classes.has('session-card') ? this : this.parentElement?.closest(_selector) ?? null; }
+  closest (selector: string): Element | null {
+    const matches = selector.split(',').some((part) => {
+      const name = part.trim();
+      return name.startsWith('.') ? this.classes.has(name.slice(1)) : this.tagName.toLowerCase() === name;
+    });
+    return matches ? this : this.parentElement?.closest(selector) ?? null;
+  }
   querySelector (_selector: string): Element { return this.children.find((item) => item.classes.has('comparison-summary'))!; }
-  querySelectorAll (_selector: string): Element[] { return this.children.filter((item) => item.id); }
+  querySelectorAll (selector: string): Element[] {
+    const descendants = this.children.flatMap((child): Element[] => [child, ...child.querySelectorAll('*')]);
+    if (selector === '*')
+      return descendants;
+    if (selector === '[data-search-refs]')
+      return descendants.filter((child) => child.dataset.searchRefs !== undefined);
+    if (selector === '[data-copy], [data-search]')
+      return descendants.filter((child) => child.dataset.copy !== undefined || child.dataset.search !== undefined);
+    if (selector === '.prompt-preview, .full-prompt pre, .turn-meta, .turn-card tbody')
+      return descendants.filter((child) => child.classes.has('prompt-preview') || child.classes.has('turn-meta')
+        || child.tagName === 'PRE' || child.tagName === 'TBODY');
+    return descendants.filter((child) => child.id);
+  }
   append (...elements: Element[]) {
     for (const element of elements) {
       if (element.parentElement)
@@ -51,7 +69,10 @@ class Element {
   }
 }
 
-function controllerFixture () {
+function controllerFixture (
+  prepare?: (cards: Element[], occurrences: Element[]) => void,
+  pending?: (main: Element, ids: Map<string, Element>) => void,
+) {
   const ids = new Map<string, Element>();
   const element = (id: string) => {
     const value = new Element(id);
@@ -73,7 +94,7 @@ function controllerFixture () {
     card.tagName = 'DETAILS';
     card.classes.add('session-card');
     card.dataset = {
-      main: 'true', search: `${id} prompt project`, title: id, type: 'local', status: 'verified',
+      main: 'true', title: id, type: 'local', status: 'verified',
       models: index === 2 ? '[]' : '["model"]', chips: index === 1 ? 'edits auto' : 'local',
       prompts: index === 2 ? '' : String(index * 3), bytes: index === 2 ? '' : String(index * 200),
       created: index === 2 ? '' : String(index + 1), updated: String(index + 1),
@@ -83,7 +104,10 @@ function controllerFixture () {
     };
     const summary = new Element();
     summary.classes.add('comparison-summary');
-    card.append(summary);
+    const prompt = new Element();
+    prompt.classes.add('prompt-preview');
+    prompt.textContent = `${id} prompt project`;
+    card.append(summary, prompt);
     return card;
   });
   ids.get('grouped-view')!.append(...cards);
@@ -97,7 +121,12 @@ function controllerFixture () {
   const turn = element('beta-turn-1');
   betaDetails.append(turn);
   cards[1]!.append(betaDetails);
-  const occurrences = cards.map((card) => { const row = element(`${card.id}-occurrence`); row.dataset = { ...card.dataset }; return row; });
+  const occurrences = cards.map((card) => {
+    const row = element(`${card.id}-occurrence`);
+    row.dataset = { ...card.dataset, conversation: card.id, reference: '1' };
+    return row;
+  });
+  prepare?.(cards, occurrences);
   const body = new Element();
   body.append(...occurrences);
   const table = Object.assign(element('occurrence-table'), { tBodies: [body] });
@@ -122,11 +151,16 @@ function controllerFixture () {
   const projectButtons = ['P2', '__multi'].map((value) => { const button = new Element(); button.dataset.projectPick = value; return button; });
   const copy = new Element();
   copy.dataset.copy = 'selector';
+  const attentionButton = new Element();
+  attentionButton.dataset.attention = 'auto';
   const selectors = new Map<string, Element[]>([
-    ['.session-card[data-main="true"]', cards], ['#occurrence-table tbody tr[data-search]', occurrences],
+    ['.session-card[data-main="true"]', cards], ['.session-card', [...cards, ignored]],
+    ['#occurrence-table tbody tr[data-conversation]', occurrences],
     ['[data-chip]', chips], ['[data-filter]', filters], ['a[href^="#"]', links],
+    ['[data-attention]', [attentionButton]],
     ['[data-pin]', pins], ['[data-copy]', [copy]], ['[data-project-pick]', projectButtons], ['.session-card, .session-card details', [...cards, betaDetails]],
   ]);
+  pending?.(main, ids);
   new Script(detailedListingController).runInNewContext({
     document: {
       documentElement: new Element(),
@@ -134,15 +168,39 @@ function controllerFixture () {
       querySelectorAll: (selector: string) => selectors.get(selector) ?? [],
       getElementById: (id: string) => ids.get(id),
       createElement: () => new Element(),
+      createTreeWalker: (root: Element) => {
+        const elements = [root, ...root.querySelectorAll('*')].filter((item) => item.textContent);
+        let index = -1;
+        return {
+          nextNode: () => ++index < elements.length,
+          get currentNode () { return { parentElement: elements[index]!, nodeValue: elements[index]!.textContent }; },
+        };
+      },
     },
+    NodeFilter: { SHOW_TEXT: 4 },
     location: { hash: '' },
     window: { addEventListener: () => {} },
     navigator: { clipboard: { writeText: async () => { throw new Error('Clipboard blocked'); } } },
     setTimeout: (callback: () => void) => callback(),
   });
   const input = (id: string, value: string) => { const control = ids.get(id)!; control.value = value; control.fire('input'); control.fire('change'); };
-  return { ids, cards, ignored, ignoredDetails, betaDetails, turn, links, chips, pins, copy, main, occurrences, table, input, projectButtons };
+  return { ids, cards, ignored, ignoredDetails, betaDetails, turn, links, chips, pins, copy, main, occurrences, table, input, projectButtons, attentionButton };
 }
+
+test('conventional attention action resets prior filters, matches its condition and Reset restores all candidates', () => {
+  const fixture = controllerFixture();
+  assert.deepEqual(fixture.cards.filter(card => !card.hidden).map(card => card.id), ['alpha', 'unknown']);
+  fixture.ids.get('show-all')!.fire('click');
+  fixture.input('search', 'alpha');
+  fixture.input('model', '?');
+  assert.equal(fixture.cards.filter(card => !card.hidden).length, 0);
+  fixture.attentionButton.fire('click');
+  assert.equal(fixture.ids.get('search')!.value, '');
+  assert.equal(fixture.ids.get('model')!.value, '');
+  assert.deepEqual(fixture.cards.filter(card => !card.hidden).map(card => card.id), ['beta']);
+  fixture.ids.get('reset')!.fire('click');
+  assert.deepEqual(fixture.cards.filter(card => !card.hidden).map(card => card.id), ['alpha', 'beta', 'unknown']);
+});
 
 test('detailed controller combines exact ranges, unknown/model/chip/search filters and occurrence view', () => {
   const f = controllerFixture();
@@ -234,4 +292,78 @@ test('project filter is inclusive and offers multi and unknown categories, also 
   assert.deepEqual(visible(), ['beta'], 'a chart label applies its project filter');
   f.input('view', 'occurrences');
   assert.deepEqual(f.occurrences.filter((row) => !row.hidden).map((row) => row.id), ['beta-occurrence']);
+});
+
+test('DOM search shares prompts but isolates reference evidence and excludes generic controls', () => {
+  const f = controllerFixture((cards, occurrences) => {
+    const add = (text: string, refs: string, className = '') => {
+      const value = new Element();
+      value.textContent = text;
+      value.dataset.searchRefs = refs;
+      className && value.classes.add(className);
+      cards[0]!.append(value);
+      return value;
+    };
+    add('C:\\workspace-a\\artifact.json missing-backing', '1');
+    add('C:\\workspace-b\\transcript.json unreadable-backing', '2');
+    const metadata = new Element();
+    metadata.classes.add('turn-meta');
+    metadata.textContent = 'Selected: Friendly model';
+    metadata.dataset.search = 'exact-model-id';
+    cards[0]!.append(metadata);
+    const full = new Element();
+    full.tagName = 'PRE';
+    full.textContent = 'Full prompt middle-only-text <script>literal</script>';
+    cards[0]!.append(full);
+    const fragments = new Element();
+    fragments.classes.add('prompt-preview');
+    const first = new Element();
+    first.textContent = 'adjacent';
+    const secondFragment = new Element();
+    secondFragment.textContent = 'fragments';
+    fragments.append(first, secondFragment);
+    cards[0]!.append(fragments);
+    const field = add('Contributor-name', '1 2');
+    const copy = new Element();
+    copy.tagName = 'BUTTON';
+    copy.textContent = 'Do not index this control';
+    copy.dataset.copy = 'C:\\exact\\prefixed-path.json';
+    field.append(copy);
+    add('not-a-searchable-disclaimer', '1', 'caption');
+    const related = new Element();
+    related.textContent = 'unrelated-family-title';
+    cards[0]!.append(related);
+    const second = new Element('alpha-second-occurrence');
+    second.dataset = { ...occurrences[0]!.dataset, reference: '2' };
+    occurrences.push(second);
+  });
+  f.input('view', 'occurrences');
+  const visible = () => f.occurrences.filter((row) => !row.hidden).map((row) => row.id);
+  f.input('search', '  ALPHA \n middle-only-text ');
+  assert.deepEqual(visible(), ['alpha-occurrence', 'alpha-second-occurrence']);
+  f.input('search', 'prompt artifact.json missing-backing');
+  assert.deepEqual(visible(), ['alpha-occurrence']);
+  f.input('search', 'prompt transcript.json');
+  assert.deepEqual(visible(), ['alpha-second-occurrence']);
+  f.input('search', 'workspace-a workspace-b');
+  assert.deepEqual(visible(), []);
+  f.input('view', 'grouped');
+  assert.deepEqual(f.cards.filter((card) => !card.hidden).map((card) => card.id), ['alpha']);
+  for (const query of ['exact-model-id', 'prefixed-path.json', '<script>literal</script>', 'adjacent fragments']) {
+    f.input('search', query);
+    assert.deepEqual(f.cards.filter((card) => !card.hidden).map((card) => card.id), ['alpha']);
+  }
+  for (const query of ['not-a-searchable-disclaimer', 'unrelated-family-title', 'index this control', 'adjacentfragments']) {
+    f.input('search', query);
+    assert.equal(f.cards.filter((card) => !card.hidden).length, 0);
+  }
+  f.input('search', 'missing-backing');
+  f.input('status', 'unresolved');
+  assert.equal(f.cards.filter((card) => !card.hidden).length, 0);
+  f.input('status', '');
+  assert.equal(f.cards.filter((card) => !card.hidden).length, 1);
+  const prompt = f.cards[0]!.children.find((child) => child.classes.has('prompt-preview'))!;
+  prompt.textContent = 'changed-after-index-initialization';
+  f.input('search', 'alpha prompt');
+  assert.equal(f.cards.filter((card) => !card.hidden).length, 1, 'cached content is independent of later visibility/content changes');
 });

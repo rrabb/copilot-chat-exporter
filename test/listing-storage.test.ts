@@ -154,7 +154,7 @@ test('source UI attributes different child IDs to the right references without i
   assert.equal(referenceBasis(a), 'Derived through parent');
   assert.equal(referenceBasis(b), 'Persisted index entry');
   assert.ok(html.includes('no own index entry') && html.includes('Shared parent backing · scoped child'));
-  assert.match(html, /Full session ID<\/th><td>[^<]*<span[^>]*>child-derived<\/span><\/td><td><span[^>]*>W1<\/span><\/td>/u);
+  assert.match(html, /Full session ID<\/th><td data-search-refs="1">[^<]*<span[^>]*>child-derived<\/span><\/td><td><span[^>]*>W1<\/span><\/td>/u);
   assert.match(html, /child-encoded<\/span><\/td><td><span[^>]*>W2<\/span><\/td>/u);
   assert.match(html, /First reference title<\/span><\/td><td><span[^>]*>W1<\/span><\/td>/u);
   assert.match(html, /Second reference title<\/span><\/td><td><span[^>]*>W2<\/span><\/td>/u);

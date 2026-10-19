@@ -3,12 +3,52 @@ export const detailedListingController = String.raw`
   document.documentElement.classList.add('js');
   const main = document.querySelector('main');
   const cards = [...document.querySelectorAll('.session-card[data-main="true"]')];
-  const occurrences = [...document.querySelectorAll('#occurrence-table tbody tr[data-search]')];
+  const occurrences = [...document.querySelectorAll('#occurrence-table tbody tr[data-conversation]')];
   const input = id => document.getElementById(id);
   const search = input('search'), type = input('type'), status = input('status'), model = input('model'), project = input('project');
   const quick = [...document.querySelectorAll('[data-chip]')];
   const pins = new Map();
-  let view = 'grouped', direction = -1, attention = '';
+  const normalize = text => text.toLowerCase().replace(/\s+/g,' ').trim();
+  const content = element => {
+    const parts = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    while(walker.nextNode()) {
+      const node = walker.currentNode;
+      if(!node.parentElement.closest('button, th, dt, h3, summary, .caption, .unknown')) parts.push(node.nodeValue);
+    }
+    for(const node of element.querySelectorAll('[data-copy], [data-search]')) {
+      if(node.dataset.copy) parts.push(node.dataset.copy);
+      if(node.dataset.search) parts.push(node.dataset.search);
+    }
+    if(element.dataset.search) parts.push(element.dataset.search);
+    return normalize(parts.join(' '));
+  };
+  // Shared fragments stay shared: occurrence rows never index another workspace's provenance.
+  const indexes = new Map();
+  const conversations = new Map();
+  for(const card of document.querySelectorAll('.session-card')) {
+    const shared = [...card.querySelectorAll('.prompt-preview, .full-prompt pre, .turn-meta, .turn-card tbody')].map(content);
+    if(card.dataset.search) shared.push(normalize(card.dataset.search));
+    const scoped = [...card.querySelectorAll('[data-search-refs]')].map(element=>({
+      refs: element.dataset.searchRefs.split(' '), text: content(element)
+    }));
+    const title = normalize(card.dataset.title || '');
+    const all = [title, ...shared, ...scoped.map(item=>item.text), normalize(card.dataset.models || '[]')];
+    conversations.set(card.id,{shared,title,scoped});
+    indexes.set(card,all);
+  }
+  for(const row of occurrences) {
+    const conversation = conversations.get(row.dataset.conversation);
+    if(!conversation) throw new Error('Missing search conversation: '+row.dataset.conversation);
+    indexes.set(row,[
+      conversation.title, ...conversation.shared,
+      ...conversation.scoped.filter(item=>item.refs.includes(row.dataset.reference)).map(item=>item.text),
+      normalize(row.dataset.models || '[]'), content(row)
+    ]);
+  }
+  let view = 'grouped';
+  let direction = -1;
+  let attention = '';
   const numeric = (row,key,minId,maxId,unknownId) => {
     const value = row.dataset[key], unknown = input(unknownId).value;
     const known = value !== '';
@@ -18,9 +58,8 @@ export const detailedListingController = String.raw`
     if((min || max) && !known) return false;
     return (!min || Number(value)>=Number(min)) && (!max || Number(value)<=Number(max));
   };
-  const match = row => {
-    const words = search.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    if(!words.every(word=>row.dataset.search.includes(word))) return false;
+  const match = (row,words) => {
+    if(!words.every(word=>indexes.get(row).some(text=>text.includes(word)))) return false;
     if(type.value && row.dataset.type!==type.value) return false;
     if(status.value && row.dataset.status!==status.value) return false;
     const models = JSON.parse(row.dataset.models || '[]');
@@ -40,9 +79,10 @@ export const detailedListingController = String.raw`
     return true;
   };
   const apply = () => {
+    const words = normalize(search.value).split(' ').filter(Boolean);
     const rows = view === 'grouped' ? cards : occurrences;
-    for(const row of cards) row.hidden = !match(row) || row.dataset.limited==='true';
-    for(const row of occurrences) row.hidden = !match(row) || row.dataset.limited==='true';
+    for(const row of cards) row.hidden = !match(row,words) || row.dataset.limited==='true';
+    for(const row of occurrences) row.hidden = !match(row,words) || row.dataset.limited==='true';
     const count = rows.filter(row=>!row.hidden).length;
     input('row-count').textContent = count+' of '+rows.length+' '+(view==='grouped'?'grouped conversations':'workspace occurrences')+' shown';
     input('grouped-view').hidden = view!=='grouped';
@@ -81,11 +121,12 @@ export const detailedListingController = String.raw`
     input('action-status').textContent='Newest-25 limit removed for this page; ignored sessions remain in their own section.';apply();
   });
   input('view').addEventListener('change',()=>{view=input('view').value;apply();});
-  input('density').addEventListener('change',()=>{
+  const density = () => {
     main.classList.toggle('compact',input('density').value==='compact');
     main.classList.toggle('comprehensive',input('density').value==='comprehensive');
     for(const details of document.querySelectorAll('.session-card, .session-card details')) details.open=input('density').value==='comprehensive';
-  });
+  };
+  input('density').addEventListener('change',density);
   const sort = () => {
     const key = input('sort').value;
     const compare = (a,b) => {

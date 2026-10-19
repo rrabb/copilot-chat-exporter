@@ -8,10 +8,11 @@ import type { StorageArtifact } from './listing-storage.ts';
 import { escapeHtml } from './listing-html.ts';
 import { formatLocalListingDate } from './listing-preview.ts';
 import { listingFileIdentity } from './listing-edits.ts';
+import { detailedTitleAttribute } from './detailed-search.ts';
 
 const safe = (value: string) => escapeHtml(redactText(value).text);
-const pill = (value: string, hint = '') => `<span class="tag"${hint ? ` title="${safe(hint)}"` : ''}>${safe(value)}</span>`;
-const copy = (value: string) => ` <button type="button" class="enhanced-only source-copy" data-copy="${safe(value)}" title="Copy the full value" aria-label="Copy the full value">📋</button>`;
+const pill = (value: string, hint = '') => `<span class="tag"${detailedTitleAttribute(value, hint)}>${safe(value)}</span>`;
+const copy = (value: string) => ` <button type="button" class="enhanced-only source-copy" data-copy="${safe(value)}" aria-label="Copy the full value">📋</button>`;
 const value = (text: string) => `<span class="source-value">${safe(text)}</span>${text.length > 30 ? copy(text) : ''}`;
 const details = (title: string, content: string, cls = '') => `<details${cls ? ` class="${cls}"` : ''}><summary>${title}</summary>${content}</details>`;
 
@@ -67,6 +68,7 @@ export function renderDetailedSource (
   anchor: string,
 ): string {
   const refs = group.occurrences;
+  const searchRefs = (indices: readonly number[]) => ` data-search-refs="${indices.map((index) => index + 1).join(' ')}"`;
   const chip = (index: number) => `<span class="workspace-ref ref-${index % 4}" title="${safe(refs[index]!.provenance.workspaceIdentity?.uri ?? refs[index]!.provenance.workspaceStoragePath)}">W${index + 1}</span>`;
   const name = (row: SessionOccurrence) => {
     const uri = row.provenance.workspaceIdentity?.uri;
@@ -102,21 +104,29 @@ export function renderDetailedSource (
         allArtifacts.set(item.path, { item, refs: [index] });
     }
   });
-  const health = new Map<string, 'danger' | 'warning' | 'info'>();
-  const note = (text: string, tone: 'danger' | 'warning' | 'info' = 'warning') => health.set(text, tone);
-  refs.forEach((row) => {
+  const health = new Map<string, { tone: 'danger' | 'warning' | 'info'; refs: number[] }>();
+  const note = (text: string, index: number, tone: 'danger' | 'warning' | 'info' = 'warning') => {
+    const existing = health.get(text);
+    if (existing) {
+      existing.tone = tone;
+      existing.refs.includes(index) || existing.refs.push(index);
+    } else {
+      health.set(text, { tone, refs: [index] });
+    }
+  };
+  refs.forEach((row, index) => {
     const data = evidence.get(row.occurrenceId);
-    row.backing.status !== 'verified' && note(`${name(row)}: ${row.backing.reason}`, 'danger');
-    data?.state !== 'read' && note(`Conversation enrichment: ${data?.state ?? 'not collected'}.`, 'danger');
-    row.diagnostics.forEach((item) => note(`${item.category}: ${item.description}`));
-    data?.diagnostics.forEach((item) => note(`${item.path}: ${item.description}`));
-    data?.flags.forEach((flag) => note(`Audit note: ${flag}`));
+    row.backing.status !== 'verified' && note(`${name(row)}: ${row.backing.reason}`, index, 'danger');
+    data?.state !== 'read' && note(`Conversation enrichment: ${data?.state ?? 'not collected'}.`, index, 'danger');
+    row.diagnostics.forEach((item) => note(`${item.category}: ${item.path}: ${item.description}`, index));
+    data?.diagnostics.forEach((item) => note(`${item.path}: ${item.description}`, index));
+    data?.flags.forEach((flag) => note(`Audit note: ${flag}`, index));
     if (!row.provenance.indexKey && row.parentOccurrenceId)
-      note(`${name(row)}: no own index entry; reference derived through the recorded parent.`, 'info');
+      note(`${name(row)}: no own index entry; reference derived through the recorded parent.`, index, 'info');
     if (row.backing.status === 'verified' && row.backing.source.kind === 'sdk-events')
-      [...row.backing.source.identityWarnings, ...row.backing.source.scopeWarnings].forEach((text) => note(text));
+      [...row.backing.source.identityWarnings, ...row.backing.source.scopeWarnings].forEach((text) => note(text, index));
   });
-  const healthHtml = health.size ? `<section class="source-health"><h3>🩺 Health checks · 🔎 Audit flags / diagnostics</h3><div class="health-cards">${[...health].map(([text, tone]) => `<div class="health-${tone}">${tone === 'danger' ? '🚨' : tone === 'info' ? 'ℹ️' : '⚠️'} ${safe(text)}</div>`).join('')}</div></section>`
+  const healthHtml = health.size ? `<section class="source-health"><h3>🩺 Health checks · 🔎 Audit flags / diagnostics</h3><div class="health-cards">${[...health].map(([text, item]) => `<div class="health-${item.tone}"${searchRefs(item.refs)}>${item.tone === 'danger' ? '🚨' : item.tone === 'info' ? 'ℹ️' : '⚠️'} ${safe(text)}</div>`).join('')}</div></section>`
     : '<div class="field-line"><strong>🩺 Health checks · 🔎 Audit flags / diagnostics:</strong> none detected in the checks performed.</div>';
   const referenceSummary = `<section><h3>📍 Where it is referenced (${refs.length})</h3><div class="table-wrap"><table class="reference-summary"><thead><tr><th>Ref</th><th>Project / workspace</th><th>Reference basis</th><th>Context</th></tr></thead><tbody>${refs.map((row, index) => {
     const data = evidence.get(row.occurrenceId);
@@ -158,6 +168,7 @@ export function renderDetailedSource (
     add('Activity timestamp', row.activityTimestamp == null ? 'Not recorded' : String(row.activityTimestamp), index);
     add('Visibility', row.visibility.status === 'hidden' ? `hidden: ${row.visibility.reason}` : 'included', index);
     add('Provider', row.provider, index);
+    add('Backing status', row.backing.status, index);
     add('User-data root', row.provenance.userDataRoot, index);
     add('Workspace name', name(row), index);
     add('Workspace identity', row.provenance.workspaceIdentity ? `${row.provenance.workspaceIdentity.kind} - ${row.provenance.workspaceIdentity.uri}` : 'Not recorded', index);
@@ -196,10 +207,10 @@ export function renderDetailedSource (
   const artifactRows = [...allArtifacts.values()].map(({ item, refs: seen }) => {
     const info = purpose(item);
     const breakdown = item.parts.length ? details('Composition / what uses the bytes', `<p class="caption">${safe(item.measurement)}</p>${item.database ? `<p>Logical stored values: ${storageBytes(item.database.logicalBytes)} across ${item.database.keys} keys. These are not additional physical bytes.</p>` : ''}<table><thead><tr><th>Contributor</th><th>Size</th><th>Records / files</th></tr></thead><tbody>${item.parts.map((part) => `<tr><td>${safe(part.name)}</td><td>${storageBytes(part.bytes)}</td><td>${part.count ?? '—'}</td></tr>`).join('')}</tbody></table>`)     : `<div class="caption">${safe(item.measurement || 'No composition available.')}</div>`;
-    return `<tr><td><strong>${safe(item.kind)}</strong></td><td>${prefixPath(item.path)}${breakdown}</td><td>${storageBytes(item.bytes)}<br>${safe(item.state)}${item.modified != null ? `<br><span class="datetime">🔄 ${formatLocalListingDate(item.modified)}</span>` : ''    }${item.files != null ? `<br>${item.files} ${item.files === 1 ? 'file' : 'files'}` : ''}</td><td>${seen.map(chip).join(' ')}${item.sharedBy ? `<div class="caption" title="Counts include all inventoried occurrences, including hidden ones; not a claim of exclusive ownership.">${item.sharedBy.conversations} report chats / ${item.sharedBy.occurrences} refs</div>` : ''}${item.kind === 'agent-host.db' ? pill('Global database', 'Not exclusively owned by these workspaces or this conversation.') : ''}</td><td>${safe(info.purpose)}</td><td>${safe(info.impact)}</td></tr>`;
+    return `<tr><td${searchRefs(seen)}><strong>${safe(item.kind)}</strong></td><td${searchRefs(seen)}>${prefixPath(item.path)}${breakdown}</td><td${searchRefs(seen)}>${storageBytes(item.bytes)}<br>${safe(item.state)}${item.modified != null ? `<br><span class="datetime">🔄 ${formatLocalListingDate(item.modified)}</span>` : ''    }${item.files != null ? `<br>${item.files} ${item.files === 1 ? 'file' : 'files'}` : ''}</td><td>${seen.map(chip).join(' ')}${item.sharedBy ? `<div class="caption" title="Counts include all inventoried occurrences, including hidden ones; not a claim of exclusive ownership.">${item.sharedBy.conversations} report chats / ${item.sharedBy.occurrences} refs</div>` : ''}${item.kind === 'agent-host.db' ? pill('Global database', 'Not exclusively owned by these workspaces or this conversation.') : ''}</td><td>${safe(info.purpose)}</td><td>${safe(info.impact)}</td></tr>`;
   }).join('');
   const workspaceDetails = refs.map((row, index) => `<div id="${anchor}-workspace-${index + 1}">${chip(index)} <strong>${safe(name(row))}</strong> · ${safe(referenceBasis(row))}</div>`).join('');
-  const technical = details('🔐 Technical identity / all unique values and reference differences', `  <p class="caption">Recorded prompt/event timestamps remain in Dates and provenance; prompt text remains in Ordered prompts. They are not repeated in this identity table.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Unique value</th><th>Seen in</th></tr></thead><tbody>${[...tuples.values()].map((item) => `<tr><th>${safe(item.field)}</th><td>${value(item.text)}</td><td>${item.refs.map(chip).join(' ')}</td></tr>`).join('')}</tbody></table></div>`);
+  const technical = details('🔐 Technical identity / all unique values and reference differences', `  <p class="caption">Recorded prompt/event timestamps remain in Dates and provenance; prompt text remains in Ordered prompts. They are not repeated in this identity table.</p><div class="table-wrap"><table><thead><tr><th>Field</th><th>Unique value</th><th>Seen in</th></tr></thead><tbody>${[...tuples.values()].map((item) => `<tr><th>${safe(item.field)}</th><td${searchRefs(item.refs)}>${value(item.text)}</td><td>${item.refs.map(chip).join(' ')}</td></tr>`).join('')}</tbody></table></div>`);
   const representativeData = evidence.get(group.representative.occurrenceId);
   const status = group.representative.backing.status === 'verified' ? `Verified ${group.representative.backing.source.kind} binding at inventory time` : 'Backing unresolved';
   const statusSummary = `<p class="source-status">${pill(status)}${pill(`Content: ${representativeData?.state ?? 'not read'}`)}${group.representative.backing.status === 'verified' && group.representative.backing.source.kind === 'sdk-events' && group.representative.backing.source.scope.kind === 'subagent' ? pill('Shared parent backing · scoped child', 'This child has no independent events.jsonl; its recorded scope is inside the parent backing file.') : ''}</p>`;

@@ -18,7 +18,7 @@ The reports help a person find a remembered chat, distinguish conversations from
 | One home for each detailed fact | Combine repeated titles; consolidate source/audit/artifact sections | Repetition makes differences harder to notice and increases report size |
 | Color has meaning | Match card borders/titles to type; separate status and warning tones | Help recognition without requiring every chip to be read |
 | Color is not the only signal | Pair colors with labels, icons and tooltips | Preserve meaning across themes and for users who cannot distinguish colors |
-| Read-only, offline and portable | Self-contained HTML, no automatically opened browser, native disclosures | Reports must remain useful without network access or JavaScript |
+| Read-only, offline and portable | Self-contained HTML, no automatically opened browser, native disclosures | Remains useful without JS; filters/copy are enhancements |
 | No cleanup verdicts from size alone | Qualified removal impacts; explicit sharing and measurement limits | Large files and multiple references are not proof of safely removable data |
 
 ## Two report levels
@@ -218,7 +218,9 @@ The first expanded section lists each distinct title value once, with every stor
 
 - Header: `💳 43c` and `⬆️~15.4M ⬇️~730k`, each only when recorded. The expanded card has one disclosure, `💳 Credits / 🔢 tokens`, with the same chips and a table: recorded metric, counted-turn sum and coverage (`recorded/total counted turns`) with the source field (`request.copilotCredits`, `request.promptTokens`, `request.completionTokens`).
 - With none recorded there is no disclosure; the notes area shows a neutral `Usage unavailable` chip.
-- Sums cover counted Local requests, once per conversation (not per reference). SDK usage is not correlated; no conversion between tokens and credits, and no parent-to-child attribution.
+- Sums cover counted Local requests, once per conversation (not per reference). For Local chats there is no conversion between tokens and credits and no parent-to-child attribution.
+- **Agent chats (Agent Host and Copilot CLI)** use the same chips, with credits taken from recorded nano-AIU / 1,000,000,000 (1 credit = $0.01), never from tokens. Per turn: the per-call rows (the Copilot CLI store `~/.copilot/session-store.db`, else `model.model_call_success` events) where they cover about every assistant reply of the chat; otherwise the difference between the log's running totals (`session.usage_checkpoint` / `session.shutdown`). The turn chip says which: a `from totals` chip for running-total turns, a `turns a-b` chip when one checkpoint covers several turns (the credits sit on the last of them), a `partial rows` chip when only incomplete per-call rows exist (a lower bound). A turn with nothing recorded shows no chip. Tokens exist only where per-call rows exist (input includes cache reads and writes). The header chip is the sum of the turns with `~` when some turns have none; its tooltip adds the log's last total for the whole file.
+- The agent disclosure table lists: credits shown, credits added before the first prompt, the last logged total for the whole log (with the shutdown count), per-call rows against assistant replies and their source, credits not matched to a turn, token rows, and a by-model table. A delegated-agent entry shows only that agent's own recorded calls matched by agent ID (agents it started itself are not included).
 
 ### Dates
 
@@ -390,15 +392,17 @@ This section is the checklist for another engineer or AI to rebuild the detailed
 | Behavior | Rule |
 | --- | --- |
 | Selection | The main candidates are groups whose visibility is included (sub-agents are ordinary groups); `--show-ignored` adds ignored groups; `--last25` limits the initially shown set to the newest 25. Ignored groups also get their own section, independent of the main filters |
-| Card data | Each card carries search text, title, type, status, project keys (JSON), models (JSON), chip flags, turns, bytes, created/updated timestamps and generator-local days as `data-*` attributes |
-| Filters | Search words are ANDed against all evidence text. Type, backing and model are exact matches; model `?` means no answering model recorded. Project filter is inclusive; `__multi` means two or more projects, `__unknown` means none. Active quick chips are ANDed. A Needs attention Show button sets one extra condition (ANDed with the rest) after clearing the others; Reset filters clears it. Date and numeric ranges never match unknown values |
+| Card data | Each card carries title, type, status, project keys (JSON), models (JSON), chip flags, turns, bytes, created/updated timestamps and generator-local days as `data-*` attributes. `data-search` is omitted unless required values are absent from designated rendered text, such as exact model IDs behind friendly names or aggregate file paths without rendered turn rows |
+| Search cache | At initialization, a text-node walker indexes prompt previews/full disclosures, turn metadata/file rows, scoped technical values, artifact values/composition and diagnostic cards, adding exact `data-copy` paths and supplemental values. Fragments are separated by spaces and normalized once. Headings, controls, captions, uncertainty placeholders and unrelated family labels are excluded; tooltips are not indiscriminately indexed. Shared conversation fragments are reused by occurrence indexes; `data-search-refs` associates technical/artifact/diagnostic content with the appropriate 1-based workspace references. Occurrence rows use short `data-conversation`/`data-reference` associations and do not require `data-search` |
+| Filters | Case-insensitive substring search words are ANDed across cached identifying/investigative fragments. Full collapsed prompts remain searchable. Grouped search includes all its references; occurrence search includes only its own workspace/source metadata plus shared conversation content. The ignored section remains outside main filters unless `--show-ignored` includes it. Type, backing and model are exact matches; model `?` means no answering model recorded. Project filter is inclusive; `__multi` means two or more projects, `__unknown` means none. Active quick chips are ANDed. A Needs attention Show button sets one extra condition (ANDed with the rest) after clearing the others; Reset filters clears it. Date and numeric ranges never match unknown values |
+| Tooltip content | Generation omits titles that repeat the complete normalized visible label/value. Informative explanations, uncertainty reasons, exact IDs behind friendly labels and full paths behind abbreviations remain. Accessible labels are independent; copy controls retain their exact redacted values and accessible names |
 | Sorting | Updated, created, turns, bytes or title; unknown values sort last; ties break by card ID; the direction toggle reverses it |
 | Views | Grouped conversations or workspace occurrences; the count line reports shown/total for the active view |
 | Density | Collapsed (default), compact, or comprehensive (opens every card and inner disclosure) |
 | Link reveal | Any `#anchor` click resets filters, shows the grouped view, lifts the newest-25 limit for the target, opens every ancestor `details`, highlights the card briefly and focuses the target |
 | Comparison | At most two cards can be pinned; each shows a clone of the card's summary panels; a third pin is refused with a message |
 | Copy | Copy buttons carry the exact value in `data-copy`; failures are stated, never silent |
-| No JavaScript | Cards and disclosures remain readable; filters, sort, pinning and copy are not available |
+| No JavaScript | All main cards and detailed evidence remain readable. Filters, sort, pinning and copy are unavailable. |
 
 ### Chip catalog
 
@@ -443,7 +447,7 @@ Sample fixtures and golden renders are in the repository tests; see [detailed-li
 
 ## Interaction and maintenance
 
-Native `details`/`summary` provides collapsed reading without JavaScript. Filtering, copying, comparison and enhanced navigation require JavaScript. Copy failure must be stated explicitly with manual-copy guidance. Comprehensive density opens cards/inner sections; balanced reading starts compact. Preserve exact target identities when revealing linked ignored/limited cards.
+In conventional output, native `details`/`summary` provides collapsed reading without JavaScript. Filtering, copying, comparison and enhanced navigation require JavaScript. Copy failure must be stated explicitly with manual-copy guidance. Comprehensive density opens cards/inner sections; balanced reading starts compact. Preserve exact target identities when revealing linked ignored/limited cards.
 
 Reports are identification aids, not near-lossless exports or atomic backups. Preserve redaction, HTML escaping and offline security policy. Do not imply global-store coverage that discovery does not implement. No warning means only that the checks performed found none.
 

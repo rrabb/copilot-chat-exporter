@@ -80,7 +80,7 @@ test('every condition has an explanation and a distinct flag', () => {
 test('the controller applies a condition filter and clears it with Reset filters', () => {
   const html = render([unresolved('u'), indexed('ok')]);
   const script = html.match(/<script>([\s\S]*?)<\/script>/u)![1];
-  assert.match(script, /let view = 'grouped', direction = -1, attention = '';/u);
+  assert.match(script, /let attention = '';/u);
   assert.match(script, /if\(attention && !flags\.includes\(attention\)\) return false;/u);
   assert.match(script, /attention = '';\s*apply\(\);\s*\};/u, 'reset clears the condition filter');
   assert.match(script, /\[data-attention\]/u);
