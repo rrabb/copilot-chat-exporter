@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Explicit `--compression gzip|brotli` selector; pinned build-only Brotli decoder, generated WASM assets/notices and quality-8 encoding with stream/length/CRC/UTF-8 validation.
+
+
+
 - Optional `--detailed --compressed` gzip HTML output, preserving the complete static overview/TOC, queued filters and links, and conventional HTML as the default.
 
 

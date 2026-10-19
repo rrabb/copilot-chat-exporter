@@ -43,6 +43,7 @@
     "verify": "npm run typecheck && npm run typecheck:test && npm run test && npm run golden",
     "verify:local": "npm run verify && npm run baseline",
     "build": "node scripts/build.mjs",
+    "generate:brotli": "node scripts/generate-brotli.mjs",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -55,6 +56,7 @@
   ],
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "brotli-dec-wasm": "2.3.2",
     "esbuild": "^0.27.7",
     "typescript": "^5.9.3"
   }

@@ -45,6 +45,17 @@ test('compressed detailed listing writes an offline shell and gzip payload', asy
   assert.match(result.stdout, /ID \/ PREFIX/u);
 });
 
+for (const codec of ['gzip', 'brotli']) {
+  test(`explicit ${codec} compression writes a standalone detailed report`, async (context) => {
+    const { invoke } = await fixture(context);
+    const result = invoke('--detailed', '--compression', codec);
+    assert.equal(result.status, 0, result.stderr);
+    const report = await fs.readFile(result.stdout.match(/HTML report: (.+)/u)![1]!.trim(), 'utf8');
+    assert.match(report, /id="report-payload"/u);
+    assert.equal(report.includes('id="report-decoder"'), codec === 'brotli');
+    assert.equal(report.includes("'wasm-unsafe-eval'"), codec === 'brotli');
+  });
+}
 
 test('an Agent Host chat is exported by prefix, with companions, left-out counts and an independent content check', async (context) => {
   const { home, root, workspace, invoke } = await fixture(context);

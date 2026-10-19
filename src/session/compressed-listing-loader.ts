@@ -1,12 +1,20 @@
 import { detailedListingController } from './detailed-listing-controller.ts';
 
-
+export type ReportCompression = 'gzip' | 'brotli';
 
 const gzipDecode = String.raw`
       if(typeof DecompressionStream === 'undefined') throw new Error('This browser does not support native gzip decompression.');
       const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
       return new Uint8Array(await new Response(stream).arrayBuffer());`;
-export function createListingCompressionLoader (controller = detailedListingController): string {
+export function createListingCompressionLoader (codec: ReportCompression, decoderScript: string, controller = detailedListingController): string {
+  const brotliDecode = `
+      if(typeof WebAssembly === 'undefined') throw new Error('This browser does not support WebAssembly for Brotli decompression.');
+      ${decoderScript}
+      const wasm = document.getElementById('report-decoder');
+      const decoded = brotliDecoder.decode(bytes,fromBase64(wasm.textContent),expected);
+      wasm.remove();
+      return decoded;`;
+
   return String.raw`
 (() => {
   const main = document.querySelector('main');
@@ -92,6 +100,14 @@ INTEGRITY
   }
 })();
 `.replace('CONTROLLER', controller)
-    .replace('DECODE', gzipDecode)
-    .replace('INTEGRITY', '');
+    .replace('DECODE', codec === 'brotli' ? brotliDecode : gzipDecode)
+    .replace('INTEGRITY', codec === 'brotli' ? String.raw`
+      let checksum = 0xffffffff;
+      const table = Uint32Array.from({length:256},(_,value)=>{
+        for(let bit=0;bit<8;bit++) value = (value >>> 1) ^ (0xedb88320 & -(value & 1));
+        return value >>> 0;
+      });
+      for(let i=0;i<decoded.length;i++) checksum = (checksum >>> 8) ^ table[(checksum ^ decoded[i]) & 255];
+      if(((checksum ^ 0xffffffff) >>> 0) !== Number(payload.dataset.crc))
+        throw new Error('The Brotli evidence checksum does not match this report.');` : '');
 }

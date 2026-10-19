@@ -69,6 +69,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     noHtml: false,
     detailed: false,
     compressed: false,
+    compression: null,
     htmlOutput: null,
     current: false,
     overwrite: false,
@@ -86,11 +87,25 @@ test('no arguments is valid: it means listing, never implicit export', () => {
 
 test('compressed HTML is opt-in and requires detailed HTML listing', () => {
   assert.equal(ok(['--detailed', '--compressed']).compressed, true);
+  assert.equal(ok(['--detailed', '--compressed']).compression, 'gzip');
   assert.equal(ok(['--list', '--detailed', '--compressed']).list, true);
   assert.match(err(['--compressed']), /requires --detailed/u);
   assert.match(err(['--list', '--compressed']), /requires --detailed/u);
   assert.match(err(['--detailed', '--compressed', '--no-html']), /cannot be combined/u);
   assert.match(err(['--verify', '--compressed']), /only when listing/u);
+});
+
+test('compression selector validates codecs, alias agreement and listing constraints', () => {
+  assert.equal(ok(['--detailed', '--compression', 'gzip']).compression, 'gzip');
+  assert.equal(ok(['--detailed', '--compression', 'brotli']).compression, 'brotli');
+  assert.equal(ok(['--detailed', '--compressed', '--compression', 'gzip']).compression, 'gzip');
+  assert.match(err(['--detailed', '--compressed', '--compression', 'brotli']), /conflicts/u);
+  assert.match(err(['--detailed', '--compression', 'zip']), /gzip\|brotli/u);
+  assert.match(err(['--compression']), /gzip\|brotli/u);
+  assert.match(err(['--compression', 'gzip']), /requires --detailed/u);
+  assert.match(err(['--detailed', '--no-html', '--compression', 'brotli']), /cannot be combined/u);
+  assert.match(err(['--verify', '--compression', 'gzip']), /only when listing/u);
+  assert.match(err(['--detailed', '--compression', 'gzip', '--compression', 'brotli']), /more than once/u);
 });
 
 test('detailed implicitly lists, is listing-only and permits the nonfatal no-html combination', () => {

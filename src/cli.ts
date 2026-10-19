@@ -184,7 +184,7 @@ if (!parsed.ok) {
 const {
   list: listMode, current: currentMode, verify: verifyMode, strict: strictMode,
   showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode, detailed: detailedMode,
-  compressed: compressedMode,
+  compression: compressionMode,
   golden: goldenAction, snapshot: snapshotAction,
   installSkill: installSkillTarget,
   workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
@@ -258,7 +258,7 @@ try {
       const html = detailedMode
         ? formatDetailedSessionListingHtml(inventory.occurrences, await collectListingEvidence(inventory.occurrences), listingOptions, generatedAt.toISOString())
         : formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString());
-      const output = compressedMode ? compressDetailedListingHtml(html) : html;
+      const output = compressionMode ? compressDetailedListingHtml(html, compressionMode) : html;
       htmlPath = await writeListingHtml(destination, output, overwriteMode);
 
     }

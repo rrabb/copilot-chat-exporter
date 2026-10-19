@@ -12,6 +12,7 @@ export interface CliOptions {
   noHtml: boolean;
   detailed: boolean;
   compressed: boolean;
+  compression: 'gzip' | 'brotli' | null;
   htmlOutput: string | null;
   current: boolean;
   overwrite: boolean;
@@ -42,6 +43,7 @@ const VALUE_FLAGS: Record<string, string> = {
   '--out-dir': '--out-dir <path>',
   '--user-data-root': '--user-data-root <path>',
   '--html-output': '--html-output <path>',
+  '--compression': '--compression gzip|brotli',
   '--golden': '--golden check|update',
   '--snapshot': '--snapshot check|update [sessionId]',
   '--install-skill': '--install-skill <targetRoot>',
@@ -92,12 +94,17 @@ export function parseArgs (argv: string[]): ParsedArgs {
   const listRequested = booleans.has('--list')
     || (modes === 0 && positionals.length === 0 && !booleans.has('--current'));
   if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
-    || booleans.has('--no-html') || booleans.has('--detailed') || booleans.has('--compressed') || values.has('--html-output')) && !listRequested)
+    || booleans.has('--no-html') || booleans.has('--detailed') || booleans.has('--compressed') || values.has('--compression') || values.has('--html-output')) && !listRequested)
     return { ok: false, error: 'Listing options are available only when listing sessions.' };
-  if (booleans.has('--compressed') && !booleans.has('--detailed'))
-    return { ok: false, error: '--compressed requires --detailed.' };
-  if (booleans.has('--compressed') && booleans.has('--no-html'))
-    return { ok: false, error: '--compressed cannot be combined with --no-html.' };
+  const compression = values.get('--compression');
+  if (compression !== undefined && compression !== 'gzip' && compression !== 'brotli')
+    return { ok: false, error: 'Usage: --compression gzip|brotli' };
+  if (booleans.has('--compressed') && compression === 'brotli')
+    return { ok: false, error: '--compressed selects gzip and conflicts with --compression brotli.' };
+  if ((booleans.has('--compressed') || compression) && !booleans.has('--detailed'))
+    return { ok: false, error: '--compressed / --compression requires --detailed.' };
+  if ((booleans.has('--compressed') || compression) && booleans.has('--no-html'))
+    return { ok: false, error: '--compressed / --compression cannot be combined with --no-html.' };
   if (booleans.has('--no-html') && values.has('--html-output'))
     return { ok: false, error: '--no-html cannot be combined with --html-output.' };
   if (modes > 1)
@@ -119,6 +126,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       noHtml: booleans.has('--no-html'),
       detailed: booleans.has('--detailed'),
       compressed: booleans.has('--compressed'),
+      compression: compression ?? (booleans.has('--compressed') ? 'gzip' : null),
       htmlOutput: values.get('--html-output') ?? null,
       current: booleans.has('--current'),
       overwrite: booleans.has('--overwrite'),

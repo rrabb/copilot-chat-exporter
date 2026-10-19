@@ -9,6 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const require = createRequire(import.meta.url);
 
+await import('./generate-brotli.mjs');
 await rm(dist, { recursive: true, force: true });
 
 await build({

@@ -32,6 +32,7 @@ export { formatSessionListing } from './session/listing.ts';
 export { collectListingEvidence } from './session/listing-evidence.ts';
 export { formatDetailedSessionListingHtml } from './session/detailed-listing.ts';
 export { compressDetailedListingHtml } from './session/compressed-listing.ts';
+export type { ReportCompression } from './session/compressed-listing.ts';
 export type { ListingEvidence, ListingTurnEvidence, ListingFileChange, ListingTitleEvidence, ListingDateEvidence } from './session/listing-evidence-types.ts';
 export type { SessionListingOptions } from './session/listing.ts';
 export { createProviderSourceResolver } from './session/provider-sources.ts';
