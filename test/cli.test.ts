@@ -32,6 +32,20 @@ test('detailed plus no-html warns without failing the console listing or creatin
   assert.doesNotMatch(result.stdout, /HTML report:/u);
 });
 
+test('compressed detailed listing writes an offline shell and gzip payload', async (context) => {
+  const { invoke } = await fixture(context);
+  const result = invoke('--detailed', '--compressed');
+  assert.equal(result.status, 0, result.stderr);
+  const reportPath = result.stdout.match(/HTML report: (.+)/u)![1]!.trim();
+  const report = await fs.readFile(reportPath, 'utf8');
+  assert.match(report, /id="conversation-index"/u);
+  assert.match(report, /id="report-payload"/u);
+  assert.match(report, /new DecompressionStream\(["']gzip["']\)/u);
+  assert.doesNotMatch(report, /<iframe/u);
+  assert.match(result.stdout, /ID \/ PREFIX/u);
+});
+
+
 test('an Agent Host chat is exported by prefix, with companions, left-out counts and an independent content check', async (context) => {
   const { home, root, workspace, invoke } = await fixture(context);
   const chat = 'aaaaaaaa-1111-4111-8111-111111111111';

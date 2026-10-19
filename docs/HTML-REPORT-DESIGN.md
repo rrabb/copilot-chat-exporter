@@ -465,3 +465,5 @@ Before changing the design, check the basic/detailed distinction, density at des
 - [detailed-listing-styles.ts](../src/session/detailed-listing-styles.ts) and [detailed-listing-controller.ts](../src/session/detailed-listing-controller.ts): themes, typography and interactions.
 
 Recorded design and validation history is in the [work log](../work-log.md). The local [reference archive index](../temp-tool-output/reference-archive-261013_1844/index.html) is an optional ignored comparison collection, not a shipped dependency.
+
+Optional detailed report packaging: `--detailed --compressed` uses gzip level 9 with native `DecompressionStream`, no network, iframe or runtime dependency. Conventional HTML remains the default and retains detailed no-JS reading. The complete overview/TOC and controls remain static; decoding starts after first paint where supported. Cards use same-document `innerHTML`; pending filters, attention actions and links apply after initialization. Unsupported/corrupt output shows an explicit regeneration message. Compression reduces file bytes, not expanded DOM. See [the work log](work-log.md) for acceptance and measurement context.

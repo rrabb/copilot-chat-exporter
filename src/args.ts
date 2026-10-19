@@ -11,6 +11,7 @@ export interface CliOptions {
   fullIds: boolean;
   noHtml: boolean;
   detailed: boolean;
+  compressed: boolean;
   htmlOutput: string | null;
   current: boolean;
   overwrite: boolean;
@@ -32,7 +33,7 @@ export type ParsedArgs =
 
 const BOOLEAN_FLAGS = new Set([
   '--list', '--current', '--overwrite', '--verify', '--audit', '--strict',
-  '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed',
+  '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed', '--compressed',
 ]);
 
 // Value is the usage line shown when the flag is wrong, so the message lives next to the flag.
@@ -91,8 +92,12 @@ export function parseArgs (argv: string[]): ParsedArgs {
   const listRequested = booleans.has('--list')
     || (modes === 0 && positionals.length === 0 && !booleans.has('--current'));
   if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
-    || booleans.has('--no-html') || booleans.has('--detailed') || values.has('--html-output')) && !listRequested)
+    || booleans.has('--no-html') || booleans.has('--detailed') || booleans.has('--compressed') || values.has('--html-output')) && !listRequested)
     return { ok: false, error: 'Listing options are available only when listing sessions.' };
+  if (booleans.has('--compressed') && !booleans.has('--detailed'))
+    return { ok: false, error: '--compressed requires --detailed.' };
+  if (booleans.has('--compressed') && booleans.has('--no-html'))
+    return { ok: false, error: '--compressed cannot be combined with --no-html.' };
   if (booleans.has('--no-html') && values.has('--html-output'))
     return { ok: false, error: '--no-html cannot be combined with --html-output.' };
   if (modes > 1)
@@ -113,6 +118,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       fullIds: booleans.has('--full-ids'),
       noHtml: booleans.has('--no-html'),
       detailed: booleans.has('--detailed'),
+      compressed: booleans.has('--compressed'),
       htmlOutput: values.get('--html-output') ?? null,
       current: booleans.has('--current'),
       overwrite: booleans.has('--overwrite'),

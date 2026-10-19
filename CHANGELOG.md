@@ -6,6 +6,9 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Optional `--detailed --compressed` gzip HTML output, preserving the complete static overview/TOC, queued filters and links, and conventional HTML as the default.
+
+
 
 - Detailed listing: agent chats (Agent Host, delegated agents, Copilot CLI) now show credits and tokens like Local chats do: per-turn and per-chat chips with the basis stated (per-call rows, `from totals`, `turns a-b`, `partial rows`), a disclosure with the last logged total, per-call coverage and a by-model table. The console listing no longer says agent export is unsupported.
 - Agent credits per turn from running totals: for chats with no per-call usage rows (most of them), each turn gets the difference between consecutive checkpoint totals, labelled "from running totals", with a range when one checkpoint covers several turns; the Cost section lists the five most expensive turns and a table of all turns, and output tokens are shown where messages record them. Example: the turn that cost 81.57 credits is now visible in this chat's export.

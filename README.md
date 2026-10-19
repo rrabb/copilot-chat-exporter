@@ -583,3 +583,5 @@ The workspace root used for file links, line counts, and `git status` is read fr
 `workspaceStorage/<hash>/workspace.json`, so the tool is correct at any install depth and when
 exporting a session that belongs to a different workspace than the one you are standing in. Override
 with `--workspace-root <path>`.
+
+Optional detailed report packaging: `--detailed --compressed` uses gzip level 9 with native `DecompressionStream`, no network, iframe or runtime dependency. Conventional HTML remains the default and retains detailed no-JS reading. The complete overview/TOC and controls remain static; decoding starts after first paint where supported. Cards use same-document `innerHTML`; pending filters, attention actions and links apply after initialization. Unsupported/corrupt output shows an explicit regeneration message. Compression reduces file bytes, not expanded DOM. See [the work log](work-log.md) for acceptance and measurement context.

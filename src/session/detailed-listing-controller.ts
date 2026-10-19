@@ -46,9 +46,9 @@ export const detailedListingController = String.raw`
       normalize(row.dataset.models || '[]'), content(row)
     ]);
   }
-  let view = 'grouped';
-  let direction = -1;
-  let attention = '';
+  let view = input('view').value || 'grouped';
+  let direction = main.dataset.pendingDirection === '1' ? 1 : -1;
+  let attention = main.dataset.pendingAttention || '';
   const numeric = (row,key,minId,maxId,unknownId) => {
     const value = row.dataset[key], unknown = input(unknownId).value;
     const known = value !== '';
@@ -189,6 +189,10 @@ export const detailedListingController = String.raw`
       input('action-status').textContent='Clipboard unavailable for this local page. Select and copy the adjacent text manually.';
     }
   });
+  if(main.dataset.pendingAll === 'true')
+    for(const row of [...cards,...occurrences]) row.dataset.limited='false';
+  if(input('density').value && input('density').value !== 'balanced') density();
+  if(main.dataset.pendingDirection || (input('sort').value && input('sort').value !== 'updated')) sort();
   apply();
   if(location.hash)reveal(decodeURIComponent(location.hash.slice(1)));
 })();

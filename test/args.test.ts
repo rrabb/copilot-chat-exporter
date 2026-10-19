@@ -68,6 +68,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     fullIds: false,
     noHtml: false,
     detailed: false,
+    compressed: false,
     htmlOutput: null,
     current: false,
     overwrite: false,
@@ -81,15 +82,24 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     userDataRoot: null,
     positionals: [],
   });
+});
 
-  test('detailed implicitly lists, is listing-only and permits the nonfatal no-html combination', () => {
-    assert.equal(ok(['--detailed']).list, true);
-    assert.equal(ok(['--list', '--detailed']).detailed, true);
-    assert.equal(ok(['--detailed', '--no-html']).noHtml, true);
-    assert.match(err(['--detailed', 'session']), /only when listing/);
-    assert.match(err(['--current', '--detailed']), /only when listing/);
-    assert.match(err(['--verify', '--detailed']), /only when listing/);
-  });
+test('compressed HTML is opt-in and requires detailed HTML listing', () => {
+  assert.equal(ok(['--detailed', '--compressed']).compressed, true);
+  assert.equal(ok(['--list', '--detailed', '--compressed']).list, true);
+  assert.match(err(['--compressed']), /requires --detailed/u);
+  assert.match(err(['--list', '--compressed']), /requires --detailed/u);
+  assert.match(err(['--detailed', '--compressed', '--no-html']), /cannot be combined/u);
+  assert.match(err(['--verify', '--compressed']), /only when listing/u);
+});
+
+test('detailed implicitly lists, is listing-only and permits the nonfatal no-html combination', () => {
+  assert.equal(ok(['--detailed']).list, true);
+  assert.equal(ok(['--list', '--detailed']).detailed, true);
+  assert.equal(ok(['--detailed', '--no-html']).noHtml, true);
+  assert.match(err(['--detailed', 'session']), /only when listing/);
+  assert.match(err(['--current', '--detailed']), /only when listing/);
+  assert.match(err(['--verify', '--detailed']), /only when listing/);
 });
 
 test('root selection and current-session intent are explicit', () => {

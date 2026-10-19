@@ -14,6 +14,7 @@ import { inventorySessions } from './session/inventory.ts';
 import { formatSessionListing, formatSessionListingHtml } from './session/listing.ts';
 import { collectListingEvidence } from './session/listing-evidence.ts';
 import { formatDetailedSessionListingHtml } from './session/detailed-listing.ts';
+import { compressDetailedListingHtml } from './session/compressed-listing.ts';
 import { defaultListingHtmlPath, writeListingHtml } from './session/listing-report.ts';
 import { writeArchive } from './archive-writer.ts';
 import type { CompanionArtifact } from './export-policy.ts';
@@ -183,6 +184,7 @@ if (!parsed.ok) {
 const {
   list: listMode, current: currentMode, verify: verifyMode, strict: strictMode,
   showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode, detailed: detailedMode,
+  compressed: compressedMode,
   golden: goldenAction, snapshot: snapshotAction,
   installSkill: installSkillTarget,
   workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
@@ -253,13 +255,12 @@ try {
       const destination = htmlOutputArg === null
         ? defaultListingHtmlPath(process.cwd(), generatedAt, detailedMode)
         : path.resolve(htmlOutputArg);
-      htmlPath = await writeListingHtml(
-        destination,
-        detailedMode
-          ? formatDetailedSessionListingHtml(inventory.occurrences, await collectListingEvidence(inventory.occurrences), listingOptions, generatedAt.toISOString())
-          : formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString()),
-        overwriteMode,
-      );
+      const html = detailedMode
+        ? formatDetailedSessionListingHtml(inventory.occurrences, await collectListingEvidence(inventory.occurrences), listingOptions, generatedAt.toISOString())
+        : formatSessionListingHtml(inventory.occurrences, listingOptions, generatedAt.toISOString());
+      const output = compressedMode ? compressDetailedListingHtml(html) : html;
+      htmlPath = await writeListingHtml(destination, output, overwriteMode);
+
     }
     console.log(`VS Code user-data root: ${inventory.userDataRoot}\n`);
     console.log(formatSessionListing(inventory.occurrences, listingOptions));

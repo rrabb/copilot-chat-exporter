@@ -187,6 +187,30 @@ function controllerFixture (
   return { ids, cards, ignored, ignoredDetails, betaDetails, turn, links, chips, pins, copy, main, occurrences, table, input, projectButtons, attentionButton };
 }
 
+test('controller initializes the latest pre-load filters, view, density and show-all intent', () => {
+  const fixture = controllerFixture(undefined, (main, ids) => {
+    main.dataset.pendingAll = 'true';
+    ids.get('search')!.value = 'beta';
+    ids.get('view')!.value = 'occurrences';
+    ids.get('density')!.value = 'comprehensive';
+  });
+
+  assert.equal(fixture.ids.get('grouped-view')!.hidden, true);
+  assert.equal(fixture.ids.get('occurrence-view')!.hidden, false);
+  assert.equal(fixture.cards[1]!.dataset.limited, 'false');
+  assert.equal(fixture.cards[1]!.open, true);
+  assert.equal(fixture.cards[1]!.hidden, false);
+  assert.equal(fixture.cards[0]!.hidden, true);
+});
+
+test('queued attention initializes as a filter and Reset clears it', () => {
+  const fixture = controllerFixture(undefined, (main) => { main.dataset.pendingAttention = 'auto'; main.dataset.pendingAll = 'true'; });
+  assert.equal(fixture.cards[0]!.hidden, true);
+  assert.equal(fixture.cards[1]!.hidden, false);
+  fixture.ids.get('reset')!.fire('click');
+  assert.equal(fixture.cards[0]!.hidden, false);
+});
+
 test('conventional attention action resets prior filters, matches its condition and Reset restores all candidates', () => {
   const fixture = controllerFixture();
   assert.deepEqual(fixture.cards.filter(card => !card.hidden).map(card => card.id), ['alpha', 'unknown']);
