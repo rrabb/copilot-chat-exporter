@@ -246,6 +246,7 @@ export function parseChatSession (
   };
   const tally = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1);
   let syntheticRequestId = 0;
+  let noContentTools = 0;
   const turns = requests
     .map((request: any) => {
       const requestId = request?.requestId || `synthetic_request_${++syntheticRequestId}`;
@@ -271,6 +272,7 @@ export function parseChatSession (
             continue;
           }
           for (const node of classified) {
+            node.type === 'tool' && node.noRecordedContent && (noContentTools += 1);
             if (node.type === 'unknownResponse' && !GENERIC_RESPONSE_KINDS.has(node.kind))
               tally(census.unreviewed, node.kind);
             if (node.type === 'autoModel') {
@@ -375,6 +377,7 @@ export function parseChatSession (
     turns,
     rawRequests: requests,
     census: {
+      ...(noContentTools ? { representationCounts: { 'tool-no-content': noContentTools } } : {}),
       seen: census.seen,
       dropped: census.dropped,
       toolData: census.toolData,

@@ -38,6 +38,12 @@ test('toolFriendly drops the prefixes nobody reads', () => {
   assert.equal(toolFriendly(undefined), 'tool');
 });
 
+test('a confirmed no-content tool shows its name once and the missing-data note', () => {
+  const output = render([testTool({ toolId: 'tool_search', noRecordedContent: true })]);
+  assert.equal(output.match(/tool_search/g)?.length, 1);
+  assert.match(output, /No message, input or output was recorded\./);
+});
+
 test('cross-turn copies with no new content become identity-keyed continuation notes', () => {
   const original = testTool({ toolCallId: 'shared', invocation: 'Recorded action', inputText: 'unique input' });
   const same = testTool({ toolCallId: 'shared' });

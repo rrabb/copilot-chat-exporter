@@ -153,6 +153,13 @@ export function fileOperation (toolId: string) {
 // `item` is `any` on purpose: it is one record of an undocumented format owned by someone else.
 // Declaring a shape here would be a guess that the compiler then enforces as if it were known.
 export function classifyNode (item: any) {
+  const produced = classifyRecord(item);
+  // A handled kind whose source text the classifier did not carry into its output falls back
+  // to the JSON block, which the census counts as unreviewed (a strict failure).
+  return outputCheckFailure(item, produced) ? unknownResponse(item) : produced;
+}
+
+function classifyRecord (item: any) {
   if (!item || typeof item !== 'object')
     return null;
   if (item.kind === 'thinking') {
@@ -195,6 +202,7 @@ export function classifyNode (item: any) {
       type: 'tool',
       toolId: item.toolId,
       toolCallId: item.toolCallId,
+      ...(isNoContentToolRecord(item) ? { noRecordedContent: true as const } : {}),
       invocation,
       pastTense,
       title: item.generatedTitle || '',
@@ -276,6 +284,92 @@ export function classifyNode (item: any) {
     && !HANDLED_RESPONSE_KINDS.has(item.kind) && !IGNORED_RESPONSE_KINDS.has(item.kind))
     return unknownResponse(item);
   return null;
+}
+
+// Fields that carry a handled kind's content. A record whose content fields hold text while the
+// classifier produced nothing from them has changed form, not merely streamed an empty partial.
+const CONTENT_FIELDS: Record<string, string[]> = {
+  thinking: ['value'],
+  markdownContent: ['content'],
+  warning: ['content'],
+  confirmation: ['title', 'message', 'buttons'],
+  questionCarousel: ['questions'],
+  textEditGroup: ['uri'],
+  workspaceEdit: ['edits'],
+  autoModeResolution: ['resolved', 'resolvedModel', 'resolvedModelName'],
+};
+
+function holdsText (value: unknown, depth = 0): boolean {
+  if (typeof value === 'string')
+    return value.trim() !== '';
+  if (!value || typeof value !== 'object' || depth > 8)
+    return false;
+  return Object.values(value).some((entry) => holdsText(entry, depth + 1));
+}
+
+function producedText (kind: string, nodes: any[]) {
+  if (kind === 'warning')
+    return nodes.some((node) => nonEmptyString(node.text));
+  if (kind === 'confirmation')
+    return nodes.some((node) => nonEmptyString(node.text) || node.title !== 'Confirmation');
+  if (kind === 'textEditGroup')
+    return nodes.some((node) => nonEmptyString(node.uri));
+  return nodes.length > 0;
+}
+
+const EMPTY_TOOL_METADATA = new Set([
+  'kind', 'toolId', 'toolCallId', 'invocationMessage', 'isComplete', 'isConfirmed',
+  'source', 'presentation', 'icon', 'subAgentInvocationId', 'isAttachedToThinking',
+]);
+
+/** Only the metadata fields reviewed at VS Code 16507d91 can establish missing content. */
+export function isNoContentToolRecord (item: Record<string, unknown>): boolean {
+  if (item.kind !== 'toolInvocationSerialized' || (item.invocationMessage !== undefined && item.invocationMessage !== '')
+    || !nonEmptyString(item.toolId) || !nonEmptyString(item.toolCallId)
+    || Object.keys(item).some((key) => !EMPTY_TOOL_METADATA.has(key)))
+    return false;
+  const metadata = (value: unknown, keys: string[]) => value == null || (typeof value === 'object' && !Array.isArray(value)
+    && Object.entries(value).every(([key, entry]) => keys.includes(key) && typeof entry === 'string'));
+  return metadata(item.source, ['type', 'label']) && metadata(item.icon, ['id'])
+    && (item.isConfirmed == null || typeof item.isConfirmed === 'boolean'
+      || (typeof item.isConfirmed === 'object' && !Array.isArray(item.isConfirmed)
+        && Object.keys(item.isConfirmed).length === 1 && 'type' in item.isConfirmed
+        && typeof item.isConfirmed.type === 'number' && Number.isFinite(item.isConfirmed.type)))
+    && ['isComplete', 'isAttachedToThinking'].every((key) => item[key] === undefined || typeof item[key] === 'boolean')
+    && ['presentation', 'subAgentInvocationId'].every((key) => item[key] === undefined || typeof item[key] === 'string');
+}
+
+/**
+ * Why a record of a handled kind did not yield usable output, or null when it did. Checks that
+ * the classifier produced non-empty output from the record, not merely that fields exist.
+ * markdownVuln and inlineReference check their own form and fall back to JSON in classifyNode.
+ */
+export function outputCheckFailure (item: any, produced: unknown) {
+  const kind = item?.kind;
+  if (typeof kind !== 'string' || !HANDLED_RESPONSE_KINDS.has(kind))
+    return null;
+  const nodes = (Array.isArray(produced) ? produced : produced ? [produced] : []) as any[];
+  if (nodes.some((node) => node?.type === 'unknownResponse'))
+    return null;
+  if (kind === 'toolInvocationSerialized') {
+    const node = nodes[0];
+    if (!node || !nonEmptyString(node.toolId))
+      return 'tool-without-id';
+    const sourceHasMessage = holdsText(item.invocationMessage) || holdsText(item.pastTenseMessage);
+    if (sourceHasMessage && !(node.invocation || node.pastTense))
+      return 'tool-message-not-rendered';
+    const content = ['invocation', 'pastTense', 'title', 'command', 'promptText', 'inputText', 'output', 'resultText', 'resultError', 'toolSpecificData', 'resultDetails'];
+    if (content.some((key) => holdsText(node[key])))
+      return null;
+    return node.noRecordedContent === true && isNoContentToolRecord(item) ? null : 'tool-without-content';
+  }
+  if (kind === 'workspaceEdit' && Array.isArray(item.edits) && nodes.length < item.edits.length)
+    return 'edit-not-rendered';
+  const fields = CONTENT_FIELDS[kind];
+  if (!fields)
+    return null;
+  const hasContent = fields.some((field) => holdsText(item[field]));
+  return hasContent && !producedText(kind, nodes) ? 'content-not-rendered' : null;
 }
 
 const DISPLAY_METADATA_KEYS = ['supportThemeIcons', 'supportHtml', 'uris'];

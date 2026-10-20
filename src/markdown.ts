@@ -422,7 +422,9 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
   const hasBody = node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
   // Nothing to expand: render a plain line rather than an empty collapsible.
   if (!hasBody)
-    return [`- ${mutedSummary(head)}`];
+    return [`- ${mutedSummary(node.noRecordedContent
+      ? `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: No message, input or output was recorded.`
+      : head)}`];
   const body = [];
   node.intent && body.push(`**Intent:** ${esc(node.intent)}`, '');
   if (node.command) {

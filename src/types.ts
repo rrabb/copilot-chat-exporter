@@ -112,6 +112,8 @@ export interface EditNode {
 export interface ToolNode {
   type: 'tool';
   toolId: string;
+  /** The source passed the reviewed metadata-only field check. */
+  noRecordedContent?: true;
   /** Journal identity. Used to merge progress updates and to attach persisted resources. */
   toolCallId: string;
   invocation: string;

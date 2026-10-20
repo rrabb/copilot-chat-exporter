@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   GENERIC_RESPONSE_KINDS, GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
-  IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS, classifyNode, fileOperation, standardMarkdownValue, thinkingText,
+  IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS, classifyNode, fileOperation, outputCheckFailure, standardMarkdownValue, thinkingText,
 } from '../src/session/classify.ts';
 
 // One minimal item per handled kind. The coverage test at the bottom fails if a kind is added to
@@ -155,11 +155,12 @@ test('a todo tool call carries its list', () => {
 });
 
 test('an incomplete tool call is marked, and a file path is recovered from the message', () => {
-  const running = classifyNode({ kind: 'toolInvocationSerialized', toolCallId: 'call_5', isComplete: false });
+  const running = classifyNode({ kind: 'toolInvocationSerialized', toolId: 'run_in_terminal', toolCallId: 'call_5', isComplete: false });
   assert.equal(running.isComplete, false);
 
   const withFile = classifyNode({
     kind: 'toolInvocationSerialized',
+    toolId: 'copilot_replaceString',
     toolCallId: 'call_6',
     invocationMessage: { value: 'Edited [a.ts](file:///c%3A/proj/a.ts)' },
   });
@@ -308,6 +309,39 @@ test('fileOperation maps tool names to what they did', () => {
   assert.equal(fileOperation('insert_edit_into_file'), 'modified');
   assert.equal(fileOperation('read_file'), '', 'reading is not a change');
   assert.equal(fileOperation(''), '');
+});
+
+test('no-content tools pass only after a bounded absence check produces a missing-data marker', () => {
+  const item = { kind: 'toolInvocationSerialized', toolId: 'tool_search', toolCallId: 'call_9', invocationMessage: '' };
+  assert.equal(outputCheckFailure(item, { type: 'tool', toolId: 'tool_search', invocation: '' }), 'tool-without-content');
+  assert.equal(classifyNode(item).noRecordedContent, true);
+  assert.equal(classifyNode({ ...item, isConfirmed: { type: 1 }, source: { type: 'internal', label: 'Built in' } }).noRecordedContent, true);
+  for (const extra of [{ futurePayload: 'not reviewed' }, { originMessage: 'recorded origin' }, { source: { type: 'internal', payload: 'new' } }])
+    assert.equal(classifyNode({ ...item, ...extra }).type, 'unknownResponse');
+  const input = classifyNode({ ...item, resultDetails: { input: 'actual input' } });
+  assert.equal(input.inputText, 'actual input');
+  assert.equal(input.noRecordedContent, undefined);
+});
+
+test('the output check fails a tool call without an ID, or whose message did not reach the node', () => {
+  assert.equal(outputCheckFailure({ kind: 'toolInvocationSerialized', toolCallId: 'c' }, { type: 'tool', toolId: '' }), 'tool-without-id');
+  const item = { kind: 'toolInvocationSerialized', toolId: 'read_file', invocationMessage: { value: 'Reading a.ts' } };
+  assert.equal(outputCheckFailure(item, { type: 'tool', toolId: 'read_file' }), 'tool-message-not-rendered');
+  assert.equal(classifyNode({ kind: 'toolInvocationSerialized', toolCallId: 'c' }).type, 'unknownResponse');
+});
+
+test('the output check passes an empty thinking partial and fails content the classifier dropped', () => {
+  assert.equal(outputCheckFailure({ kind: 'thinking', value: '' }, null), null);
+  assert.equal(outputCheckFailure({ kind: 'warning', content: { value: 'x' } }, null), 'content-not-rendered');
+  assert.equal(outputCheckFailure({ kind: 'questionCarousel', questions: [{ title: 'Q' }] }, []), 'content-not-rendered');
+  const edit = { kind: 'workspaceEdit', edits: [{ oldResource: { path: '/a' } }, { oldResource: { path: '/b' } }] };
+  assert.equal(outputCheckFailure(edit, [{ type: 'edit' }]), 'edit-not-rendered');
+});
+
+test('a handled record whose form changed falls back to the unreviewed JSON block', () => {
+  const node = classifyNode({ kind: 'warning', content: { message: 'renamed field' } });
+  assert.equal(node.type, 'unknownResponse');
+  assert.equal(node.kind, 'warning');
 });
 
 test('every handled kind has an example above', () => {
