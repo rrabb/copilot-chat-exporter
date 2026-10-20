@@ -75,6 +75,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     overwrite: false,
     verify: false,
     strict: false,
+    json: false,
     golden: null,
     snapshot: null,
     installSkill: null,
@@ -183,4 +184,11 @@ test('--golden no longer leaves its action in the positionals', () => {
 test('--list is a mode, and junk beside it is still refused', () => {
   assert.equal(ok(['--list']).list, true);
   assert.match(err(['--list', '--bogus']), /Unknown option/);
+});
+
+test('--json is a verify-only option that sets json', () => {
+  assert.equal(ok(['--verify', 'the-session', '--json']).json, true);
+  assert.equal(ok(['--verify', 'the-session']).json, false);
+  assert.match(err(['the-session', '--json']), /--json is available only with --verify/);
+  assert.match(err(['--list', '--json']), /--json is available only with --verify/);
 });

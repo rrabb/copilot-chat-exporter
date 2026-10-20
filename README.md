@@ -45,6 +45,12 @@ bundle, license, README, docs and CI templates are the files that would ship.
 
 ## Build output
 
+### Verification reports
+
+`node src/cli.ts --verify --strict --json <session-selector> [export.md]` writes a machine-readable report. Local journals accept exact `.jsonl` paths. SDK chats use an exact qualified chat key from `--list`. Strict verification requires the pinned `markdown-it` dev dependency; it fails if the parser is unavailable. Exporting without verification still has no runtime dependencies.
+
+Run `node scripts/verify-corpus.mjs --user-data-root "<Code user-data root>" --out reports/corpus/latest.json --concurrency 6` to verify every source selected by the inventory. Reports are local-only and gitignored. The report records per-source exit reasons, content categories, parser results, fence repairs, missing-tool-content representations, and size/mtime before and after each run. Changed sources are excluded from totals. It also counts raw JSON string values containing a base64-alphabet run of at least 64 KiB. This heuristic triggers a review; it neither extracts nor decodes content.
+
 `npm run build` writes two bundles and TypeScript declarations into `dist/`:
 
 | File | Built from | Purpose |

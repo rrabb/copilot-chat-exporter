@@ -1,4 +1,5 @@
 import { buildDocument } from '../markdown.ts';
+import type { FenceRepairs } from '../markdown.ts';
 import type { CompanionArtifact } from '../export-policy.ts';
 import type { ParsedSession } from '../types.ts';
 import { eventsInScope, readSdkEvents } from './sdk-events.ts';
@@ -9,6 +10,7 @@ import { attachRunningTotals, attachUsage, copilotHomeOf, readUsageLedger, usage
 import type { UsageCall } from './sdk-usage.ts';
 
 export interface SdkExport {
+  fenceRepairs: FenceRepairs;
   markdown: string;
   companions: CompanionArtifact[];
   session: ParsedSession;
@@ -43,6 +45,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
   attachRunningTotals(built.session, events);
   const opaque = built.session.turns.reduce((sum, turn) => sum + (turn.scalar.opaqueReasoningBlocks ?? 0), 0);
   const overflow = { assetsDirectory: options.assetsDirectory, companions: [] as CompanionArtifact[] };
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
   const base = buildDocument(built.session, {
     location: { sessionId: source.sessionId, sessionPath: source.path, hashRoot: '' },
     resources: { resources: [], byCall: new Map(), resourceRoot: '' },
@@ -53,6 +56,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     generatedAt: options.generatedAt,
     source: 'sdk-events',
     overflow,
+    fenceRepairs,
   });
   const omissions = [...built.leftOut].sort(([left], [right]) => left.localeCompare(right));
   const lines = [
@@ -66,7 +70,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     `Reasoning recorded only as an encrypted token and therefore not readable: ${opaque.toLocaleString('en-US')} assistant message(s).`,
     '',
   ];
-  return { markdown: `${base}${lines.join('\n')}`, companions: [...built.companions, ...overflow.companions], session: built.session, leftOut: built.leftOut, events };
+  return { markdown: `${base}${lines.join('\n')}`, companions: [...built.companions, ...overflow.companions], session: built.session, leftOut: built.leftOut, events, fenceRepairs };
 }
 
 /** The usage rows the CLI stored for one chat's event log, read without changing the database. Empty when there are none. */

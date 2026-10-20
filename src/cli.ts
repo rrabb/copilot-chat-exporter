@@ -25,6 +25,8 @@ import {
 } from './session/classify.ts';
 import { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
 import { buildLossAccount } from './verify/loss-account.ts';
+import { buildLocalVerifyJson } from './verify/json-report.ts';
+import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { runSdkCommand } from './sdk-cli.ts';
 import {
@@ -193,7 +195,7 @@ if (!parsed.ok) {
   process.exit(1);
 }
 const {
-  list: listMode, current: currentMode, verify: verifyMode, strict: strictMode,
+  list: listMode, current: currentMode, verify: verifyMode, strict: strictMode, json: jsonMode,
   showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode, detailed: detailedMode,
   compression: compressionMode,
   golden: goldenAction, snapshot: snapshotAction,
@@ -293,7 +295,7 @@ if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefin
   // Agent Host and Copilot CLI chats are not Local journals; the inventory decides which path applies.
   const sdkExit = await runSdkCommand({
     root: selectedRoot, selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
-    overwrite: overwriteMode, verify: verifyMode, strict: strictMode,
+    overwrite: overwriteMode, verify: verifyMode, strict: strictMode, json: jsonMode,
   });
   sdkExit !== null && process.exit(sdkExit);
 }
@@ -314,37 +316,51 @@ const { location, raw, session } = loaded;
 
 if (verifyMode) {
   const report = buildVerificationReport(session, session.rawRequests || []);
-  printVerificationReport(report);
-  printCensusReport(session.census);
+  !jsonMode && printVerificationReport(report);
+  !jsonMode && printCensusReport(session.census);
   const crossCheck = buildJournalCrossCheck(session, raw);
-  printJournalCrossCheck(crossCheck);
-  let renderFailed = false;
+  !jsonMode && printJournalCrossCheck(crossCheck);
+  let renderReport: ReturnType<typeof buildRenderReport> | null = null;
+  let renderSkipReason: 'no-output-path' | 'unreadable-output' | null = null;
   let renderedMarkdown: string | null = null;
   if (outputArgument) {
     const renderPath = path.resolve(getWorkspaceRoot(), outputArgument);
     try {
       const markdown = await fs.readFile(renderPath, 'utf8');
       renderedMarkdown = markdown;
-      const renderReport = buildRenderReport(session, markdown);
-      printRenderReport(renderReport, workspacePath(renderPath));
-      renderFailed = renderReport.failed;
+      renderReport = buildRenderReport(session, markdown);
+      !jsonMode && printRenderReport(renderReport, workspacePath(renderPath));
     } catch (error) {
-      console.log(`Layer C - skipped: could not read output file ${outputArgument} (${errorLabel(error)}). Run the export first, then verify against it.`);
+      renderSkipReason = 'unreadable-output';
+      !jsonMode && console.log(`Layer C - skipped: could not read output file ${outputArgument} (${errorLabel(error)}). Run the export first, then verify against it.`);
     }
   } else {
-    console.log('Layer C - skipped: no output file given. Pass one to enable render checks: --verify <sessionId> <outputFile>');
+    renderSkipReason = 'no-output-path';
+    !jsonMode && console.log('Layer C - skipped: no output file given. Pass one to enable render checks: --verify <sessionId> <outputFile>');
   }
   const overflow = { assetsDirectory: 'assets', companions: [] as CompanionArtifact[] };
-  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
   const built = renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), overflow, fenceRepairs });
-  printFenceRepairs(fenceRepairs);
+  !jsonMode && printFenceRepairs(fenceRepairs);
   const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown ?? built}\n${renderedMarkdown === null
     ? overflow.companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')
     : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!))}`);
-  printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
-  const failed = report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || renderFailed
+  !jsonMode && printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
+  const parserCheck = buildParserCheck(renderedMarkdown ?? built, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
+  !jsonMode && console.log(formatParserCheck(parserCheck, renderedMarkdown === null ? 'in-memory build' : 'the given file').join('\n'));
+  const failed = report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || Boolean(renderReport?.failed) || parserCheck.failed
     || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0 || lossAccount.failed || fenceRepairs.early.length > 0));
-  process.exit(failed ? 2 : 0);
+  if (jsonMode) {
+    const json = buildLocalVerifyJson({
+      strict: strictMode, report, census: session.census, crossCheck, render: renderReport, renderSkipReason,
+      fenceRepairs, loss: lossAccount, lossTarget: renderedMarkdown === null ? 'in-memory' : 'file', parser: parserCheck,
+    });
+    process.stdout.write(`${JSON.stringify(json)}\n`);
+    process.exitCode = json.exitCode;
+  } else {
+    process.exitCode = failed ? 2 : 0;
+  }
+  process.exit();
 }
 
 // Renders in memory rather than writing an export: the digest is the artifact, and nothing in it
@@ -383,7 +399,7 @@ if (snapshotAction) {
 
 const outputPath = resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
 let rendered = '';
-const exportFenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+const exportFenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
 
 let outputSize: number;
 let companionCount = 0;
@@ -395,6 +411,7 @@ try {
       const overflow = { assetsDirectory, companions: [] as CompanionArtifact[] };
       exportFenceRepairs.early = [];
       exportFenceRepairs.turnEnd = 0;
+      exportFenceRepairs.html = [];
       rendered = renderSession(loaded, {
         outputPath,
         gitStatus: loaded.host.gitStatus(),

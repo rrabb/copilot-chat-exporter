@@ -157,10 +157,15 @@ export interface TextOverflow {
 // parameter through every renderer below it.
 let overflow: TextOverflow | null = null;
 
-/** Code fences the renderer had to close itself. `early` entries split a fence mid-run and fail strict mode. */
+/**
+ * Structure the renderer had to repair in model text. `early` entries split a fence mid-run and
+ * fail strict mode; `html` entries name an unclosed `<!--` ('comment') or raw-text tag the
+ * exporter escaped so it cannot hide the rest of the export.
+ */
 export interface FenceRepairs {
   early: Array<{ turn: number; kind: string }>;
   turnEnd: number;
+  html: Array<{ turn: number; kind: string }>;
 }
 
 let fenceRepairs: FenceRepairs | null = null;

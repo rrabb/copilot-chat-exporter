@@ -56,9 +56,11 @@
     "transcript"
   ],
   "devDependencies": {
+    "@types/markdown-it": "14.2.0",
     "@types/node": "^25.9.1",
     "brotli-dec-wasm": "2.3.2",
     "esbuild": "^0.27.7",
+    "markdown-it": "14.3.3",
     "typescript": "^5.9.3"
   }
 }

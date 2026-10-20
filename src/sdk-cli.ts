@@ -9,6 +9,8 @@ import { readSdkScope, readUsageForSource, renderSdkExport, selectSdkSession } f
 import type { SdkExport } from './session/sdk-export.ts';
 import { buildSdkLossAccount } from './verify/sdk-loss-account.ts';
 import { printLossAccount } from './verify/loss-report.ts';
+import { buildSdkVerifyJson } from './verify/json-report.ts';
+import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { errorLabel } from './text.ts';
 
 export interface SdkCommandOptions {
@@ -19,6 +21,7 @@ export interface SdkCommandOptions {
   overwrite: boolean;
   verify: boolean;
   strict: boolean;
+  json?: boolean;
 }
 
 /** Returns an exit code, or null when the selector is not an Agent Host or Copilot CLI chat. */
@@ -40,7 +43,7 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
     const ledger = readUsageForSource(source);
     if (options.verify) {
       const preview = renderSdkExport(events, source, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger });
-      return verifyReport(preview, options.strict);
+      return await verifyReport(preview, options.strict, options.json === true);
     }
     const host = await createHostContext({ hashRoot: '', workspaceRoot: null, outDir: options.outDir });
     setWorkspaceRoot(host.workspaceRoot);
@@ -87,9 +90,15 @@ function companionText (result: SdkExport): string {
   return result.companions.filter((item) => item.mediaType.startsWith('text/')).map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n');
 }
 
-function verifyReport (preview: SdkExport, strict: boolean): number {
+async function verifyReport (preview: SdkExport, strict: boolean, json: boolean): Promise<number> {
   const account = buildSdkLossAccount(preview.events, preview.markdown, companionText(preview));
+  const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const drift = preview.session.census.unhandled;
+  if (json) {
+    const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, parser, fenceRepairs: preview.fenceRepairs });
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    return report.exitCode;
+  }
   console.log('SDK event census');
   console.log(`- Scoped events: ${[...preview.session.census.seen.values()].reduce((sum, count) => sum + count, 0).toLocaleString('en-US')}`);
   drift.length
@@ -97,5 +106,8 @@ function verifyReport (preview: SdkExport, strict: boolean): number {
     : console.log('- Unhandled event types: none');
   console.log(`- Left out on purpose: ${[...preview.leftOut].map(([name, count]) => `${name} ${count}`).join('; ') || 'nothing'}`);
   printLossAccount(account, 'the Markdown this build would write');
-  return strict && (account.failed || drift.length > 0) ? 2 : 0;
+  console.log(formatParserCheck(parser, 'in-memory build').join('\n'));
+  const { early, turnEnd, html } = preview.fenceRepairs;
+  console.log(`Code fences closed by the exporter: ${early.length} before the end of a turn, ${turnEnd} at the end of a turn; HTML escapes: ${html.length}. Only early closes fail --strict.`);
+  return parser.failed || (strict && (account.failed || drift.length > 0 || early.length > 0)) ? 2 : 0;
 }

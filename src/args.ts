@@ -18,6 +18,8 @@ export interface CliOptions {
   overwrite: boolean;
   verify: boolean;
   strict: boolean;
+  /** With --verify: print one machine-readable JSON object instead of the text report. */
+  json: boolean;
   golden: 'check' | 'update' | null;
   snapshot: 'check' | 'update' | null;
   installSkill: string | null;
@@ -33,7 +35,7 @@ export type ParsedArgs =
   | { ok: false; error: string };
 
 const BOOLEAN_FLAGS = new Set([
-  '--list', '--current', '--overwrite', '--verify', '--audit', '--strict',
+  '--list', '--current', '--overwrite', '--verify', '--audit', '--strict', '--json',
   '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed', '--compressed',
 ]);
 
@@ -107,6 +109,8 @@ export function parseArgs (argv: string[]): ParsedArgs {
     return { ok: false, error: '--compressed / --compression cannot be combined with --no-html.' };
   if (booleans.has('--no-html') && values.has('--html-output'))
     return { ok: false, error: '--no-html cannot be combined with --html-output.' };
+  if (booleans.has('--json') && !(booleans.has('--verify') || booleans.has('--audit')))
+    return { ok: false, error: '--json is available only with --verify.' };
   if (modes > 1)
     return { ok: false, error: 'Choose one action: --list, --verify, --snapshot, --golden or --install-skill.' };
   if (booleans.has('--current') && (booleans.has('--list') || values.has('--golden') || values.has('--install-skill')))
@@ -132,6 +136,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       overwrite: booleans.has('--overwrite'),
       verify: booleans.has('--verify') || booleans.has('--audit'),
       strict: booleans.has('--strict'),
+      json: booleans.has('--json'),
       golden: (values.get('--golden') ?? null) as CliOptions['golden'],
       snapshot: (values.get('--snapshot') ?? null) as CliOptions['snapshot'],
       installSkill: values.get('--install-skill') ?? null,

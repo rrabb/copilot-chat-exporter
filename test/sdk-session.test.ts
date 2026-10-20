@@ -16,6 +16,18 @@ const assistant = (data: Record<string, unknown>) => event('assistant.message', 
 
 const build = (events: SdkEvent[]) => buildSdkSession(events, events, { title: 'Agent chat', assetsDirectory: 'chat_assets' });
 
+test('SDK exports report early and turn-end fence repairs from the shared renderer', () => {
+  const repair = (events: SdkEvent[]) => renderSdkExport(events, source(), {
+    title: 'Repairs', assetsDirectory: 'assets', outputPath: '', generatedAt: '2026-10-20T00:00:00Z',
+  }).fenceRepairs;
+  assert.equal(repair([prompt('Question'), assistant({ content: '~~~text\nunfinished' })]).turnEnd, 1);
+  const early = repair([
+    prompt('Question'), assistant({ content: '~~~text\nunfinished', toolRequests: [{ toolCallId: 'call', name: 'view', arguments: { path: 'test.ts' } }] }),
+  ]);
+  assert.equal(early.early.length, 1);
+  assert.equal(early.early[0].kind, 'tool');
+});
+
 test('readable reasoning, text and tool intent become turn content in recorded order', () => {
   const { session } = build([
     event('session.start', { copilotVersion: '1.2.3', startTime: '2026-10-14T09:59:00.000Z', context: { cwd: 'C:\\work' } }),

@@ -163,7 +163,7 @@ test('a node that interrupts an open fence is recorded as an early close and not
 });
 
 test('the fence repair sink counts early closes by kind and turn-end closes', () => {
-  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
   buildDocument(testSession({
     turns: [
       testTurn({ prompt: 'q1', body: [
@@ -184,7 +184,7 @@ test('the fence repair sink counts early closes by kind and turn-end closes', ()
 test('the stray fence that hugs an inline edit preview is not counted as an open fence', () => {
   // VS Code frames an inline edit preview with bare fences: one closes the run before the edit,
   // one opens the run after it. Both are dropped, so nothing is left open at turn end.
-  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
   const output = buildDocument(testSession({
     turns: [testTurn({ prompt: 'q', body: [
       { type: 'text', text: 'Updating the file.\n```\n' },
@@ -193,7 +193,7 @@ test('the stray fence that hugs an inline edit preview is not counted as an open
     ] })],
   }), documentContext({ fenceRepairs }));
 
-  assert.deepEqual(fenceRepairs, { early: [], turnEnd: 0 });
+  assert.deepEqual(fenceRepairs, { early: [], turnEnd: 0, html: [] });
   assert.doesNotMatch(output, /Representation change/);
   assert.match(output, /The file is updated\./);
 });

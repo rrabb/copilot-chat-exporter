@@ -144,6 +144,12 @@ test('an unknown agent event type is schema drift that --verify --strict reports
   const result = invoke('--verify', '--strict', 'bbbbbbbb', '--user-data-root', root);
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.match(result.stdout, /UNHANDLED event types: brand\.new\.kind=1/u);
+  const json = invoke('--verify', '--strict', '--json', 'bbbbbbbb', '--user-data-root', root);
+  assert.equal(json.status, 2, json.stdout + json.stderr);
+  const report = JSON.parse(json.stdout);
+  assert.equal(report.path, 'sdk');
+  assert.deepEqual(report.failureReasons, ['unhandled-kind']);
+  assert.deepEqual(report.census.unhandled, { 'brand.new.kind': 1 });
 });
 
 test('--verify prints the independent content check and --strict fails only when content is missing', async (context) => {
@@ -153,6 +159,35 @@ test('--verify prints the independent content check and --strict fails only when
   assert.match(clean.stdout, /Layer D - recorded content vs the Markdown this build would write/u);
   assert.match(clean.stdout, /Every checked piece of recorded content appears in the export\./u);
   assert.equal(invoke('--verify', '--strict', UUID).status, 0);
+});
+
+test('--verify --json writes one JSON document with counts and the same exit code', async (context) => {
+  const { invoke } = await fixture(context);
+  const result = invoke('--verify', '--strict', '--json', UUID);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const lines = result.stdout.trim().split('\n');
+  assert.equal(lines.length, 1, 'JSON mode prints nothing but the document');
+  const report = JSON.parse(lines[0]!);
+  assert.equal(report.version, 2);
+  assert.equal(report.path, 'local');
+  assert.equal(report.parser.failed, false);
+  assert.equal(report.parser.skipped, null, 'the dev parser is installed, so the check runs');
+  assert.equal(report.exitCode, 0);
+  assert.deepEqual(report.failureReasons, []);
+  assert.equal(report.layerB.rawRequests, 1);
+  assert.equal(report.layerC.skipped, 'no-output-path');
+  assert.equal(report.layerD.target, 'in-memory');
+  assert.ok(report.layerD.checked > 0);
+  assert.doesNotMatch(result.stdout, /Question|Answer/u, 'recorded text stays out of the JSON');
+  const unreadable = JSON.parse(invoke('--verify', '--json', UUID, 'missing.md').stdout);
+  assert.equal(unreadable.layerC.skipped, 'unreadable-output');
+});
+
+test('--json is refused without --verify', async (context) => {
+  const { invoke } = await fixture(context);
+  const result = invoke('--json', UUID);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /--json is available only with --verify/u);
 });
 
 async function fixture (context: test.TestContext, multipleRoots = false) {

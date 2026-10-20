@@ -347,6 +347,8 @@ export interface Turn {
  * classified to nothing. `unhandled` also includes unknown kinds kept as raw JSON until review.
  */
 export interface Census {
+  /** Source records given an explicit missing-data representation, separate from content pieces. */
+  representationCounts?: Record<string, number>;
   seen: Map<string, number>;
   dropped: Map<string, number>;
   /** `toolSpecificData.kind` counts, for spotting a renamed tool payload. */

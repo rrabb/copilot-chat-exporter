@@ -6,6 +6,8 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Machine-readable `--verify --json` reports and a reproducible corpus runner, including source-change checks and detection of base64-like strings at 64 KiB. Verification uses a pinned, dev-only Markdown parser; an unavailable parser fails strict verification. SDK fence repairs are reported and gated like Local.
+
 - Local UUID and prefix selection now searches both workspace journals and empty-window journals. Duplicate IDs still require an exact `.jsonl` path; missing IDs explain how to list sessions and choose the correct user-data root.
 - Unknown Local response kinds are kept as collapsed, redacted JSON only, held until an open code fence closes, with companion files for payloads over 300 lines OR 15 KiB. They remain visible in the schema census and fail strict verification until reviewed. Layer C checks that each block round-trips through `JSON.parse`.
 - `markdownVuln` response items render semantically: their text joins the surrounding run so code blocks stay continuous, and their warnings follow the run, labeled as unvalidated.
