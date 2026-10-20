@@ -62,8 +62,18 @@ const LINE_CATEGORIES = new Set(['tool-input', 'tool-output', 'terminal-output',
 // Recorded response kinds that are presentation, bookkeeping or handled as file references.
 const NON_CONTENT_KINDS = new Set([
   'undoStop', 'codeblockUri', 'progressMessage', 'progressTaskSerialized', 'mcpServersStarting',
-  'inlineReference', 'textEditGroup', 'workspaceEdit',
+  'textEditGroup', 'workspaceEdit',
 ]);
+
+// The recorded label of an inline reference, read independently of the classifier: the `name`
+// VS Code shows first, or a symbol's own name. Unlabelled references (a bare URI or Location,
+// shown by basename) are file references and are not checked as text.
+function inlineReferenceText (leaf: Record<string, any>): string {
+  if (typeof leaf.name === 'string' && leaf.name.trim())
+    return leaf.name.trim();
+  const ref = leaf.inlineReference;
+  return isRecord(ref) && isRecord(ref.location) && typeof ref.name === 'string' ? ref.name.trim() : '';
+}
 
 function isRecord (value: unknown): value is Record<string, any> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -173,7 +183,10 @@ function pieces (request: unknown): Piece[] {
     endStream();
     if (NON_CONTENT_KINDS.has(kind))
       continue;
-    if (kind === 'thinking') {
+    if (kind === 'inlineReference') {
+      const label = inlineReferenceText(leaf);
+      label && result.push({ category: 'inline-reference', text: label });
+    } else if (kind === 'thinking') {
       result.push({ category: 'reasoning', text: reasoningText(leaf.value) });
     } else if (kind === 'toolInvocationSerialized') {
       const details = leaf.resultDetails;

@@ -63,6 +63,24 @@ test('a short markdownVuln fragment inside a code line is checked through its wh
   assert.equal(broken.failed, true);
 });
 
+test('every labelled inline reference is checked, so an empty rendered reference is absent', () => {
+  const uri = { scheme: 'file', path: '/proj/src/deep/widget.ts' };
+  const raw = [request([
+    { value: 'See ' },
+    { kind: 'inlineReference', inlineReference: { uri, range: { startLineNumber: 3 } }, name: 'src/deep/widget.ts#L3' },
+    { value: ' and ' },
+    { kind: 'inlineReference', inlineReference: { name: 'runExport', location: { uri } } },
+    { value: ' for details.' },
+  ])];
+  const intact = 'Please explain the build failure\nSee `src/deep/widget.ts#L3` and `runExport` for details.';
+  const account = buildLossAccount(raw, intact);
+  assert.equal(summary(account)['inline-reference'], '2/0/0');
+  assert.equal(account.failed, false);
+  const dropped = buildLossAccount(raw, intact.replace('`src/deep/widget.ts#L3`', ''));
+  assert.deepEqual(dropped.unaccounted.map((item) => [item.category, item.status]), [['inline-reference', 'absent']]);
+  assert.equal(dropped.failed, true);
+});
+
 test('Layer D detects repeated recorded text rendered only once', () => {
   const account = buildLossAccount([
     request([{ value: 'Repeated response fragment.' }, { value: 'Repeated response fragment.' }]),

@@ -268,3 +268,41 @@ export function mutedSummary (html: string) {
 export function assistantBlock (markdown: string) {
   return [`<div style="${ASSISTANT_BOX}">`, '', closeUnbalancedFences(neutralizeStructuralHtml(markdown)), '', '</div>', ''];
 }
+
+/**
+ * True when `text` ends inside an unclosed inline code span: a backtick run of length N that no
+ * later run of exactly N backticks closes. Only the last paragraph outside code fences counts,
+ * because a code span cannot cross a blank line or a fence. Text ending inside a fence returns
+ * false; check that with openFenceTicks.
+ */
+export function hasUnclosedInlineCode (text: string) {
+  const lines = text.split('\n');
+  let fence = '';
+  const inside = lines.map((line) => {
+    if (fence) {
+      fenceCloses(line, fence) && (fence = '');
+      return true;
+    }
+    fence = fenceOpener(line);
+    return Boolean(fence);
+  });
+  if (fence)
+    return false;
+  let start = 0;
+  lines.forEach((line, index) => {
+    (inside[index] || !line.trim()) && (start = index + 1);
+  });
+  let open = 0;
+  for (const match of lines.slice(start).join('\n').matchAll(/(\\*)(`+)/g)) {
+    // Outside a span, an odd number of backslashes escapes the first backtick of the run.
+    const run = !open && match[1].length % 2 ? match[2].length - 1 : match[2].length;
+    if (!run)
+      continue;
+    if (!open)
+      open = run;
+    else if (run === open)
+      open = 0;
+  }
+  return open > 0;
+}
+

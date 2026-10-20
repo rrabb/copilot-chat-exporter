@@ -23,7 +23,7 @@ import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
 import {
   COLLATOR, COMMAND_CODE, FILE_LINK_COLOR, MARK, MUTED, MUTED_CODE, NESTED_INDENT, PROMPT_BADGE,
-  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences, fenceCloses, fenceOpener, openFenceTicks,
+  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences, hasUnclosedInlineCode, fenceCloses, fenceOpener, openFenceTicks,
   esc, extractUri, fenceFor, fmtAiCredits, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
   mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
   userMessageAnchor, userMessageHref,
@@ -714,7 +714,10 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       node.vulnerabilities?.length && held.push(...renderVulnerabilities(node));
     } else if (node.type === 'ref' && node.text) {
       flushThoughts();
-      run.push(`\`${node.text}\``);
+      // Like VS Code, merge the plain label into code (an open fence or inline code span) and
+      // show it as a code span in prose.
+      const inCode = fenceOpen() || hasUnclosedInlineCode(pending());
+      run.push(inCode ? node.text : `\`${node.text}\``);
     } else if (node.type === 'tool') {
       flush({ interrupter: 'tool' });
       flushThoughts();

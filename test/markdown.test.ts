@@ -95,6 +95,21 @@ test('markdownVuln text joins the code fence it was streamed into, and its warni
   assert.match(output, /supportThemeIcons, supportHtml, uris/);
 });
 
+test('an inline reference is a code span in prose but its plain label inside code', () => {
+  // VS Code merges the label into the text when it lands inside a fence or an open inline code span,
+  // so wrapping it in backticks there would break the code.
+  const ref = { type: 'ref' as const, text: 'src/a.ts#L3' };
+  assert.match(render([{ type: 'text', text: 'See ' }, ref, { type: 'text', text: ' for details.' }]), /See `src\/a\.ts#L3` for details\./);
+  for (const marker of ['```', '~~~']) {
+    const output = render([{ type: 'text', text: `${marker}text\nopen ` }, ref, { type: 'text', text: `\n${marker}\nAfter.` }]);
+    assert.match(output, new RegExp(`${marker}text\\nopen src/a\\.ts#L3\\n${marker}`), `plain label inside ${marker}`);
+    assert.doesNotMatch(output, /Representation change/);
+  }
+  assert.match(render([{ type: 'text', text: 'Run `cat ' }, ref, { type: 'text', text: '` now.' }]), /Run `cat src\/a\.ts#L3` now\./);
+  assert.match(render([{ type: 'text', text: 'Run ``a`b ' }, ref, { type: 'text', text: '`` now.' }]), /Run ``a`b src\/a\.ts#L3`` now\./);
+  assert.match(render([{ type: 'text', text: 'Closed `x` then ' }, ref]), /Closed `x` then `src\/a\.ts#L3`/);
+});
+
 test('an unknown kind inside an open fence never splits it; its JSON follows the run and round-trips', () => {
   const payload = JSON.stringify({ kind: 'futureKind', content: { value: 'const b = 2;\n' } }, null, 2);
   const output = render([

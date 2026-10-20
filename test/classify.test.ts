@@ -196,6 +196,32 @@ test('workspaceEdit returns an ARRAY, one node per file operation', () => {
   assert.equal(classifyNode({ kind: 'workspaceEdit', edits: [] }), null);
 });
 
+test('inlineReference labels follow VS Code: the recorded name first, else the basename or symbol name', () => {
+  const uri = { $mid: 1, scheme: 'file', path: '/proj/src/deep/c.ts' };
+  const range = { startLineNumber: 3, startColumn: 1, endLineNumber: 7, endColumn: 1 };
+  const label = (item: Record<string, unknown>) => classifyNode({ kind: 'inlineReference', ...item });
+  assert.deepEqual(label({ inlineReference: { uri, range }, name: 'src/deep/c.ts#L3-L7' }), { type: 'ref', text: 'src/deep/c.ts#L3-L7' });
+  assert.deepEqual(label({ inlineReference: { uri, range } }), { type: 'ref', text: 'c.ts' });
+  assert.deepEqual(label({ inlineReference: { name: 'runExport', kind: 12, location: { uri, range } } }), { type: 'ref', text: 'runExport' });
+  assert.deepEqual(label({ inlineReference: uri }), { type: 'ref', text: 'c.ts' });
+  assert.deepEqual(label({ inlineReference: uri, name: 'src/deep/c.ts' }), { type: 'ref', text: 'src/deep/c.ts' });
+  assert.deepEqual(label({ inlineReference: { uri: { scheme: 'file', fsPath: 'C:\\proj\\d.ts' }, range } }), { type: 'ref', text: 'd.ts' });
+});
+
+test('an inlineReference to a root URI with no basename falls back to the path, then the external URI', () => {
+  const label = (ref: Record<string, unknown>) => classifyNode({ kind: 'inlineReference', inlineReference: ref });
+  assert.deepEqual(label({ $mid: 1, scheme: 'file', path: '/', fsPath: '\\', external: 'file:///', _sep: 1 }), { type: 'ref', text: '/' });
+  assert.deepEqual(label({ scheme: 'file', external: 'file:///' }), { type: 'ref', text: 'file:///' });
+  assert.deepEqual(label({ scheme: 'https', external: 'https://example.com/docs/page.md' }), { type: 'ref', text: 'page.md' });
+  assert.deepEqual(label({ uri: { scheme: 'file', path: '/' } }), { type: 'ref', text: '/' });
+});
+
+test('an inlineReference with no label falls back to unreviewed JSON instead of rendering empty', () => {
+  const node = classifyNode({ kind: 'inlineReference', inlineReference: { range: { startLineNumber: 1 } } });
+  assert.equal(node?.type, 'unknownResponse');
+  assert.equal((node as { kind: string }).kind, 'inlineReference');
+});
+
 test('inlineReference is reduced to a basename', () => {
   assert.deepEqual(classifyNode(SAMPLES.inlineReference), { type: 'ref', text: 'b.ts' });
   assert.deepEqual(classifyNode({ kind: 'inlineReference', reference: 'plain.ts' }), { type: 'ref', text: 'plain.ts' });

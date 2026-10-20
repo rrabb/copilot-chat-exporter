@@ -15,7 +15,6 @@
 // silences the census, and fourteen unobserved names once sat there disarming the very alarm
 // built to catch them.
 
-import path from 'node:path';
 import { extractUri, stripAnsi } from '../text.ts';
 
 // A handled kind can still yield nothing for a given item (an empty streamed `thinking` partial,
@@ -252,9 +251,8 @@ export function classifyNode (item: any) {
     return entries.length ? entries : null;
   }
   if (item.kind === 'inlineReference') {
-    const ref = item.inlineReference || item.reference || item.name;
-    const value = typeof ref === 'string' ? ref : (ref?.path || ref?.fsPath || ref?.name || '');
-    return { type: 'ref', text: value ? path.basename(String(value)) : '' };
+    const label = inlineReferenceLabel(item);
+    return label ? { type: 'ref', text: label } : unknownResponse(item);
   }
   if (item.kind === 'autoModeResolution') {
     // Which model Auto picked for this request. Observed in two shapes: the newer
@@ -298,6 +296,34 @@ export function vulnerabilityList (value: unknown) {
     || !value.every((entry) => typeof entry?.title === 'string' && typeof entry?.description === 'string'))
     return null;
   return value.map((entry) => ({ title: entry.title as string, description: entry.description as string }));
+}
+
+/**
+ * The label VS Code shows for an inline reference (annotations.ts in 1.141.2): the recorded
+ * `name` first, otherwise a symbol's name or the basename of the URI, Location or path. A root
+ * URI has no basename, so the exporter falls back to the path, then the external URI (VS Code
+ * would show an empty label there).
+ */
+export function inlineReferenceLabel (item: any) {
+  const name = nonEmptyString(item?.name);
+  if (name)
+    return name;
+  const ref = item?.inlineReference || item?.reference;
+  if (typeof ref === 'string')
+    return baseName(ref);
+  if (!ref || typeof ref !== 'object')
+    return '';
+  const symbol = ref.location ? nonEmptyString(ref.name) : '';
+  if (symbol)
+    return symbol;
+  const uri = ref.location?.uri || ref.uri || ref;
+  const location = nonEmptyString(uri?.path) || nonEmptyString(uri?.fsPath) || nonEmptyString(uri?.external);
+  return baseName(location.replace(/^[a-z][\w+.-]*:\/\//i, '')) || location;
+}
+
+/** The last path segment, splitting on either slash so Windows paths work on any platform. */
+function baseName (value: unknown) {
+  return typeof value === 'string' ? value.split(/[\\/]/).filter(Boolean).pop()?.trim() || '' : '';
 }
 
 function unknownResponse (item: any) {
