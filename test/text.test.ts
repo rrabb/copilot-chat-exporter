@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  assistantBlock, blockquote, clip, closeUnbalancedFences, esc, extractUri, fenceFor,
+  assistantBlock, blockquote, clip, closeUnbalancedFences, esc, escapeUnclosedHtml, extractUri, fenceFor, fenceOpener,
   fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp, mutedSummary,
   neutralizeStructuralHtml, parseJson, reEscape, redact, stripAnsi, stripMarkdown, thousands,
 } from '../src/text.ts';
@@ -86,6 +86,36 @@ test('closeUnbalancedFences appends a matching close only when one is missing', 
   assert.equal(closeUnbalancedFences('no fences here'), 'no fences here');
 });
 
+test('closeUnbalancedFences repeats the opener container prefix: list indentation, blockquote markers, or both', () => {
+  assert.equal(closeUnbalancedFences('- item\n  ```\n  code'), '- item\n  ```\n  code\n  ```', 'list continuation indent');
+  assert.equal(closeUnbalancedFences('- ```js\n  code'), '- ```js\n  code\n  ```', 'bullet replaced by its width');
+  assert.equal(closeUnbalancedFences('1. ```\n   code'), '1. ```\n   code\n   ```', 'ordered marker replaced by its width');
+  assert.equal(closeUnbalancedFences('> ```\n> code'), '> ```\n> code\n> ```', 'blockquote marker kept');
+  assert.equal(closeUnbalancedFences('> - ```\n>   code'), '> - ```\n>   code\n>   ```', 'list nested in a blockquote');
+  assert.equal(closeUnbalancedFences('> > ~~~\n> > code'), '> > ~~~\n> > code\n> > ~~~', 'nested blockquotes');
+  assert.equal(closeUnbalancedFences('  ```\ncode'), '  ```\ncode\n  ```', 'top-level indented fence keeps its indent');
+});
+
+test('only spaces and tabs indent a fence, as in CommonMark; a BOM or other Unicode space does not', () => {
+  for (const prefix of ['\uFEFF', '\u00A0', '\u2003', '\u3000']) {
+    const text = `${prefix}~~~\ncode`;
+    assert.equal(closeUnbalancedFences(text), text, `U+${prefix.codePointAt(0)!.toString(16).toUpperCase()} before ~~~ is not a fence`);
+    assert.equal(fenceOpener(`${prefix}\`\`\``), '');
+  }
+  assert.equal(closeUnbalancedFences('\t```\ncode'), '\t```\ncode\n\t```', 'a tab-indented opener gets the same tab, never a 1-space fence');
+  assert.equal(closeUnbalancedFences('```\ncode\n```\uFEFF'), '```\ncode\n```\uFEFF\n```', 'a trailing BOM stops a line closing the fence');
+});
+
+test('a fence inside a container ends with the container, so no repair is appended', () => {
+  const quoted = '> ```\n> code\nafter';
+  assert.equal(closeUnbalancedFences(quoted), quoted, 'a line without > ends the blockquote and its fence');
+  const listed = '- item\n  ```\n  code\nafter';
+  assert.equal(closeUnbalancedFences(listed), listed, 'a less-indented line ends the list item and its fence');
+  const nested = '> - ```\n>   code\n> after';
+  assert.equal(closeUnbalancedFences(nested), nested, 'a less-indented quoted line ends the nested list item');
+  assert.equal(closeUnbalancedFences('> ```\n> code\n```'), '> ```\n> code\n```\n```', 'the unquoted fence after the blockquote is the one left open');
+});
+
 test('tilde fences are tracked like backtick fences, and the two never close each other', () => {
   assert.equal(closeUnbalancedFences('open\n~~~js\ncode'), 'open\n~~~js\ncode\n~~~');
   assert.equal(closeUnbalancedFences('~~~~\ninner ~~~ run'), '~~~~\ninner ~~~ run\n~~~~');
@@ -100,6 +130,41 @@ test('neutralizeStructuralHtml leaves markup inside a tilde fence alone', () => 
   assert.equal(lines[1], '<details>');
   assert.equal(lines[3], '</details>', 'a backtick line does not end a tilde fence');
   assert.equal(lines[5], '&lt;details>');
+});
+
+test('escapeUnclosedHtml escapes an unclosed comment opener outside code and counts it', () => {
+  const result = escapeUnclosedHtml('Before\n<!-- never closed\nAfter');
+  assert.equal(result.text, 'Before\n&lt;!-- never closed\nAfter');
+  assert.deepEqual(result.escaped, ['comment']);
+});
+
+test('unclosed pre tags are escaped outside code without changing closed tags', () => {
+  assert.deepEqual(escapeUnclosedHtml('<pre>\nnever closed'), { text: '&lt;pre>\nnever closed', escaped: ['pre'] });
+  for (const text of ['<pre>closed</pre>', '```html\n<pre>\n```', '`<pre>`'])
+    assert.deepEqual(escapeUnclosedHtml(text), { text, escaped: [] });
+});
+
+test('escapeUnclosedHtml leaves a closed comment, even across lines, alone', () => {
+  const text = 'a <!-- hidden\nstill hidden --> b';
+  assert.deepEqual(escapeUnclosedHtml(text), { text, escaped: [] });
+});
+
+test('escapeUnclosedHtml escapes unclosed raw-text tags but not closed ones or lookalikes', () => {
+  const result = escapeUnclosedHtml('<script>\n<STYLE type="x">\n<textarea\n<scripts> <stylesheet>');
+  assert.equal(result.text, '&lt;script>\n&lt;STYLE type="x">\n&lt;textarea\n<scripts> <stylesheet>');
+  assert.deepEqual(result.escaped, ['script', 'style', 'textarea']);
+  const closed = '<script>x()</script> <style>a{}</STYLE>';
+  assert.deepEqual(escapeUnclosedHtml(closed), { text: closed, escaped: [] });
+});
+
+test('escapeUnclosedHtml leaves openers inside fences and inline code spans alone', () => {
+  const text = ['Use `<!--` or ``<script>`` here.', '```html', '<!-- open', '<textarea>', '```', '~~~', '<style>', '~~~'].join('\n');
+  assert.deepEqual(escapeUnclosedHtml(text), { text, escaped: [] });
+});
+
+test('escapeUnclosedHtml treats a closer before the opener as no closer', () => {
+  const result = escapeUnclosedHtml('--> then <!-- open');
+  assert.equal(result.text, '--> then &lt;!-- open');
 });
 
 test('extractUri decodes a file URI or yields nothing', () => {

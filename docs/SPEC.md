@@ -47,6 +47,8 @@ The exporter keeps tool calls that VS Code hides (`presentation: 'hidden'`). A l
 
 For Local tool records, an explicit missing-data representation is allowed only after checking the complete record against the reviewed metadata fields. It renders the tool name once and "No message, input or output was recorded." The census reports these under `representationCounts.tool-no-content`, separately from Layer D content pieces. Unfamiliar fields fall back to JSON and fail strict rather than claiming no content.
 
+Container fence repairs repeat list indentation and blockquote prefixes. Fence whitespace excludes BOM characters. Outside code, unclosed comments and `script`, `style`, `textarea` and `pre` tags are escaped and recorded as representation changes.
+
 Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backing id>/events.jsonl`. The export is selected like a Local chat (`copilot-chat-export <id>`), by the chat UUID, the backing ID, a unique prefix of at least 8 hex characters, or the exact qualified chat key shown by `--list`. The main conversation is exported, and each sub-agent conversation is nested inline at the delegation point (collapsed, always labelled as a sub-agent with its title, a summary line and a collapsible full conversation). Nesting is followed up to 8 levels; child events with no matching delegation in the conversation are counted under "Left out of this export". Usage is exported as AI credits (see "Agent usage and credits" below); where none was recorded it shows "not recorded", never zero.
 
 | Record | Decision | Where it appears |

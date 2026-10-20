@@ -23,9 +23,9 @@ import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
 import {
   COLLATOR, COMMAND_CODE, FILE_LINK_COLOR, MARK, MUTED, MUTED_CODE, NESTED_INDENT, PROMPT_BADGE,
-  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences, hasUnclosedInlineCode, fenceCloses, fenceOpener, openFenceTicks,
+  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences, hasUnclosedInlineCode, openFenceCloser, openFenceTicks, scanFences,
   esc, extractUri, fenceFor, fmtAiCredits, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
-  mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
+  escapeUnclosedHtml, mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
   userMessageAnchor, userMessageHref,
 } from './text.ts';
 
@@ -66,31 +66,29 @@ function borderedMarkdown (content: unknown, { copyable = true, lang = 'markdown
 // Live-rendering embedded Markdown is only safe for plain prose. Anything in this list
 // changes how the surrounding document renders, so such content is shown as source.
 function markdownRisks (content: string) {
-  let marker = '';
   let html = false;
   let comment = false;
   let heading = false;
   let link = false;
-  for (const line of String(content).split('\n')) {
-    if (marker) {
-      fenceCloses(line, marker) && (marker = '');
-      continue;
-    }
-    marker = fenceOpener(line);
-    if (marker)
-      continue;
+  const lines = String(content).split('\n');
+  const { inside, open } = scanFences(lines);
+  lines.forEach((line, index) => {
+    if (inside[index])
+      return;
     // Any tag-like token renders live: <Select> becomes a real dropdown, <img> loads, etc.
     /<\/?[A-Za-z][\w:.-]*(\s[^<>]*)?\/?>/.test(line) && (html = true);
+    // A raw-text opener needs no '>' to start an HTML block that runs to the end of the page.
+    /<(script|style|textarea|pre)(?=[\s/>]|$)/i.test(line) && (html = true);
     line.includes('<!--') && (comment = true);
     /^\s{0,3}#{1,6}\s/.test(line) && (heading = true);
     /^\s*<a\s|<a\s+id=/i.test(line) && (link = true);
-  }
+  });
   const risks = [];
   html && risks.push('raw HTML/XML');
   comment && risks.push('HTML comments');
   heading && risks.push('headings would pollute the outline');
   link && risks.push('anchors');
-  marker && risks.push('unclosed code fence');
+  open && risks.push('unclosed code fence');
   return risks;
 }
 
@@ -169,6 +167,20 @@ export interface FenceRepairs {
 }
 
 let fenceRepairs: FenceRepairs | null = null;
+
+const HTML_ESCAPE_NOTE = '> _Representation change: the exporter escaped an unclosed HTML comment or block tag (script, style, textarea, pre) in chat text so it cannot hide the rest of the export._';
+
+// Model and prompt text render live, and a renderer passes an HTML block's raw source to the
+// page: an unclosed <!-- or <script> there swallows the rest of the export in the browser, even
+// when the Markdown container around it ends.
+function escapeModelHtml (markdown: string, turnNumber: number, notes: string[]) {
+  const { text, escaped } = escapeUnclosedHtml(markdown);
+  if (escaped.length) {
+    fenceRepairs?.html.push(...escaped.map((kind) => ({ turn: turnNumber, kind })));
+    notes.includes(HTML_ESCAPE_NOTE) || notes.push(HTML_ESCAPE_NOTE, '');
+  }
+  return text;
+}
 
 // The fence VS Code writes before an inline edit preview; it is dropped when the run is flushed.
 const LEAD_EDIT_FENCE = /^\s*`{3,}[^\n]*\n?/;
@@ -706,7 +718,7 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       held.unshift(`> _Representation change: the exporter closed a code fence early because a ${interrupter} record interrupted it; the code continues in the next block._`, '');
     }
     if (markdown) {
-      lines.push(...assistantBlock(markdown));
+      lines.push(...assistantBlock(escapeModelHtml(markdown, turn.number, held)));
     }
     run = [];
   };
@@ -715,6 +727,8 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
     const tl = thoughts.length;
     if (!tl)
       return;
+    const notes: string[] = [];
+    const rendered = thoughts.map((thought) => `💡 ${closeUnbalancedFences(neutralizeStructuralHtml(escapeModelHtml(redact(thought), turn.number, notes)))}`);
     lines.push(
       `<details class="agent-reasoning"><summary>${mutedSummary(`🧠 Agent reasoning (${tl} thought${tl !== 1 ? 's' : ''})`)}</summary>`,
       '',
@@ -724,12 +738,13 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       // without the full paragraph gap between them piling up for a multi-thought turn. Each
       // thought is fence-closed first so a stray ``` in one cannot swallow the rest, and the
       // <br> sits on its own line so it never lands on an appended closing fence.
-      thoughts.map((thought) => `💡 ${closeUnbalancedFences(neutralizeStructuralHtml(redact(thought)))}`).join('\n<br>\n'),
+      rendered.join('\n<br>\n'),
       '',
       '</div>',
       '',
       '</details>',
       '',
+      ...notes,
     );
     thoughts = [];
   };
@@ -781,7 +796,7 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       stripLeadFence = Boolean(node.inline);
     }
   }
-  const unclosed = openFenceTicks(pending());
+  const unclosed = openFenceCloser(pending());
   if (unclosed) {
     run.push(`${run.join('').endsWith('\n') ? '' : '\n'}${unclosed}\n`);
     fenceRepairs && (fenceRepairs.turnEnd += 1);
@@ -1265,6 +1280,8 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
 
   for (const turn of turns) {
     const badge = esc(clip(turn.prompt, 90));
+    const promptNotes: string[] = [];
+    const prompt = blockquote(escapeModelHtml(String(turn.prompt ?? ''), turn.number, promptNotes));
     lines.push(
       '---',
       '',
@@ -1277,10 +1294,11 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       '',
       `<div style="${PROMPT_BOX}">`,
       '',
-      blockquote(turn.prompt),
+      prompt,
       '',
       '</div>',
       '',
+      ...promptNotes,
     );
     lines.push(...renderTurnBody(turn, resources.byCall, outputPath, { previousTools }), '');
     lines.push(...turnInfo(turn), '');

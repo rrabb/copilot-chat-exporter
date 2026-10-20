@@ -174,6 +174,7 @@ function printRenderReport (report: ReturnType<typeof buildRenderReport>, target
 }
 
 function printFenceRepairs (repairs: FenceRepairs) {
+  repairs.html.length && console.log(`HTML escaped by the exporter: ${repairs.html.length} unclosed comment or raw-text tag(s) in chat text. Each is noted in the export as a representation change.`);
   if (!repairs.early.length && !repairs.turnEnd)
     return;
   const byKind = new Map<string, number>();

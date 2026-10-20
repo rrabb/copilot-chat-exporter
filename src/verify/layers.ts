@@ -18,7 +18,7 @@
 import type { ParsedSession, ToolNode, Turn, TurnNode } from '../types.ts';
 import { classifyNode, thinkingText } from '../session/classify.ts';
 import { flattenItems, messageText, requestValues } from '../session/journal.ts';
-import { MARK, clip, fenceCloses, fenceOpener, reEscape, redact, sectionAnchor } from '../text.ts';
+import { MARK, clip, fenceCloses, fenceOpener, reEscape, redact, scanFences, sectionAnchor } from '../text.ts';
 
 // The comparable shape of one turn. Layer A derives it twice - once by replaying the journal,
 // once from the parsed turns - and every mismatch it reports is a field of this.
@@ -381,17 +381,9 @@ export function buildJournalCrossCheck (session: ParsedSession, rawText: string)
 // the same character, at least as long as the opener), because fenceFor emits 4+ backtick
 // wrappers around content that itself contains ``` lines.
 function stripFencedRegions (text: string) {
-  const out = [];
-  let marker = '';
-  for (const line of text.split('\n')) {
-    if (!marker) {
-      marker = fenceOpener(line);
-      marker || out.push(line);
-    } else if (fenceCloses(line, marker)) {
-      marker = '';
-    }
-  }
-  return out.join('\n');
+  const lines = text.split('\n');
+  const { inside } = scanFences(lines);
+  return lines.filter((line, index) => !inside[index]).join('\n');
 }
 
 // The exporter's own structural scaffolding (anchors, headers, tool badges, TOC, details)

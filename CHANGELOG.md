@@ -11,6 +11,7 @@ All notable changes to this project are documented here.
 - Inline references keep their recorded labels and stay inline inside code; Layer D scores reference names.
 - Layer A ignores tool IDs from replaced request slots. Carousel labels matching their values count once. Same-ID cross-turn copies with no new content become continuation notes; new content and hidden tools remain visible.
 - Known-kind output checks include a reviewed missing-tool-content representation, counted separately as `tool-no-content`; unfamiliar records fall back to JSON and fail strict.
+- Fence repairs keep list and blockquote prefixes, and fence whitespace no longer treats BOMs as indentation. Unclosed comments and script/style/textarea/pre tags outside code are escaped and recorded without failing strict.
 
 - Local UUID and prefix selection now searches both workspace journals and empty-window journals. Duplicate IDs still require an exact `.jsonl` path; missing IDs explain how to list sessions and choose the correct user-data root.
 - Unknown Local response kinds are kept as collapsed, redacted JSON only, held until an open code fence closes, with companion files for payloads over 300 lines OR 15 KiB. They remain visible in the schema census and fail strict verification until reviewed. Layer C checks that each block round-trips through `JSON.parse`.

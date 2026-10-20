@@ -81,23 +81,60 @@ const STRUCTURAL_TAG = /<(\/?)(details|summary|div)\b/gi;
 // live it opens collapsibles that never close and swallows the rest of the document, so
 // escape it outside fenced code (inside a fence it is already inert).
 export function neutralizeStructuralHtml (value: unknown) {
-  let marker = '';
-  return String(value).split('\n').map((line) => {
-    if (!marker) {
-      marker = fenceOpener(line);
-      return marker ? line : line.replace(STRUCTURAL_TAG, (all, slash, tag) => `&lt;${slash}${tag}`);
+  const lines = String(value).split('\n');
+  const { inside } = scanFences(lines);
+  return lines.map((line, index) => inside[index] ? line : line.replace(STRUCTURAL_TAG, (all, slash, tag) => `&lt;${slash}${tag}`)).join('\n');
+}
+
+// CommonMark HTML blocks of type 1 (raw-text tags) and type 2 (comments) run until their closer
+// or the end of the document, so an unclosed one in model text hides everything the exporter
+// writes after it.
+const UNCLOSED_HTML_OPENER = /<!--|<(script|style|textarea|pre)(?=[\s/>]|$)/gi;
+const INLINE_CODE_SPAN = /(`+)(?:(?!\1)[\s\S])*?\1(?!`)/g;
+
+/**
+ * Escapes comment and raw HTML block openers outside code that have no later
+ * closer in `value`, and names each escape ('comment' or the lowercase tag) in `escaped`.
+ */
+export function escapeUnclosedHtml (value: unknown) {
+  const text = String(value);
+  const escaped: string[] = [];
+  const lines = text.split('\n');
+  const { inside } = scanFences(lines);
+  let offset = 0;
+  const out = lines.map((line, index) => {
+    const start = offset;
+    offset += line.length + 1;
+    if (inside[index] || !line.includes('<'))
+      return line;
+    // Same-length mask so match positions still index into the original line.
+    const masked = line.replace(INLINE_CODE_SPAN, (span) => ' '.repeat(span.length));
+    const cuts: number[] = [];
+    for (const match of masked.matchAll(UNCLOSED_HTML_OPENER)) {
+      const tag = match[1]?.toLowerCase();
+      const closer = tag ? new RegExp(`</${tag}(?=[\\s>]|$)`, 'i') : /-->/;
+      const after = text.slice(start + match.index + match[0].length);
+      if (closer.test(after))
+        continue;
+      cuts.push(match.index);
+      escaped.push(tag ?? 'comment');
     }
-    fenceCloses(line, marker) && (marker = '');
-    return line;
-  }).join('\n');
+    let result = line;
+    for (const cut of cuts.reverse())
+      result = `${result.slice(0, cut)}&lt;${result.slice(cut + 1)}`;
+    return result;
+  });
+  return { text: out.join('\n'), escaped };
 }
 
 // CommonMark fences: a run of 3+ backticks or 3+ tildes opens; only a run of the same
 // character, at least as long, with nothing after it, closes. A backtick opener's info
 // string cannot contain a backtick (that line is inline code, not a fence). Indentation
-// is accepted leniently, matching the exporter's historical behavior.
-const FENCE_OPENER = /^\s*(`{3,}|~{3,})(.*)$/;
-const FENCE_CLOSER = /^\s*(`{3,}|~{3,})\s*$/;
+// is accepted leniently (any number of spaces or tabs), matching the exporter's historical
+// behavior. Only spaces and tabs count: JS `\s` also matches a BOM or NBSP, which CommonMark
+// treats as text, so `\uFEFF~~~` is not a fence.
+const FENCE_OPENER = /^[ \t]*(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSER = /^[ \t]*(`{3,}|~{3,})[ \t]*$/;
 
 /** The fence marker (for example '```' or '~~~~') when `line` opens a code fence, else ''. */
 export function fenceOpener (line: string) {
@@ -120,20 +157,139 @@ export function fenceCloses (line: string, marker: string) {
 // verify/layers.ts, so the render self-check and the renderer agree on where fences end.
 export function closeUnbalancedFences (value: unknown) {
   const text = String(value);
-  const ticks = openFenceTicks(text);
-  return ticks ? `${text}\n${ticks}` : text;
+  const closer = openFenceCloser(text);
+  return closer ? `${text}\n${closer}` : text;
 }
 
 /** The marker (backticks or tildes) of a code fence still open at the end of `text`, or '' when every fence is closed. */
 export function openFenceTicks (text: string) {
-  let marker = '';
-  for (const line of text.split('\n')) {
-    if (!marker)
-      marker = fenceOpener(line);
-    else if (fenceCloses(line, marker))
-      marker = '';
+  return scanFences(text.split('\n')).open?.marker ?? '';
+}
+
+/**
+ * The line that closes the fence still open at the end of `text`, with the opener's container
+ * prefix (blockquote markers, list content indentation, or both), or '' when every fence is closed.
+ */
+export function openFenceCloser (text: string) {
+  return scanFences(text.split('\n')).open?.closer ?? '';
+}
+
+export interface OpenFence {
+  marker: string;
+  /** Blockquote depth of the opener. */
+  quoteDepth: number;
+  /** Content column of the list item that holds the fence, after the blockquote markers; 0 at top level. */
+  indent: number;
+  /** A closing line that stays inside the same containers as the opener. */
+  closer: string;
+}
+
+const QUOTE_MARKER = /^ {0,3}> ?/;
+const LIST_MARKER = /^( {0,3})([-*+]|\d{1,9}[.)])( {1,4}|$)/;
+const leadingSpaces = (line: string) => /^[ \t]*/.exec(line)![0].length;
+const isBlank = (line: string) => /^[ \t]*$/.test(line);
+
+/** Strips up to `limit` blockquote markers; `depth` is how many were present. */
+function stripQuotes (line: string, limit = Infinity) {
+  let rest = line;
+  let depth = 0;
+  while (depth < limit) {
+    const match = QUOTE_MARKER.exec(rest);
+    if (!match)
+      break;
+    rest = rest.slice(match[0].length);
+    depth++;
   }
-  return marker;
+  return { depth, rest };
+}
+
+/**
+ * Line-by-line CommonMark fence tracking that knows the two containers models write fences in:
+ * blockquotes and list items. A fence opened inside a container ends when the container ends (a
+ * line with fewer `>` markers, or a non-blank line indented less than the list item's content
+ * column), and its repair closer repeats the opener's full container prefix. Without the prefix,
+ * a column-0 closer ends the list item instead and opens a new top-level fence that swallows the
+ * exporter headings after it. `inside[i]` is true for opener, content and closer lines.
+ */
+export function scanFences (lines: string[]) {
+  const inside = new Array<boolean>(lines.length).fill(false);
+  let open: OpenFence | null = null;
+  // The innermost list item seen outside fences: its blockquote depth and content column.
+  let list: { quoteDepth: number; indent: number } | null = null;
+  let blankBefore = false;
+  lines.forEach((line, index) => {
+    if (open) {
+      const { depth, rest } = stripQuotes(line, open.quoteDepth);
+      const endsContainer = depth < open.quoteDepth || (open.indent > 0 && !isBlank(rest) && leadingSpaces(rest) < open.indent);
+      if (!endsContainer) {
+        inside[index] = true;
+        fenceCloses(rest.slice(Math.min(open.indent, leadingSpaces(rest))), open.marker) && (open = null);
+        return;
+      }
+      open = null;
+    }
+    const { depth, rest } = stripQuotes(line);
+    if (isBlank(rest)) {
+      blankBefore = true;
+      return;
+    }
+    let indent = 0;
+    if (list && list.quoteDepth === depth && leadingSpaces(rest) >= list.indent)
+      indent = list.indent;
+    else if (list && (list.quoteDepth !== depth || blankBefore))
+      list = null;
+    let body = rest.slice(indent);
+    let marker = LIST_MARKER.exec(body);
+    let listed = false;
+    while (marker) {
+      indent += marker[0].length;
+      body = body.slice(marker[0].length);
+      listed = true;
+      marker = LIST_MARKER.exec(body);
+    }
+    listed && (list = { quoteDepth: depth, indent });
+    blankBefore = false;
+    const fence = fenceOpener(body);
+    if (!fence)
+      return;
+    // A fence cannot be a lazy continuation line, so one indented less than the item ends the list.
+    indent === 0 && (list = null);
+    inside[index] = true;
+    // An indented opener's closer repeats that whitespace literally, so a tab-indented opener
+    // (an indented code block to CommonMark) gets a tab-indented closer, never a new fence.
+    const closer = `${'> '.repeat(depth)}${' '.repeat(indent)}${/^[ \t]*/.exec(body)![0]}${fence}`;
+    open = { marker: fence, quoteDepth: depth, indent, closer };
+  });
+  return { inside, open: open as OpenFence | null };
+}
+
+/**
+ * True when `text` ends inside an unclosed inline code span: a backtick run of length N that no
+ * later run of exactly N backticks closes. Only the last paragraph outside code fences counts,
+ * because a code span cannot cross a blank line or a fence. Text ending inside a fence returns
+ * false; check that with openFenceTicks.
+ */
+export function hasUnclosedInlineCode (text: string) {
+  const lines = text.split('\n');
+  const { inside, open: fence } = scanFences(lines);
+  if (fence)
+    return false;
+  let start = 0;
+  lines.forEach((line, index) => {
+    (inside[index] || !line.trim()) && (start = index + 1);
+  });
+  let open = 0;
+  for (const match of lines.slice(start).join('\n').matchAll(/(\\*)(`+)/g)) {
+    // Outside a span, an odd number of backslashes escapes the first backtick of the run.
+    const run = !open && match[1].length % 2 ? match[2].length - 1 : match[2].length;
+    if (!run)
+      continue;
+    if (!open)
+      open = run;
+    else if (run === open)
+      open = 0;
+  }
+  return open > 0;
 }
 
 // --- parsing and cleaning ---
@@ -268,41 +424,3 @@ export function mutedSummary (html: string) {
 export function assistantBlock (markdown: string) {
   return [`<div style="${ASSISTANT_BOX}">`, '', closeUnbalancedFences(neutralizeStructuralHtml(markdown)), '', '</div>', ''];
 }
-
-/**
- * True when `text` ends inside an unclosed inline code span: a backtick run of length N that no
- * later run of exactly N backticks closes. Only the last paragraph outside code fences counts,
- * because a code span cannot cross a blank line or a fence. Text ending inside a fence returns
- * false; check that with openFenceTicks.
- */
-export function hasUnclosedInlineCode (text: string) {
-  const lines = text.split('\n');
-  let fence = '';
-  const inside = lines.map((line) => {
-    if (fence) {
-      fenceCloses(line, fence) && (fence = '');
-      return true;
-    }
-    fence = fenceOpener(line);
-    return Boolean(fence);
-  });
-  if (fence)
-    return false;
-  let start = 0;
-  lines.forEach((line, index) => {
-    (inside[index] || !line.trim()) && (start = index + 1);
-  });
-  let open = 0;
-  for (const match of lines.slice(start).join('\n').matchAll(/(\\*)(`+)/g)) {
-    // Outside a span, an odd number of backslashes escapes the first backtick of the run.
-    const run = !open && match[1].length % 2 ? match[2].length - 1 : match[2].length;
-    if (!run)
-      continue;
-    if (!open)
-      open = run;
-    else if (run === open)
-      open = 0;
-  }
-  return open > 0;
-}
-

@@ -232,6 +232,44 @@ test('the stray fence that hugs an inline edit preview is not counted as an open
   assert.match(output, /The file is updated\./);
 });
 
+test('an unclosed HTML comment in assistant text is escaped, recorded and noted after the run', () => {
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
+  const output = buildDocument(testSession({
+    turns: [testTurn({ prompt: 'q', body: [{ type: 'text', text: 'Before <!-- never closed\nafter' }] })],
+  }), documentContext({ fenceRepairs }));
+
+  assert.match(output, /Before &lt;!-- never closed/);
+  assert.doesNotMatch(output, /Before <!--/);
+  assert.ok(output.indexOf('never closed') < output.indexOf('escaped an unclosed HTML comment'));
+  assert.deepEqual(fenceRepairs.html, [{ turn: 1, kind: 'comment' }]);
+  assert.deepEqual(fenceRepairs.early, []);
+});
+
+test('unclosed raw-text tags in a prompt and in reasoning are escaped too', () => {
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
+  const output = buildDocument(testSession({
+    turns: [testTurn({ prompt: 'Why does <script break', body: [
+      { type: 'think', text: 'A <textarea opens here' },
+      { type: 'text', text: 'Answer.' },
+    ] })],
+  }), documentContext({ fenceRepairs }));
+
+  assert.match(output, /&lt;script break/);
+  assert.match(output, /&lt;textarea opens/);
+  assert.deepEqual(fenceRepairs.html.map((item) => item.kind).sort(), ['script', 'textarea']);
+});
+
+test('closed HTML comments and fenced HTML are left alone', () => {
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
+  const output = buildDocument(testSession({
+    turns: [testTurn({ prompt: 'q', body: [{ type: 'text', text: 'A <!-- closed --> comment.\n```html\n<!-- open in code\n```' }] })],
+  }), documentContext({ fenceRepairs }));
+
+  assert.match(output, /A <!-- closed --> comment\./);
+  assert.match(output, /\n<!-- open in code\n/);
+  assert.deepEqual(fenceRepairs.html, []);
+});
+
 test('the worktree snapshot fence is longer than any backtick run in git status', () => {
   const gitStatus = '?? docs/```weird```.md';
   const output = buildDocument(testSession({ turns: [testTurn({ prompt: 'q' })] }), documentContext({ gitStatus }));
