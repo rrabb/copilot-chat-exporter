@@ -291,28 +291,77 @@ export function buildVerificationReport (session: ParsedSession, rawRequests: an
 // silent-drop bug in those shared primitives cannot hide behind an identical derivation.
 // A plain walk never descends into string values, so tool ids embedded in quoted prior
 // exports or subagent result blobs are excluded for free.
+// Ids are bucketed per request slot so that a request replaced at the `requests` level (a
+// kind:2 push with `i` below the current length, a kind:1 set of `requests` or one slot, or a
+// kind:3 delete) discards the ids only the replaced request carried. Deeper edits inside a
+// request are not replayed: an id once recorded in a live slot stays expected.
 export function buildJournalCrossCheck (session: ParsedSession, rawText: string) {
-  const rawToolIds = new Set<string>();
+  const topIds = new Set<string>();
+  let slots: Array<Set<string>> = [];
   let rawThinking = 0;
-  const walk = (node: any) => {
+  const walk = (node: any, sink: Set<string>) => {
     if (!node || typeof node !== 'object')
       return;
     if (node.kind === 'toolInvocationSerialized' && typeof node.toolCallId === 'string')
-      rawToolIds.add(node.toolCallId);
+      sink.add(node.toolCallId);
     if (node.kind === 'thinking')
       rawThinking += 1;
     for (const key of Object.keys(node))
-      walk(node[key]);
+      walk(node[key], sink);
+  };
+  const fillSlots = (values: unknown, start: number) => {
+    slots.length = Math.min(slots.length, start);
+    while (slots.length < start)
+      slots.push(new Set());
+    for (const value of Array.isArray(values) ? values : []) {
+      const sink = new Set<string>();
+      walk(value, sink);
+      slots.push(sink);
+    }
+  };
+  const slotFor = (index: number) => {
+    while (slots.length <= index)
+      slots.push(new Set());
+    return slots[index];
   };
   for (const line of rawText.split(/\r?\n/)) {
     if (!line)
       continue;
+    let record: any;
     try {
-      walk(JSON.parse(line));
+      record = JSON.parse(line);
     } catch {
       // Non-JSON lines are already reported by the parser; skip here.
+      continue;
+    }
+    const path = Array.isArray(record?.k) ? record.k : null;
+    const onRequests = path?.[0] === 'requests';
+    if (record?.kind === 0 && record.v && typeof record.v === 'object') {
+      const { requests, ...rest } = record.v;
+      walk(rest, topIds);
+      slots = [];
+      fillSlots(requests, 0);
+    } else if (onRequests && path.length === 1 && record.kind === 2) {
+      fillSlots(record.v, typeof record.i === 'number' ? record.i : slots.length);
+    } else if (onRequests && path.length === 1 && record.kind === 1) {
+      fillSlots(record.v, 0);
+    } else if (onRequests && path.length === 2 && typeof path[1] === 'number' && record.kind === 1) {
+      const sink = new Set<string>();
+      walk(record.v, sink);
+      slotFor(path[1]);
+      slots[path[1]] = sink;
+    } else if (onRequests && path.length === 2 && typeof path[1] === 'number' && record.kind === 3) {
+      path[1] < slots.length && (slots[path[1]] = new Set());
+    } else if (onRequests && path.length > 2 && typeof path[1] === 'number') {
+      walk(record, slotFor(path[1]));
+    } else {
+      walk(record, topIds);
     }
   }
+  const rawToolIds = new Set<string>(topIds);
+  for (const slot of slots)
+    for (const id of slot)
+      rawToolIds.add(id);
   const parsedToolIds = new Set<string>(session.turns.flatMap((turn: Turn) => turn.toolNodes.map((node: ToolNode) => node.toolCallId).filter(Boolean)));
   const dropped = [...rawToolIds].filter((id) => !parsedToolIds.has(id));
   const invented = [...parsedToolIds].filter((id) => !rawToolIds.has(id));

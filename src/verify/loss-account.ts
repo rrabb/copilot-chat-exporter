@@ -140,7 +140,10 @@ function questionCarouselStrings (questions: unknown): string[] {
     for (const option of Array.isArray(question.options) ? question.options : []) {
       if (!isRecord(option))
         continue;
-      values.push(text(option.label), text(option.value));
+      const label = text(option.label);
+      const value = text(option.value);
+      // The renderer shows one entry when label and value are equal, so count one piece.
+      values.push(label, label === value ? '' : value);
     }
     return values.filter(Boolean);
   });

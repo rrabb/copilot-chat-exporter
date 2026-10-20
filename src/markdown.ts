@@ -638,7 +638,35 @@ function renderFilesTouched (filesTouched: FileTouch[], outputPath: string, opti
 // Walks `turn.body` in recorded order and interleaves prose runs, reasoning, tool calls, and
 // edit markers exactly as they streamed - never bucketed by type. `flush()`/`flushThoughts()`
 // close out the current run before a different node type starts.
-export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '', options: { heading?: boolean } = {}) {
+interface PreviousTool { turn: number; node: ToolNode }
+
+function containsRecordedValue (earlier: unknown, later: unknown): boolean {
+  if (later == null || later === '')
+    return true;
+  if (typeof later !== 'object')
+    return earlier === later;
+  if (!earlier || typeof earlier !== 'object')
+    return Object.keys(later).length === 0;
+  return Object.entries(later).every(([key, value]) => containsRecordedValue(Reflect.get(earlier, key), value));
+}
+
+function continuationOf (node: ToolNode, turn: number, previous: Map<string, PreviousTool[]>): number | null {
+  if (!node.toolCallId)
+    return null;
+  const history = previous.get(node.toolCallId) ?? [];
+  const fields: Array<keyof ToolNode> = [
+    'toolId', 'invocation', 'pastTense', 'title', 'command', 'promptText', 'inputText', 'inputLanguage',
+    'resultDetails', 'todos', 'output', 'exitCode', 'duration', 'resultText', 'resultError',
+    'detailText', 'intent', 'subagent', 'fileUri', 'patchFiles', 'toolSpecificData', 'isComplete',
+  ];
+  const original = history.find((entry) => entry.turn < turn
+    && fields.every((key) => containsRecordedValue(entry.node[key], node[key])));
+  history.push({ turn, node });
+  previous.set(node.toolCallId, history);
+  return original?.turn ?? null;
+}
+
+export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '', options: { heading?: boolean; previousTools?: Map<string, PreviousTool[]> } = {}) {
   const lines = options.heading === false ? [] : [MARK.assistantHeading, ''];
   let run: string[] = [];
   let thoughts: string[] = [];
@@ -722,7 +750,10 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       flush({ interrupter: 'tool' });
       flushThoughts();
       stripLeadFence = false;
-      lines.push(...renderToolNode(node, byCall), '');
+      const from = options.previousTools ? continuationOf(node, turn.number, options.previousTools) : null;
+      lines.push(...(from === null ? renderToolNode(node, byCall) : [
+        `- ${mutedSummary(`${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: continued from turn ${from}.`)}`,
+      ]), '');
     } else if (node.type === 'note') {
       flush({ interrupter: 'note' });
       flushThoughts();
@@ -1058,6 +1089,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
   const sessionFiles = aggregateFileTouches(turns.flatMap((turn) => turn.filesTouched));
 
   const byModel = new Map();
+  const previousTools = new Map<string, PreviousTool[]>();
   for (const turn of turns) {
     const key = turn.scalar.modelId || 'unknown';
     const entry = byModel.get(key) ?? { turns: 0, prompt: 0, completion: 0, credits: 0, elapsed: 0 };
@@ -1248,7 +1280,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       '</div>',
       '',
     );
-    lines.push(...renderTurnBody(turn, resources.byCall, outputPath), '');
+    lines.push(...renderTurnBody(turn, resources.byCall, outputPath, { previousTools }), '');
     lines.push(...turnInfo(turn), '');
     lines.push(turnCost(turn.scalar), '');
     lines.push('<div align="right"><a href="#user-questions-and-requests">⬆️ Back to questions</a></div>', '');

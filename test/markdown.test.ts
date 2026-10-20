@@ -38,6 +38,19 @@ test('toolFriendly drops the prefixes nobody reads', () => {
   assert.equal(toolFriendly(undefined), 'tool');
 });
 
+test('cross-turn copies with no new content become identity-keyed continuation notes', () => {
+  const original = testTool({ toolCallId: 'shared', invocation: 'Recorded action', inputText: 'unique input' });
+  const same = testTool({ toolCallId: 'shared' });
+  const fresh = testTool({ toolCallId: 'different', invocation: 'Recorded action', inputText: 'unique input' });
+  const updated = testTool({ ...original, output: 'new output' });
+  const turns = [original, same, fresh, updated].map((node, i) => testTurn({ number: i + 1, requestId: `r${i}`, body: [node], toolNodes: [node] }));
+  const output = buildDocument(testSession({ turns }), documentContext());
+  assert.equal(output.match(/continued from turn 1/g)?.length, 1);
+  assert.match(output, /new output/);
+  assert.equal(output.match(/unique input/g)?.length, 3, 'a different ID and a same-ID update both keep their content');
+  assert.equal(turns[1].body[0], same, 'rendering does not change parsed records');
+});
+
 test('a turn body renders in recorded order, never bucketed by type', () => {
   // The single most important rule in this file: the export has to match what the chat window
   // showed, where a tool call appears between the sentences that surround it.

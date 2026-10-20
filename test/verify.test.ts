@@ -93,6 +93,36 @@ test('cross-check survives a non-JSON line rather than throwing', () => {
   assert.equal(buildJournalCrossCheck(session, raw).failed, false);
 });
 
+test('cross-check ignores tool ids from a request replaced by a kind:2 splice on requests', () => {
+  // A push appends request 1 carrying X; a later push with i=1 truncates requests back to one
+  // slot and appends the replacement, which never carried X. The final state has no X, so the
+  // parser cannot render it and Layer A must not call it dropped.
+  const session = testSession({ turns: [turn({ toolNodes: [tool('c1')] }), turn({ number: 2, toolNodes: [tool('c2')] })] });
+  const req = (toolCallId: string) => ({ requestId: `r-${toolCallId}`, message: { text: 'q' }, response: [{ kind: 'toolInvocationSerialized', toolCallId }] });
+  const raw = [
+    JSON.stringify({ kind: 0, v: { requests: [req('c1')] } }),
+    JSON.stringify({ kind: 2, k: ['requests'], v: [req('X')] }),
+    JSON.stringify({ kind: 2, k: ['requests'], i: 1, v: [req('c2')] }),
+  ].join('\n');
+  const report = buildJournalCrossCheck(session, raw);
+  assert.deepEqual(report.dropped, []);
+  assert.equal(report.failed, false);
+  assert.equal(report.rawToolIds, 2);
+});
+
+test('cross-check still reports an id the replacement request kept but the parser lost', () => {
+  const session = testSession({ turns: [turn({ toolNodes: [tool('c1')] })] });
+  const req = (ids: string[]) => ({ requestId: 'r', message: { text: 'q' }, response: ids.map((toolCallId) => ({ kind: 'toolInvocationSerialized', toolCallId })) });
+  const raw = [
+    JSON.stringify({ kind: 0, v: { requests: [] } }),
+    JSON.stringify({ kind: 2, k: ['requests'], v: [req(['old'])] }),
+    JSON.stringify({ kind: 2, k: ['requests'], i: 0, v: [req(['c1', 'kept'])] }),
+    JSON.stringify({ kind: 2, k: ['requests', 0, 'response'], v: [{ kind: 'toolInvocationSerialized', toolCallId: 'late' }] }),
+  ].join('\n');
+  const report = buildJournalCrossCheck(session, raw);
+  assert.deepEqual(report.dropped.sort(), ['kept', 'late']);
+});
+
 // --- layer A: replayed journal vs parsed turns -----------------------------------------------
 
 const rawRequest = (over: Record<string, unknown> = {}) => ({

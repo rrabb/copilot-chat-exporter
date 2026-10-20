@@ -149,6 +149,16 @@ test('question-carousel text is independently accounted', () => {
   assert.equal(account.totals['other:questionCarousel']?.present, 4);
 });
 
+test('a carousel option whose value equals its label is one piece, matching the single rendered entry', () => {
+  const question = {
+    kind: 'questionCarousel',
+    questions: [{ title: 'Pick', options: [{ label: 'Same', value: 'Same' }, { label: 'Shown', value: 'other' }] }],
+  };
+  const account = buildLossAccount([request([question])], 'Please explain the build failure Pick - Same - Shown (other)');
+  assert.equal(account.totals['other:questionCarousel']?.present, 4);
+  assert.equal(account.totals['other:questionCarousel']?.absent, 0);
+});
+
 test('clipped long text is partial, not present and not lost', () => {
   const long = Array.from({ length: 80 }, (_, index) => `sentence number ${index} of the long answer`).join('. ');
   const account = buildLossAccount([request([{ value: long }])], `Please explain the build failure ${long.slice(0, 300)} ... [middle omitted]`);
