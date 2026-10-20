@@ -198,6 +198,14 @@ test('the stray fence that hugs an inline edit preview is not counted as an open
   assert.match(output, /The file is updated\./);
 });
 
+test('the worktree snapshot fence is longer than any backtick run in git status', () => {
+  const gitStatus = '?? docs/```weird```.md';
+  const output = buildDocument(testSession({ turns: [testTurn({ prompt: 'q' })] }), documentContext({ gitStatus }));
+  const fence = fenceFor(gitStatus, 'text');
+  assert.equal(fence.close, '````');
+  assert.ok(output.includes(`${fence.open}\n${gitStatus}\n${fence.close}\n`), 'snapshot uses a fence the content cannot close');
+});
+
 test('fenceFor makes a JSON fence longer than the longest backtick run in its content', () => {
   assert.deepEqual(fenceFor('{"a": 1}', 'json'), { open: '```json', close: '```' });
   assert.equal(fenceFor('{"a": "```"}').close, '````');
