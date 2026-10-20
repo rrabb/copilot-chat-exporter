@@ -9,8 +9,8 @@ import { currentSessionFromEnv, listSessions, looksLikeSessionArgument, resolveS
 import { workspaceStorageRoots } from '../src/host.ts';
 import { defaultSessionTitle, messageText } from '../src/session/journal.ts';
 
-const UUID = '1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d';
-const RENAMED_UUID = '43d9c15d-46b7-4d49-9fd6-f84cd1b265bc';
+const UUID = 'aaaaaaaa-2222-4222-8222-222222222222';
+const RENAMED_UUID = 'bbbbbbbb-2222-4222-8222-222222222222';
 
 test('messageText preserves the legacy string message form', () => {
   assert.equal(messageText('an older saved prompt'), 'an older saved prompt');
@@ -252,7 +252,7 @@ test('short UUID prefixes must uniquely identify a Local journal', async (contex
 test('UUID and prefix lookup include empty-window Local journals', async (context) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-empty-window-'));
   context.after(() => fs.rm(root, { recursive: true, force: true }));
-  const sessionId = '7c11e329-5b29-41bf-940b-8f7f5d7ac624';
+  const sessionId = 'cccccccc-2222-4222-8222-222222222222';
   const directory = path.join(root, 'User', 'globalStorage', 'emptyWindowChatSessions');
   await fs.mkdir(directory, { recursive: true });
   const sessionPath = path.join(directory, `${sessionId}.jsonl`);

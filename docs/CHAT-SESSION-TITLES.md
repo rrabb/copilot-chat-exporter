@@ -72,8 +72,8 @@ Example index value:
 {
   "version": 1,
   "entries": {
-    "1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d": {
-      "sessionId": "1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d",
+    "aaaaaaaa-2222-4222-8222-222222222222": {
+      "sessionId": "aaaaaaaa-2222-4222-8222-222222222222",
       "title": "Building-chat-exporter"
     }
   }

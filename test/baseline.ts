@@ -13,7 +13,7 @@ import { normalizeRender } from '../src/verify/golden.ts';
 // shape, so the exporter derives its hashRoot from the fixture instead of AppData. Both the
 // fixture and the baseline are gitignored (~33 MB). Recreate the fixture with:
 //
-//   $sid = '1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d'
+//   $sid = 'aaaaaaaa-2222-4222-8222-222222222222'
 //   $hr  = "$env:APPDATA\Code\User\workspaceStorage\<workspace-hash>"
 //   $dst = 'tools/copilot-chat-exporter/test/fixtures/live-session'
 //   Copy-Item "$hr\chatSessions\$sid.jsonl" "$dst\chatSessions\"
@@ -25,9 +25,12 @@ import { normalizeRender } from '../src/verify/golden.ts';
 // then `npm run baseline:update -w copilot-chat-exporter` to record the expected render.
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SESSION_ID = '1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d';
 const FIXTURE = path.join(PKG, 'test', 'fixtures', 'live-session');
-const JOURNAL = path.join(FIXTURE, 'chatSessions', `${SESSION_ID}.jsonl`);
+const candidates = process.env.CCE_BASELINE_JOURNAL ? [path.resolve(process.env.CCE_BASELINE_JOURNAL)]
+  : (await fs.readdir(path.join(FIXTURE, 'chatSessions'))).filter((name) => name.endsWith('.jsonl')).map((name) => path.join(FIXTURE, 'chatSessions', name));
+if (candidates.length !== 1)
+  throw new Error('Expected one baseline journal. Set CCE_BASELINE_JOURNAL to an exact local fixture path.');
+const JOURNAL = candidates[0]!;
 const BASELINE = path.join(PKG, 'test', 'baseline', 'live-session.expected.md');
 const RENDER = path.join(PKG, 'test', 'baseline', 'live-session.render.md');
 const ACTUAL = path.join(PKG, 'test', 'baseline', 'live-session.actual.md');

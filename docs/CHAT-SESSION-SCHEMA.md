@@ -266,7 +266,7 @@ This section preserves why replay changed. It belongs here rather than in a sepa
 the defect was a misunderstanding of the journal contract, and this guide is the maintenance source
 for that contract.
 
-**Observed failure.** Session `dd0c0407-1d1b-4a0f-8424-a056fdcec2d8` showed 27 requests in the VS
+**Observed failure.** Session `dddddddd-1111-4111-8111-111111111111` showed 27 requests in the VS
 Code Chat UI but exported 28. A localization question appeared twice instead of the later prompt
 `yes`. Near the end, the package-name question owned response content from the following
 implementation request, while the final exported turn held only an initial fragment.

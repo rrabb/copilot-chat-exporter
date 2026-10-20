@@ -7,7 +7,7 @@ import {
   loadMemoryFiles, loadModelNames, loadResources, modelName, readVersions,
 } from '../src/session/enrich.ts';
 
-const SESSION = '1e6f4d3f-34bd-4f42-a5bd-d6a48ed6447d';
+const SESSION = 'aaaaaaaa-2222-4222-8222-222222222222';
 
 async function tempDir () {
   return await fs.mkdtemp(path.join(os.tmpdir(), 'cce-enrich-'));

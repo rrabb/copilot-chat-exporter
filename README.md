@@ -203,7 +203,7 @@ The listing has a `TYPE` column (`local`, `agent`, `sub-agent`, or `CLI agent`) 
 Multiple discovered roots prompt for a numbered selection only in an interactive terminal. Non-interactive use fails with candidate paths and `--user-data-root` remediation; it never picks the first root. Explicit journal paths validate Local format/identity without scanning unrelated roots. Current Agent Host/SDK main-conversation export is available by chat ID, backing ID or prefix (see "Exporting an Agent Host or Copilot CLI chat"); the detailed listing marks each exportable agent chat and shows its copy-ready export command. Listing distinguishes verified backing identity from unresolved sources and does not export guessed conversations.
 > ```
 > node ./dist/cli.js --list   
-> node ./src/cli.ts ef6eb63d-269b-4166-aac8-34df2a71ae49 docs/temp/Migration-vite-svelte5.md
+> node ./src/cli.ts eeeeeeee-1111-4111-8111-111111111111 docs/temp/Migration-vite-svelte5.md
 > ```
 
 
@@ -213,7 +213,7 @@ Every Markdown export re-reads the file it just wrote and self-checks it. A clea
 summary and `Layer C self-check: all 9 render checks pass`:
 
 ```
-Exported session ef6eb63d-269b-4166-aac8-34df2a71ae49:
+Exported session eeeeeeee-1111-4111-8111-111111111111:
 Title: Migration-vite-svelte5
 Custom Title: Project source file scanning request
 First Prompt: Can u scan this entire project and all source files and update your model?
@@ -226,8 +226,8 @@ Layer C self-check: all 9 render checks pass.
 
 ### Failed Run:
 ```
-node ./src/cli.ts ef6eb63d-269b-4166-aac8-34df2a71ae49 docs/temp/Migration-vite-svelte5.md
-Exported session ef6eb63d-269b-4166-aac8-34df2a71ae49:
+node ./src/cli.ts eeeeeeee-1111-4111-8111-111111111111 docs/temp/Migration-vite-svelte5.md
+Exported session eeeeeeee-1111-4111-8111-111111111111:
 Title: Migration-vite-svelte5
 Custom Title: Project source file scanning request
 First Prompt: Can u scan this entire project and all source files and update your model?

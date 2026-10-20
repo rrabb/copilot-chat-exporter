@@ -2,7 +2,7 @@
 
 ## Current status
 
-Snapshot: October 21, 2026, after the `markdownVuln` handler and code-fence safety pass. This section, the [numbered backlog](#numbered-todo-and-backlog), [priorities](#prioritized-next-items) and [next action](#next-action) are authoritative. Dated history is in [work-log-archive.md](work-log-archive.md); its older pending or deferred statements do not override these sections. All earlier work is committed (latest `a3c7503`, the report series ending task #35). This pass is uncommitted and unstaged: a semantic `markdownVuln` handler (checked against VS Code 1.141.2, commit 16507d91, with bundled Copilot Chat 0.69.0), fences closed only at the end of a turn, unknown kinds kept as JSON held until the fence closes, an OR companion rule for unknown payloads (over 300 lines or over 15 KiB), a JSON round-trip check in Layer C, merged-line Layer D (`assistant-text-joined`), `~~~` fence recognition in the renderer and in Layer C, and an updated version label. Strict fails on early fence closes; closes at the end of a turn are recorded as representation changes and do not fail strict (user decision). `npm run verify` passed (461 tests plus golden) and `npm run build` passed. Measured on 83 Local journals by exact path: 1 early fence close before the fix (from `markdownVuln`, none from known kinds), 0 after. The exact `markdownVuln` journal passes `--verify --strict` (exit 0); Layer D checked 259 pieces (256 before) with 0 issues. Full corpus by exact path: 82 of 83 exit 0; Layer D checked 27,560 pieces (27,557 at HEAD and at `d67ee94`) with 0 partial and 0 absent; round-trip passed in all 83. The `~~~` fix cleared the `<details> balanced (scaffold-only)` false positives in three journals, which also fail at HEAD and at `d67ee94`; the October 17 report missed them, and its helper script no longer exists. The one remaining failure is the unresolved 1,040 versus 1,039 raw tool-call mismatch (one tool-call ID appears under two turns). An earlier report of 10,479 pieces was a parsing error in a deleted helper script: it cut counts such as 1,234 off at the comma. There is no losslessness claim.
+Snapshot: October 20, 2026, after the approved corrections. The committed fence pass (`e9a84ff`, `22a2f5d`, `70f0898`) is unchanged. This checkpoint completes the eight approved commits; nothing has been pushed. The parser now fails strict verification when unavailable; markdown-it 14.3.3 and its types 14.2.0 are pinned. SDK fence repairs are reported and strict-gated like Local. The ID-only exemption was replaced with a reviewed metadata-only field check and an explicit missing-data note, counted separately as `tool-no-content`. Redundant cross-turn tool copies get identity-keyed continuation notes; new content and hidden tool calls are kept. Unclosed `pre` tags now join the HTML escapes, which remain recorded changes rather than strict failures. Forward-only privacy replacements and a guard test are done; Git history and session data are unchanged. Both final `npm run verify` runs passed 532/532 tests, including the browser test, and matched the golden output exactly ([run 1](temp-tool-output/verify-approved-final1-20261020.log), [run 2](temp-tool-output/verify-approved-final2-20261020.log), local-only). Build passed ([log](temp-tool-output/build-final-20261020.log), local-only). Latest runner report: [corpus-2026-10-20-corrections-final.json](reports/corpus/corpus-2026-10-20-corrections-final.json), local-only and gitignored. All 109 sources exited 0; S023 changed during its run and is excluded from totals and comparisons. The 108 stable sources contain 88,182 content pieces, all present, plus 288 `tool-no-content` representations. There are no parser failures, skips or early/turn-end fence closes. Stable SDK sources have 3 recorded HTML escapes; Local has none. The base64 trigger fired: 370 qualifying string values across 21 stable sources, with 0 invalid scan lines. Extraction remains backlog work. The log's structure, decision table and research requirement are unchanged. There is no losslessness claim.
 
 | Workstream | Tasks | State | Evidence / what remains |
 | --- | --- | --- | --- |
@@ -12,15 +12,84 @@ Snapshot: October 21, 2026, after the `markdownVuln` handler and code-fence safe
 | HTML listing report size reduction | #35 | Complete and committed | `e058cad`, `29dd23a`, `e1d874b`, `a3c7503`; further size work belongs to the other chat |
 | SDK Markdown export and usage | #9, #20 | Complete for approved scope, committed | `58039ea`, `7491042` |
 | Local fidelity and export policy | #15, #16 | Text fixes and `markdownVuln` handler done; policy work deferred | `--high-fidelity`, `--no-redact`, extra metadata and comprehensive omission/redaction policy are not wired |
-| Source-aware verification and schema drift | #10, #11 | This pass adds fence repair accounting, round-trip, merged-line checks and `~~~`-aware fence handling | Remaining: the 1,040/1,039 tool-call mismatch |
-| Documentation | #12, #24, #27, #28 | README, SPEC, UPGRADING and CHANGELOG updated for this pass | Final cross-surface consistency review remains |
-| Acceptance | #13 | Automated checks pass; corpus has 1 known failure (tool-call mismatch) | Interactive terminal acceptance remains |
-| Repository state | #31, #32 | #31 committed; this pass uncommitted | Graph last re-indexed October 14 and is stale |
+| Source-aware verification and schema drift | #10, #11 | Committed: JSON reports, corpus runner, parser, fuzz, D1-D6 and approved corrections | SDK gate and continuation notes done; no losslessness claim |
+| Documentation | #12, #24, #27, #28 | README and SPEC now document JSON verification, corpus checks and the approved tool/HTML policies | Final cross-surface review remains |
+| Acceptance | #13 | Both final full suites pass; all sources exit 0, with S023 excluded from comparisons because it changed | Interactive terminal acceptance remains |
+| Repository state | #31, #32 | Eight approved commits complete; not pushed | Five user-owned customization changes remain excluded. Graph last re-indexed October 14 and is stale |
 
 ## Next action
 
-Waiting for approval of the proposed commit grouping for this pass. Then, subject to approval, decide on the propose-only items: base64/data-URI extraction to companion files (about 0.5-1 day), a CommonMark/GFM parser check in `--verify` (needs a dev dependency; about 0.5-1 day) and fuzz tests for fence edge cases (about 1 day). Separately investigate the raw tool-call mismatch.
+Next: finish the parent's privacy/research review, then push the approved commits. No push has run. The eight groups below were validated as cumulative index snapshots in a sibling folder at the same depth as the project, isolated from later unstaged edits. User-owned customization files stay out. No history rewrite. Work-log restructuring is deferred to the next pass.
 
+| Group | Commit / scope | `npm run verify` tests | `npm run build` |
+| --- | --- | --- | --- |
+| 1 | `a8cf283`: JSON reports, corpus runner, parser and SDK gate | 489/489 | Passed |
+| 2 | `1e03ed9`: content-sized git-status fences | 490/490 | Passed |
+| 3 | `31a6362`: inline references and Layer D scoring | 495/495 | Passed |
+| 4 | `a23fe4e`: request slots, continuations and carousel counts | 499/499 | Passed |
+| 5 | `3eb404a`: reviewed missing-tool-content representation | 504/504 | Passed |
+| 6 | `05a9326`: container fences, BOM and HTML repairs | 516/516 | Passed |
+| 7 | `932b7cb`: deterministic fuzz tests | 530/530 | Passed |
+| 8 | This checkpoint: ignore rules, log and forward-only privacy scrub | 532/532 | Passed |
+
+Evidence: local-only `temp-tool-output/approved-snapshot-N-verify.log` and `approved-snapshot-N-build.log` for groups 1-8. Group 1's passing verify log has the suffix `-verify-retry.log`. Its first run failed the generated-asset check because the committed generated license string reflects CRLF in `docs/BROTLI-NOTICES.txt`, while an index checkout produced LF. Validation used CRLF for that notice file, matching the existing Windows worktree without changing its normalized Git blob. This checkout sensitivity remains a limitation, not a clean-LF verification claim. All subsequent snapshot runs passed generated checks, both typechecks, tests and golden checks. No browser retry was needed in this series.
+
+The earlier `corpus-2026-10-21.json` filename is mislabeled: its `generatedAt` is `2026-10-20T18:37:05.940Z`. The final report records `2026-10-20T20:05:36.967Z`. October 20 is the correct UTC date. Both artifacts remain unchanged.
+
+Read-only follow-up evidence: local-only `temp-tool-output/base64-field-audit-20261020.json` reproduces all 370 qualifying values. Of these, 350 are images (236 Local, 114 SDK) and 20 are opaque/encrypted reasoning (18 Local, 2 SDK). There are no signatures, non-image tool outputs or other values. MIME types or PNG/JPEG/GIF/WebP magic identify images. Bytes from 180 image occurrences appear encoded in Markdown; 114 SDK image occurrences match decoded binary companions. Another 56 image occurrences appear in neither, but raw snapshot duplicates mean this is not automatically 56 losses. All 20 opaque values are absent from Markdown and companion bytes. No extraction behavior changed.
+
+The read-only backup audit found 26 journals in `%APPDATA%\Code\User\workspaceStorage\<workspace-hash>\bkup2\chatSessions`. The 418-occurrence inventory contains no `bkup2` entries. Four terminal carryovers with new content currently render the entire later copy: `continuationOf` returns null, then `renderToolNode` renders it. Rendering just the delta is proposed, not implemented.
+
+## Layer D category totals
+
+Source: `node scripts/verify-corpus.mjs --user-data-root "$env:APPDATA\Code" --out reports/corpus/corpus-2026-10-20-corrections-final.json --concurrency 6`. The [JSON](reports/corpus/corpus-2026-10-20-corrections-final.json) is local-only (gitignored). Of 109 sources, S023 changed during its run and is excluded. The 108 stable sources contain 88,182 pieces, all present (0 partial, 0 absent). The separate `representationCounts.tool-no-content` total is 288; it is not added to the content-piece table.
+
+Local, 83 journals, 35,093 pieces:
+
+| Category | Count |
+| --- | --- |
+| assistant-text | 14,332 |
+| inline-reference | 7,828 |
+| tool-input | 3,571 |
+| reasoning | 3,310 |
+| terminal-output | 2,562 |
+| prompt | 1,067 |
+| other:questionCarousel | 1,007 |
+| tool-output | 835 |
+| subagent-prompt | 261 |
+| subagent-result | 256 |
+| request-error | 31 |
+| other:confirmation | 26 |
+| tool-error | 3 |
+| vulnerability | 2 |
+| assistant-text-joined | 1 |
+| other:warning | 1 |
+| Total | 35,093 |
+
+Without `inline-reference`, Local is 27,265: the earlier 27,560 minus the 295 carousel options whose label equals the value (1,302 → 1,007).
+
+SDK, 25 stable sources, 53,089 pieces (S023 excluded):
+
+| Category | Count |
+| --- | --- |
+| tool-output | 13,588 |
+| tool-input | 12,458 |
+| tool-intent | 11,306 |
+| tool-detail | 7,303 |
+| reasoning | 4,123 |
+| assistant-text | 3,181 |
+| prompt | 536 |
+| tool-error | 352 |
+| compaction-summary | 93 |
+| system-prompt | 121 |
+| skill-file | 22 |
+| task-summary | 4 |
+| session-error | 2 |
+| Total | 53,089 |
+
+Reconciliation: 35,093 + 53,089 = 88,182. Applying the same S023 exclusion to the [previous runner report](reports/corpus/corpus-2026-10-21.json) (local-only) gives 87,998. The increase of 184 is entirely in S002, whose source grew between runs. Local is unchanged. Do not compare the new total with an earlier all-source total that includes S023.
+
+October 16 comparison: the archived baseline ([work-log-archive.md](work-log-archive.md), "Real-data baseline") reported 26,258 pieces, but its rows add up to 26,244 and the other 14 cannot be recovered. Its "13" confirmation and question-carousel pieces are inferred: the archived absent total (54) minus the itemized absents (38) is 16, which is 13 confirmation plus 3 tool-error. That generic walk did not reach carousel `questions[]` (0 carousel strings in 55 parts); the raw-journal replay confirmed 163 questions, 163 titles + 163 messages + 488 labels + 488 values.
 ## Numbered todo and backlog
 
 Implementation has explicit user approval. Numbers are convenient references, not execution order; prerequisites govern work. Stable task IDs match the session todo database. Keep this table synchronized as work progresses; obtain decisions for any new material ambiguity.
@@ -63,26 +132,34 @@ Implementation has explicit user approval. Numbers are convenient references, no
 
 ## Prioritized next items
 
-Current priorities as of October 21. Effort: S under half a day, M about a day, L several days. Each item needs separate approval.
+Current priorities as of October 20. Effort: S under half a day, M about a day, L several days. New implementation needs approval.
 
 | Rank | ID | Item | Status | Why it pays off | Effort | Needs from you |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | next-commit-fence-pass | Commit the `markdownVuln` and fence-safety pass | Implemented, verified, uncommitted | Preserves verified work | S | Approve the commit grouping |
-| 2 | next-tilde-scaffold | Make Layer C `scaffoldText`/`stripFencedRegions` skip `~~~` fences (#10) | Done in this pass, uncommitted (renderer and Layer C) | Removed the 3 corpus false positives | - | Part of item 1 |
-| 3 | next-local-toolcall-mismatch | Investigate the 1,040-versus-1,039 Local tool-call identity discrepancy (#10, #13) | Unresolved | Restores strict verification for the remaining Local exception | M | None beyond approval |
-| 4 | next-acceptance | Final cross-surface review and interactive root-chooser acceptance (#12, #13) | Open | Closes acceptance and stale-documentation gaps | S to M | A short manual terminal run |
-| 5 | next-fence-fuzz | Fuzz tests: backtick runs, `~~~`, `</details>`, unclosed fences, multi-MB single lines, lone surrogates | Proposed | Finds renderer edge cases before real data does | M (about 1 day) | Approval |
-| 6 | next-commonmark-verify | Parse output with a CommonMark/GFM parser in `--verify`; confirm exporter headings and sections are never inside code | Proposed | Independent structural check | M (0.5-1 day) | Approve a dev-only dependency |
-| 7 | next-base64-companions | Move long base64/data-URI-like strings to companion files with size and hash inline | Proposed | Keeps Markdown readable for binary-like payloads | M (0.5-1 day) | Approval; no such payload seen in the corpus yet |
-| 8 | next-local-fidelity | Research remaining metadata/omission/redaction policy (#15, #16) | Deferred by user | Clarifies high-fidelity scope | M to L | Finish policy research before implementing either flag |
-| 9 | next-graph-reindex | Refresh graph (#32) | October 14 snapshot is stale | Makes later modules discoverable | S | Timing |
-| 10 | next-design-fixture | Anonymized design-guide sample and reference render | Backlog | Reproducible report rebuilds | S | Approval before creating a sample |
+| 1 | next-inlineref-uri | Resolve `inlineReference` labels like VS Code, with a root-URI fallback; empty labels fail strict; Layer D scores reference names | Committed in `31a6362` | Restores the dropped references; corpus has no `unhandled-kind` failures | S | None |
+| 2 | next-local-toolcall-mismatch | Layer A honors request splices; redundant cross-turn copies use continuation notes without dropping new content | Committed in `a23fe4e` | Keeps identity and recorded updates | S | None |
+| 3 | next-kind-checks | Non-empty classifier output or reviewed missing-data representation; anything else falls back to JSON and fails strict | Committed in `3eb404a`: 288 reviewed no-content records counted separately in the latest runner JSON | Catches schema drift without an ID-only exemption | S | None |
+| 4 | next-commonmark-verify | Parser check in `--verify`, exact dependency pins and strict failure when unavailable | Committed in `a8cf283`; latest runner JSON: 0 failures/skips; S015 parser 228 ms of 70,745 ms verify; 4,057 ms over stable sources | Independent structural check | S to M (2-5 hours) | None |
+| 5 | next-fence-fuzz | Seeded fuzz tests with the parser as oracle (backtick runs, `~~~`, `</details>`, unclosed fences and HTML, multi-MB lines, lone surrogates, control/BOM/NUL/bidi, blockquotes and lists) | Committed in `932b7cb`; container-prefix fix in `05a9326`, todo allowance removed | Found the list-item fence-repair bug (latent, 0 corpus cases) | S to M (2-5 hours) | None |
+| 6 | next-html-passthrough | Escape unclosed comments and script/style/textarea/pre tags outside code; record without failing strict | Committed in `05a9326`; latest runner JSON: Local 0, stable SDK 3 escapes | Prevents model text from hiding exporter output | S | None |
+| 6a | next-sdk-fence-gate | Pass SDK fence repairs to `--verify` and strict, like Local | Committed in `a8cf283`; latest runner JSON: 0 early and turn-end closes | SDK repairs are no longer silent | S | None |
+| 6b | next-privacy-scrub | Synthetic IDs, generic user paths and a privacy guard | Committed forward-only in this checkpoint; baseline discovers its fixture path without renaming session files | Repository is public | S | None; history remains unchanged |
+| 7 | next-acceptance | Final cross-surface review and interactive root-chooser acceptance (#12, #13) | Open | Closes acceptance and stale-documentation gaps | S to M | A short manual terminal run |
+| 8 | next-base64-companions | Move long base64/data-URI-like strings to companion files with size and hash inline | Detection implemented; extraction not built | Latest runner JSON: trigger met, 370 string values across 21 stable sources; no scan errors | M | Trigger: base64-alphabet run of at least 64 KiB. Review false positives and approve extraction scope first |
+| 9 | next-local-fidelity | Research remaining metadata/omission/redaction policy (#15, #16) | Deferred by user | Clarifies high-fidelity scope | M to L | Finish policy research before implementing either flag |
+| 10 | next-graph-reindex | Refresh graph (#32) | October 14 snapshot is stale | Makes later modules discoverable | S | Timing |
+| 11 | next-design-fixture | Anonymized design-guide sample and reference render | Backlog | Reproducible report rebuilds | S | Approval before creating a sample |
+| 12 | next-browser-parallel-flake | Investigate the browser check's known timeout under parallel load | Backlog; latest final runs and all eight snapshot runs passed | A passing retry must not hide the original failure | S to M | Reproduce under load before changing timeouts or scheduling |
+| 13 | next-terminal-delta | Render only new content in same-ID terminal carryovers | Proposed; four observed carryovers still render the whole later copy | Avoid repeated output without dropping updates | M | Approve identity-aware delta rules and tests |
+| 14 | next-backup-inventory | Decide whether nested backup journals belong in discovery | Research only; 26 `bkup2` journals absent from the inventory | Makes backup coverage limits clear | S to M | Approve scope before changing discovery |
 | - | next-report-size | HTML report-size follow-ups | Other chat owns this | Avoid conflicting edits | M per experiment | None here |
 | - | next-model-icon | Distinct model-chip icon (#21) | Skipped by user | Not active scope | S | None |
 
-Done: `next-commit-checkpoint` (#31), `next-markdown-vuln-review` (semantic handler in this pass), `next-drift-automode` (#11), `next-global-stores` (#22), `next-evidence-field-column` (#30), `next-needs-attention` (#29), `next-sdk-markdown` (#9), `next-verification` (#10 approved text scope), `next-sdk-usage` (#20) and the Local selector follow-up.
+Done: `next-commit-fence-pass` (`e9a84ff`, `22a2f5d`, `70f0898`), `next-tilde-scaffold`, `next-corpus-runner` (`a8cf283`), `next-commit-checkpoint` (#31, including the eight approved groups), `next-markdown-vuln-review` (semantic handler in this pass), `next-drift-automode` (#11), `next-global-stores` (#22), `next-evidence-field-column` (#30), `next-needs-attention` (#29), `next-sdk-markdown` (#9), `next-verification` (#10 approved text scope), `next-sdk-usage` (#20) and the Local selector follow-up.
 
 ## Session-wide research requirement for AI agents
+
+Correction-pass source check (October 20): reviewed [IChatToolInvocationSerialized and isEffectivelyHidden](https://github.com/microsoft/vscode/blob/16507d91/src/vs/workbench/contrib/chat/common/chatService/chatService.ts), [tool invocation dispatch](https://github.com/microsoft/vscode/blob/16507d91/src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatToolInvocationPart.ts), and [empty progress visibility](https://github.com/microsoft/vscode/blob/16507d91/src/vs/workbench/contrib/chat/browser/widget/chatContentParts/toolInvocationParts/chatToolProgressPart.ts). These are source-derived observations at the requested commit, not current-main assumptions. The read-only [field audit](temp-tool-output/measure-corrections-20261020.json) is local-only and contains field names/counts rather than recorded messages. Graph coverage reported changed/untracked files, so current source reads and executable checks supplied the evidence. No private data was sent online.
 
 Full-width panel follow-up: this task changes HTML presentation and controller behavior, not VS Code storage interpretation. Previously verified workspace/source evidence was reused; [MDN details reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details) was consulted for the native no-JavaScript disclosure pattern. No additional VS Code schema behavior is inferred from this UI change.
 
@@ -119,6 +196,9 @@ The originally referenced "Pasted text #1" was not available as an attachment. T
 | Unknown `New Chat` placeholders (October 8, 17:14) | Hide a row by default only when its title is exactly `New Chat` (case-insensitive after trimming) and both creation date and prompt count are unknown. `--show-ignored` restores it. This is a convenience filter, not a claim that the underlying chat is empty; do not broaden it to other titles or metadata combinations without another decision. |
 | Listing identity/status clarity (October 8, 17:14) | Show chat type, an exact copyable Local UUID prefix without an ellipsis, and widen the ID column when needed. Explain `verified`, `unresolved`, and `ambiguous`; mark repeated Local journal IDs `path required`, since UUID alone is not an unambiguous selector. |
 | No arguments | Produce a listing, not a Markdown chat export, even when a current-session environment variable exists. |
+| Hidden and repeated tool calls (October 20) | Keep calls with `presentation: 'hidden'`. A same-ID later copy that adds nothing becomes "continued from turn N"; any new content stays. Never deduplicate different IDs by text. |
+| Missing tool content (October 20) | Check every field against reviewed metadata before emitting the tool name once and "No message, input or output was recorded." Count `tool-no-content` separately. An unfamiliar field falls back to JSON and fails strict. |
+| Verification and privacy (October 20) | Missing parser fails strict. SDK early closes fail strict; turn-end closes and HTML escapes are recorded only. Privacy scrub is forward-only, with synthetic test IDs and no session-data or Git-history changes. |
 | Listing output | Terminal listing plus offline HTML by default. `--no-html` suppresses HTML generation. |
 | HTML destination | Save the default offline listing in the invoking directory with a timestamped filename. `--html-output` selects an explicit file destination; `--no-html` disables HTML. Print the saved path without automatically opening a browser. |
 | Default filtering | Match `/fix`, confirmed-empty, and superseded-placeholder filtering. The terminal uses `--show-ignored`; HTML inclusion controls remain to be finalized. Unresolved is not empty. The compact-listing slice also hides ambiguous rows while retaining independently verified main conversations. |
@@ -136,5 +216,7 @@ The originally referenced "Pasted text #1" was not available as an attachment. T
 | Redaction | Redact by default in both modes, including companion files; report categories, counts and locations without revealing secret values. Explicit `--no-redact` disables all exporter redaction. Keep a clear archive/CLI warning that such output may contain credentials and private content; do not upload it or print secret values in diagnostics. The existing regex detector is not a guarantee of comprehensive secret detection. Test all rendered/exported content paths for consistent policy, including metadata, copy-source and companion files. |
 | Binary/opaque attachments | In both ordinary and high-fidelity exports, record metadata and omission reasons for non-image binary attachments and encrypted/opaque reasoning; do not copy their payloads or interpret them as readable reasoning. Exception: save all available recorded images in both modes, without an exporter size cap or resizing, as local files in the approved timestamped sibling companion folder and link from the main Markdown. Do not fetch remote images or reconstruct unavailable originals. Images can contain sensitive information that text redaction does not remove. |
 | Loss limits | Apply the approved line-based preview/companion policies, redaction and binary/opaque exclusions. No additional byte cap or silent clipping of substantive text/images is approved. Meaningful formatting/content must survive except documented safety/rendering representation and approved redaction; new unavoidable losses require explicit reporting and, for material policy changes, another user decision. |
+| Inline reference label (October 21) | Use VS Code's order: the recorded `name` first, then a symbol name, then the basename of the URI, Location or path. Where VS Code would show an empty label (a root URI), use the path, then the external URI. A record that still has no label renders as unreviewed JSON and fails strict. |
+| Parser check dependency (October 21) | `markdown-it` 14.x is approved as a devDependency used only by `--verify` and tests; it must not enter the runtime bundle. |
 
 The user subsequently explicitly approved implementation of these decisions and the revised sequence, with questions required for any new material ambiguity.
