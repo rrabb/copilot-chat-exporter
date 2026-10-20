@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { GENERIC_RESPONSE_KINDS } from '../src/session/classify.ts';
 import { parseChatSession } from '../src/session/journal.ts';
 
 const request = (requestId: string, prompt: string, response: unknown[] = []) => ({
@@ -75,6 +76,60 @@ test('autoModeResolution is request metadata: it reaches the scalars, not the bo
   assert.deepEqual(session.turns[0].scalar.autoModelResolutions,
     [{ modelId: 'gpt-x', modelName: 'GPT X', confidence: null, predictedLabel: '' }]);
   assert.deepEqual(session.census.unhandled, []);
+});
+
+test('unknown response JSON stays in order and remains unreviewed, not dropped', () => {
+  const unknown = { kind: 'futureResponse', nested: { text: 'raw text' } };
+  const raw = journal({
+    kind: 0,
+    v: {
+      version: 3,
+      requests: [request('r1', 'question', [
+        { value: 'before' },
+        unknown,
+        { value: 'after' },
+      ])],
+    },
+  });
+
+  const session = parseChatSession('session.jsonl', raw);
+
+  assert.deepEqual(session.turns[0].body.map((node) => node.type), ['text', 'unknownResponse', 'text']);
+  assert.equal(session.turns[0].body[1].type === 'unknownResponse' ? session.turns[0].body[1].payload : '', JSON.stringify(unknown, null, 2));
+  assert.deepEqual(session.census.unhandled, [['futureResponse', 1]]);
+  assert.equal(session.census.dropped.has('futureResponse'), false);
+});
+
+test('a malformed markdownVuln stays unreviewed for strict mode even though the kind is handled', () => {
+  const raw = journal({
+    kind: 0,
+    v: { version: 3, requests: [request('r1', 'question', [
+      { kind: 'markdownVuln', content: { value: 'ok' }, vulnerabilities: [{ title: 'x', description: 'y' }] },
+      { kind: 'markdownVuln', content: { value: 'bad' }, vulnerabilities: 'not an array' },
+    ])] },
+  });
+
+  const session = parseChatSession('session.jsonl', raw);
+
+  assert.deepEqual(session.turns[0].body.map((node) => node.type), ['text', 'unknownResponse']);
+  assert.deepEqual(session.census.unhandled, [['markdownVuln', 1]]);
+});
+
+test('a reviewed generic response keeps its payload without blocking strict census', () => {
+  const kind = 'reviewedGenericResponse';
+  const raw = journal({
+    kind: 0,
+    v: { version: 3, requests: [request('r1', 'question', [{ kind, detail: 'kept' }])] },
+  });
+  GENERIC_RESPONSE_KINDS.add(kind);
+  try {
+    const session = parseChatSession('session.jsonl', raw);
+
+    assert.equal(session.turns[0].body[0].type, 'unknownResponse');
+    assert.deepEqual(session.census.unhandled, []);
+  } finally {
+    GENERIC_RESPONSE_KINDS.delete(kind);
+  }
 });
 
 test('compact confirmation remains on its recorded request', () => {

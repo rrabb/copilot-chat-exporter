@@ -6,6 +6,7 @@ import type { Census } from './types.ts';
 import { parseArgs } from './args.ts';
 import { installAgentFiles } from './install.ts';
 import { loadSession, renderSession } from './index.ts';
+import type { FenceRepairs } from './index.ts';
 import { formatExportSummary } from './export-summary.ts';
 import { getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
 import { looksLikeSessionArgument } from './session/locate.ts';
@@ -142,10 +143,10 @@ function printCensusReport (census: Census) {
     console.log('- Unrecognized toolSpecificData kinds: none');
   }
   if (census.unhandled.length) {
-    console.log(`- UNHANDLED kinds (content dropped in silence): ${census.unhandled.length}`);
+    console.log(`- UNREVIEWED response kinds (strict verification fails until reviewed): ${census.unhandled.length}`);
     for (const [kind, count] of census.unhandled)
       console.log(`    ${kind}: ${thousands(count)} occurrence(s)`);
-    console.log('    Add a classifyNode branch, or add the kind to IGNORED_RESPONSE_KINDS if it carries no content.');
+    console.log('    Unknown response records are retained as raw JSON when their kind is available. Review the payload, then add a semantic branch, approve generic output in GENERIC_RESPONSE_KINDS, or add a deliberate ignore rule.');
   } else {
     console.log('- Unhandled kinds: none');
   }
@@ -168,6 +169,16 @@ function printRenderReport (report: ReturnType<typeof buildRenderReport>, target
   console.log(`Layer C - rendered file vs parsed turns (${target})`);
   for (const check of report.checks)
     console.log(`  - [${check.ok ? 'PASS' : 'FAIL'}] ${check.name} (${check.detail})`);
+}
+
+function printFenceRepairs (repairs: FenceRepairs) {
+  if (!repairs.early.length && !repairs.turnEnd)
+    return;
+  const byKind = new Map<string, number>();
+  for (const { kind } of repairs.early)
+    byKind.set(kind, (byKind.get(kind) || 0) + 1);
+  const kinds = [...byKind].map(([kind, count]) => `${kind}=${count}`).join(', ');
+  console.log(`Code fences closed by the exporter: ${repairs.early.length} before the end of a turn${kinds ? ` (${kinds})` : ''}, ${repairs.turnEnd} at the end of a turn. Each is noted in the export as a representation change; early closes fail --strict.`);
 }
 
 function printDigestDiff (diffs: ReturnType<typeof diffDigest>) {
@@ -324,13 +335,15 @@ if (verifyMode) {
     console.log('Layer C - skipped: no output file given. Pass one to enable render checks: --verify <sessionId> <outputFile>');
   }
   const overflow = { assetsDirectory: 'assets', companions: [] as CompanionArtifact[] };
-  const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown
-    ?? renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), overflow })}\n${renderedMarkdown === null
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+  const built = renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), overflow, fenceRepairs });
+  printFenceRepairs(fenceRepairs);
+  const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown ?? built}\n${renderedMarkdown === null
     ? overflow.companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')
     : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!))}`);
   printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
   const failed = report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || renderFailed
-    || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0 || lossAccount.failed));
+    || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0 || lossAccount.failed || fenceRepairs.early.length > 0));
   process.exit(failed ? 2 : 0);
 }
 
@@ -370,6 +383,7 @@ if (snapshotAction) {
 
 const outputPath = resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
 let rendered = '';
+const exportFenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
 
 let outputSize: number;
 let companionCount = 0;
@@ -379,11 +393,14 @@ try {
     outputPath, generatedAt: new Date().toISOString(), overwrite: goldenMode || overwriteMode,
     plan: (assetsDirectory) => {
       const overflow = { assetsDirectory, companions: [] as CompanionArtifact[] };
+      exportFenceRepairs.early = [];
+      exportFenceRepairs.turnEnd = 0;
       rendered = renderSession(loaded, {
         outputPath,
         gitStatus: loaded.host.gitStatus(),
         generatedAt: new Date().toISOString(),
         overflow,
+        fenceRepairs: exportFenceRepairs,
       });
       return {
         markdown: rendered, companions: overflow.companions, diagnostics: [],
@@ -408,10 +425,13 @@ for (const line of formatExportSummary({
   console.log(line);
 assetsPath && console.log(`Companion files: ${companionCount} in ${workspacePath(assetsPath)} (full text of tool output over 300 lines and 15 KiB)`);
 if (session.census.unhandled.length) {
-  console.log(`Schema drift: ${session.census.unhandled.length} unhandled node kind(s) - ${session.census.unhandled.map(([kind, count]) => `${kind}=${count}`).join(', ')}. Run --verify for the full census.`);
+  console.log(`Schema drift: ${session.census.unhandled.length} unreviewed response kind(s) - ${session.census.unhandled.map(([kind, count]) => `${kind}=${count}`).join(', ')}. Unknown payloads are shown as collapsed JSON when available. Run --verify for the full census.`);
   if (strictMode)
     process.exitCode = 2;
 }
+printFenceRepairs(exportFenceRepairs);
+if (strictMode && exportFenceRepairs.early.length)
+  process.exitCode = 2;
 
 // Driftless Layer C: check the just-rendered content against the same parse snapshot, so
 // no tool calls can accrue between render and check (verifying a stale file on disk drifts

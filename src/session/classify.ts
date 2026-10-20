@@ -5,10 +5,11 @@
 // The procedure - diagnosing, deciding which list a new name belongs in, re-saving the recorded
 // exports - is in `docs/UPGRADING.md`.
 //
-// The three lists below are not interchangeable:
+// These lists are not interchangeable:
 //   handled  - dispatched on, produces an export node
 //   ignored  - deliberately dropped, and OBSERVED in a real journal
 //   unseen   - known to exist but never observed here, so still reported if it appears
+//   generic  - reviewed and approved to retain only as raw JSON
 //
 // Never move a name into the ignored list without seeing it in a real journal first. That list
 // silences the census, and fourteen unobserved names once sat there disarming the very alarm
@@ -30,6 +31,7 @@ export const HANDLED_RESPONSE_KINDS = new Set([
   'warning',
   'confirmation',
   'questionCarousel',
+  'markdownVuln',
 ]);
 
 // Produce no export node ON PURPOSE: presentation, bookkeeping, or content already captured
@@ -50,7 +52,6 @@ export const IGNORED_RESPONSE_KINDS = new Set([
 export const KNOWN_UNSEEN_KINDS = new Set([
   'info',
   'command',
-  'markdownVuln',
   'notebookEditGroup',
   'extensions',
   'pullRequest',
@@ -64,6 +65,10 @@ export const KNOWN_UNSEEN_KINDS = new Set([
   'clearToPreviousToolInvocation',
   'disabledClaudeHooks',
 ]);
+
+// Add a response kind here only after reviewing its payload and approving generic JSON output.
+// It still renders as raw JSON, but no longer blocks strict verification.
+export const GENERIC_RESPONSE_KINDS = new Set<string>();
 
 // `toolSpecificData` payload kinds lifted into dedicated fields below. A rename here is the quiet
 // failure: the content still renders, but as a generic JSON dump instead of a command block, todo
@@ -93,7 +98,7 @@ export const GENERIC_TOOL_PAYLOAD_KINDS = new Set([
 
 // Recorded so a reader knows which VS Code the parse was validated against. A census detects a
 // NEW or renamed kind; it cannot detect an existing kind quietly changing meaning.
-export const VALIDATED_AGAINST = 'VS Code 1.134 / Copilot Chat 0.62 (journal schema kinds 0/1/2/3)';
+export const VALIDATED_AGAINST = 'VS Code 1.134 / Copilot Chat 0.62 and VS Code 1.141.2 (commit 16507d91) / Copilot Chat 0.69.0 (journal schema kinds 0/1/2/3)';
 
 export function thinkingText (value: unknown) {
   if (typeof value === 'string')
@@ -158,6 +163,20 @@ export function classifyNode (item: any) {
   if (item.kind === 'markdownContent') {
     const text = typeof item.content === 'string' ? item.content : item.content?.value;
     return typeof text === 'string' && text ? { type: 'text', text } : null;
+  }
+  if (item.kind === 'markdownVuln') {
+    // VS Code merges `content.value` into the surrounding Markdown (annotations.ts at 16507d91),
+    // so the text can be a fragment of a code line. Anything off this form stays unreviewed JSON.
+    const text = standardMarkdownValue(item.content);
+    const vulnerabilities = vulnerabilityList(item.vulnerabilities);
+    if (text === null || !vulnerabilities)
+      return unknownResponse(item);
+    return {
+      type: 'text',
+      text,
+      vulnerabilities,
+      omittedDisplayMetadata: DISPLAY_METADATA_KEYS.filter((key) => key in item.content),
+    };
   }
   if (item.kind === 'toolInvocationSerialized') {
     const invocation = messageValue(item.invocationMessage);
@@ -255,7 +274,34 @@ export function classifyNode (item: any) {
   }
   if (item.kind == null && typeof item.value === 'string')
     return { type: 'text', text: item.value };
+  if (typeof item.kind === 'string'
+    && !HANDLED_RESPONSE_KINDS.has(item.kind) && !IGNORED_RESPONSE_KINDS.has(item.kind))
+    return unknownResponse(item);
   return null;
+}
+
+const DISPLAY_METADATA_KEYS = ['supportThemeIcons', 'supportHtml', 'uris'];
+const STANDARD_MARKDOWN_KEYS = new Set(['value', ...DISPLAY_METADATA_KEYS]);
+
+/** `content.value` when `content` is VS Code's standard Markdown string object, otherwise null. */
+export function standardMarkdownValue (content: unknown) {
+  if (!content || typeof content !== 'object' || Array.isArray(content))
+    return null;
+  const record = content as Record<string, unknown>;
+  if (typeof record.value !== 'string' || Object.keys(record).some((key) => !STANDARD_MARKDOWN_KEYS.has(key)))
+    return null;
+  return record.value;
+}
+
+export function vulnerabilityList (value: unknown) {
+  if (!Array.isArray(value)
+    || !value.every((entry) => typeof entry?.title === 'string' && typeof entry?.description === 'string'))
+    return null;
+  return value.map((entry) => ({ title: entry.title as string, description: entry.description as string }));
+}
+
+function unknownResponse (item: any) {
+  return { type: 'unknownResponse' as const, kind: String(item.kind), payload: JSON.stringify(item, null, 2) };
 }
 
 function nonEmptyString (value: unknown) {

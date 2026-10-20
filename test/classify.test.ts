@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
-  IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS, classifyNode, fileOperation, thinkingText,
+  GENERIC_RESPONSE_KINDS, GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
+  IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS, classifyNode, fileOperation, standardMarkdownValue, thinkingText,
 } from '../src/session/classify.ts';
 
 // One minimal item per handled kind. The coverage test at the bottom fails if a kind is added to
@@ -20,6 +20,11 @@ const SAMPLES = {
   questionCarousel: {
     kind: 'questionCarousel',
     questions: [{ title: 'Delivery scope', message: 'Which option?', options: [{ label: 'Local only', value: 'local' }] }],
+  },
+  markdownVuln: {
+    kind: 'markdownVuln',
+    content: { value: ' {\n', supportThemeIcons: false, supportHtml: false, uris: {} },
+    vulnerabilities: [{ title: 'path-injection', description: 'Unvalidated input in path value creation' }],
   },
 };
 
@@ -207,10 +212,57 @@ test('named markdownContent is reduced to the same text node', () => {
   assert.equal(classifyNode({ kind: 'markdownContent', content: { value: '' } }), null);
 });
 
-test('an unknown kind yields nothing, which is what the census then reports', () => {
-  assert.equal(classifyNode({ kind: 'somethingNew' }), null);
+test('an unknown kind keeps its complete raw JSON payload for later review', () => {
+  const response = { kind: 'somethingNew', nested: { message: 'still available' } };
+  assert.deepEqual(classifyNode(response), {
+    type: 'unknownResponse',
+    kind: 'somethingNew',
+    payload: JSON.stringify(response, null, 2),
+  });
+  assert.equal(classifyNode({ kind: 'progressMessage', value: 'deliberately ignored' }), null);
   assert.equal(classifyNode(null), null);
   assert.equal(classifyNode('a string'), null);
+});
+
+test('an unknown kind never inlines content.value, even in the standard Markdown form', () => {
+  const response = { kind: 'somethingNew', content: { value: 'visible text', supportHtml: false, uris: {} } };
+  assert.deepEqual(classifyNode(response), {
+    type: 'unknownResponse',
+    kind: 'somethingNew',
+    payload: JSON.stringify(response, null, 2),
+  });
+});
+
+test('standardMarkdownValue accepts only value plus the display metadata keys', () => {
+  assert.equal(standardMarkdownValue({ value: 'x', supportHtml: true, supportThemeIcons: false, uris: {} }), 'x');
+  assert.equal(standardMarkdownValue({ value: '' }), '');
+  for (const content of [{ value: 'x', extra: 1 }, { value: 42 }, 'plain string', [{ value: 'x' }], null])
+    assert.equal(standardMarkdownValue(content), null, JSON.stringify(content));
+});
+
+test('markdownVuln merges its text into the run and keeps the recorded warnings', () => {
+  assert.deepEqual(classifyNode(SAMPLES.markdownVuln), {
+    type: 'text',
+    text: ' {\n',
+    vulnerabilities: [{ title: 'path-injection', description: 'Unvalidated input in path value creation' }],
+    omittedDisplayMetadata: ['supportThemeIcons', 'supportHtml', 'uris'],
+  });
+});
+
+test('a malformed markdownVuln falls back to the unreviewed JSON block', () => {
+  const malformed = [
+    { kind: 'markdownVuln', content: { value: 7 }, vulnerabilities: [] },
+    { kind: 'markdownVuln', content: { value: 'x' } },
+    { kind: 'markdownVuln', content: { value: 'x' }, vulnerabilities: [{ title: 'only a title' }] },
+    { kind: 'markdownVuln', content: { value: 'x' }, vulnerabilities: 'not an array' },
+  ];
+  for (const item of malformed) {
+    const node = classifyNode(item) as { type: string; kind?: string; payload?: string };
+    assert.equal(node.type, 'unknownResponse', JSON.stringify(item));
+    assert.equal(node.kind, 'markdownVuln');
+    assert.equal(node.payload, JSON.stringify(item, null, 2));
+    assert.equal('inlineText' in node, false, 'no unreviewed text is inlined');
+  }
 });
 
 test('autoModeResolution keeps the model Auto picked, in both observed shapes', () => {
@@ -242,7 +294,7 @@ test('every handled kind has an example above', () => {
 
 test('the kind lists do not overlap', () => {
   // A name in two lists means the census would describe it two ways.
-  const lists = { HANDLED_RESPONSE_KINDS, IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS };
+  const lists = { GENERIC_RESPONSE_KINDS, HANDLED_RESPONSE_KINDS, IGNORED_RESPONSE_KINDS, KNOWN_UNSEEN_KINDS };
   for (const [nameA, listA] of Object.entries(lists))
     for (const [nameB, listB] of Object.entries(lists)) {
       if (nameA >= nameB)

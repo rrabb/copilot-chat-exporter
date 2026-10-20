@@ -16,14 +16,14 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { planToolText } from './export-policy.ts';
 import type { CompanionArtifact, CompanionKind } from './export-policy.ts';
-import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, Turn, TurnNode, TurnScalars, UsageFigures } from './types.ts';
+import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
 import { modelName } from './session/enrich.ts';
 import {
   COLLATOR, COMMAND_CODE, FILE_LINK_COLOR, MARK, MUTED, MUTED_CODE, NESTED_INDENT, PROMPT_BADGE,
-  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences,
+  PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences, fenceCloses, fenceOpener, openFenceTicks,
   esc, extractUri, fenceFor, fmtAiCredits, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
   mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
   userMessageAnchor, userMessageHref,
@@ -66,21 +66,18 @@ function borderedMarkdown (content: unknown, { copyable = true, lang = 'markdown
 // Live-rendering embedded Markdown is only safe for plain prose. Anything in this list
 // changes how the surrounding document renders, so such content is shown as source.
 function markdownRisks (content: string) {
-  let fenceLen = 0;
+  let marker = '';
   let html = false;
   let comment = false;
   let heading = false;
   let link = false;
   for (const line of String(content).split('\n')) {
-    const match = /^\s*(`{3,})\s*(\S*)\s*$/.exec(line);
-    if (match) {
-      if (fenceLen === 0)
-        fenceLen = match[1].length;
-      else if (match[1].length >= fenceLen && !match[2])
-        fenceLen = 0;
+    if (marker) {
+      fenceCloses(line, marker) && (marker = '');
       continue;
     }
-    if (fenceLen > 0)
+    marker = fenceOpener(line);
+    if (marker)
       continue;
     // Any tag-like token renders live: <Select> becomes a real dropdown, <img> loads, etc.
     /<\/?[A-Za-z][\w:.-]*(\s[^<>]*)?\/?>/.test(line) && (html = true);
@@ -93,7 +90,7 @@ function markdownRisks (content: string) {
   comment && risks.push('HTML comments');
   heading && risks.push('headings would pollute the outline');
   link && risks.push('anchors');
-  fenceLen > 0 && risks.push('unclosed code fence');
+  marker && risks.push('unclosed code fence');
   return risks;
 }
 
@@ -160,6 +157,17 @@ export interface TextOverflow {
 // parameter through every renderer below it.
 let overflow: TextOverflow | null = null;
 
+/** Code fences the renderer had to close itself. `early` entries split a fence mid-run and fail strict mode. */
+export interface FenceRepairs {
+  early: Array<{ turn: number; kind: string }>;
+  turnEnd: number;
+}
+
+let fenceRepairs: FenceRepairs | null = null;
+
+// The fence VS Code writes before an inline edit preview; it is dropped when the run is flushed.
+const LEAD_EDIT_FENCE = /^\s*`{3,}[^\n]*\n?/;
+
 function saveOverflow (text: string, kind: CompanionKind, label: string, extension: string, toolCallId?: string) {
   const sink = overflow!;
   const hash = createHash('sha256').update(text).digest('hex').slice(0, 8);
@@ -172,29 +180,54 @@ function saveOverflow (text: string, kind: CompanionKind, label: string, extensi
   return { name, href: relativePath.replaceAll(' ', '%20') };
 }
 
+// An unreviewed payload's preview is the first 10 lines, cut to this many bytes so one huge line cannot fill the Markdown.
+const PREVIEW_MAX_BYTES = 2048;
+
+/** The longest prefix within `maxBytes` UTF-8 bytes that ends on a code point boundary. */
+function utf8Prefix (text: string, maxBytes: number) {
+  let bytes = 0;
+  let end = 0;
+  for (const char of text) {
+    const size = Buffer.byteLength(char, 'utf8');
+    if (bytes + size > maxBytes)
+      break;
+    bytes += size;
+    end += char.length;
+  }
+  return text.slice(0, end);
+}
+
 /** Applies the line policy to one text: the text to show, plus the note that links the full companion when there is one. */
-function limitText (text: string, options: { kind: CompanionKind; label: string; extension?: string; toolCallId?: string }) {
-  const plan = planToolText(text);
+function limitText (text: string, options: { kind: CompanionKind; label: string; extension?: string; toolCallId?: string; rule?: 'both' | 'either' }) {
+  const plan = planToolText(text, options.rule);
   if (plan.companionText === null || overflow === null)
-    return { shown: text, linked: false, note: '' };
+    return { shown: text, linked: false, note: '', summary: '' };
   const saved = saveOverflow(plan.companionText, options.kind, options.label, options.extension ?? 'txt', options.toolCallId);
+  const totalBytes = thousands(Buffer.byteLength(text, 'utf8'));
+  const lines = `${thousands(plan.lineCount)} line${plan.lineCount === 1 ? '' : 's'}`;
+  const link = `Full text: [${saved.name}](${saved.href}).`;
+  if (options.rule !== 'either' || Buffer.byteLength(plan.preview, 'utf8') <= PREVIEW_MAX_BYTES)
+    return { shown: plan.preview, linked: true, summary: 'first 10 lines', note: `Showing the first 10 of ${lines} (${totalBytes} bytes). ${link}` };
+  const shown = utf8Prefix(plan.preview, PREVIEW_MAX_BYTES);
   return {
-    shown: plan.preview,
+    shown,
     linked: true,
-    note: `Showing the first 10 of ${thousands(plan.lineCount)} lines (${thousands(Buffer.byteLength(text, 'utf8'))} bytes). Full text: [${saved.name}](${saved.href}).`,
+    summary: 'preview',
+    note: `Showing the first ${thousands(Buffer.byteLength(shown, 'utf8'))} of ${totalBytes} bytes (${lines}). ${link}`,
   };
 }
 
 /**
  * A collapsed block for tool text under the approved policy: text up to 300 lines or 15 KiB stays in the
- * Markdown, longer text shows the first 10 and link a companion with the full text.
+ * Markdown, longer text shows the first 10 lines and links a companion with the full text. Unreviewed payloads
+ * (`rule: 'either'`) move at 300 lines OR 15 KiB, and their preview is capped at 2 KiB.
  * With no companion folder (library callers) the full text stays inline; it is never clipped.
  */
-function toolTextBlock (summary: string, text: string, language: string, options: { kind: CompanionKind; label: string; extension?: string; toolCallId?: string; tail?: string }) {
+function toolTextBlock (summary: string, text: string, language: string, options: { kind: CompanionKind; label: string; extension?: string; toolCallId?: string; tail?: string; rule?: 'both' | 'either' }) {
   const limited = limitText(text, options);
   const fence = fenceFor(limited.shown, language);
   return [
-    `<details><summary>${mutedSummary(`${summary}${limited.linked ? ' - first 10 lines, full text linked' : ''}${options.tail ?? ''}`)}</summary>`,
+    `<details><summary>${mutedSummary(`${summary}${limited.linked ? ` - ${limited.summary}, full text linked` : ''}${options.tail ?? ''}`)}</summary>`,
     '',
     ...indentBlock([fence.open, limited.shown, fence.close, ...(limited.note ? ['', limited.note] : [])], NESTED_INDENT),
     '',
@@ -485,6 +518,25 @@ function renderNote (node: NoteNode) {
   ];
 }
 
+// Warnings a markdownVuln record attached to its text. Written after the text run, never inside it.
+function renderVulnerabilities (node: TextNode) {
+  const warnings = (node.vulnerabilities ?? []).map((entry) =>
+    `> ⚠️ Code-safety warning recorded by the chat source, not validated by the exporter: **${esc(entry.title)}** - ${esc(entry.description)}`);
+  const omitted = node.omittedDisplayMetadata?.length
+    ? ['>', `> <sub>Omitted display metadata: ${node.omittedDisplayMetadata.map(esc).join(', ')}</sub>`]
+    : [];
+  return [...warnings.flatMap((line, index) => index ? ['>', line] : [line]), ...omitted, ''];
+}
+
+function renderUnknownResponse (node: UnknownResponseNode) {
+  return toolTextBlock(
+    `⚠️ Unreviewed response kind: ${esc(node.kind)}`,
+    redact(node.payload),
+    'json',
+    { kind: 'metadata', label: 'unreviewed-response', extension: 'json', rule: 'either' },
+  );
+}
+
 function renderTodos (todos: TodoItem[]) {
   if (!todos.length)
     return [];
@@ -589,17 +641,35 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
   // the response stream; strip a fence that hugs an edit marker so it does not
   // render as an empty code box around the "Edited <file>" note.
   let stripLeadFence = false;
-  const flush = ({ trailingEdit=false,  } = {}) => {
+  // Blocks the exporter adds (warnings, notes, unreviewed JSON) wait here while the prose run has
+  // a code fence open, so they never split the fence; they are written right after the run.
+  let held: string[] = [];
+  // The run as it will be written: the stray fence before an inline edit preview is dropped at
+  // flush, so fence state is read after that strip, never from the raw run.
+  const pending = () => stripLeadFence ? run.join('').replace(LEAD_EDIT_FENCE, '') : run.join('');
+  const fenceOpen = () => Boolean(openFenceTicks(pending()));
+  const flush = ({ trailingEdit = false, interrupter = '' } = {}) => {
+    flushRun({ trailingEdit, interrupter });
+    lines.push(...held);
+    held = [];
+  };
+  const flushRun = ({ trailingEdit = false, interrupter = '' } = {}) => {
     if (!run.length) {
       return;
     }
     let markdown = redact(run.join(''));
     if (stripLeadFence)
-      markdown = markdown.replace(/^\s*`{3,}[^\n]*\n?/, '');
+      markdown = markdown.replace(LEAD_EDIT_FENCE, '');
     if (trailingEdit)
       markdown = markdown.replace(/\n?`{3,}[ \t]*\s*$/, '');
     stripLeadFence = false;
     markdown = markdown.replace(/\n{3,}/g, '\n\n').trim();
+    // A node that interrupts an open fence forces assistantBlock to close it here, splitting the
+    // code. Record it so strict mode can fail; the turn-end close is handled before the last flush.
+    if (interrupter && openFenceTicks(markdown)) {
+      fenceRepairs?.early.push({ turn: turn.number, kind: interrupter });
+      held.unshift(`> _Representation change: the exporter closed a code fence early because a ${interrupter} record interrupted it; the code continues in the next block._`, '');
+    }
     if (markdown) {
       lines.push(...assistantBlock(markdown));
     }
@@ -631,26 +701,37 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
 
   for (const node of turn.body) {
     if (node.type === 'think') {
-      flush();
+      flush({ interrupter: 'think' });
       thoughts.push(node.text);
     } else if (node.type === 'text') {
       flushThoughts();
       run.push(node.text);
+      node.vulnerabilities?.length && held.push(...renderVulnerabilities(node));
     } else if (node.type === 'ref' && node.text) {
       flushThoughts();
       run.push(`\`${node.text}\``);
     } else if (node.type === 'tool') {
-      flush();
+      flush({ interrupter: 'tool' });
       flushThoughts();
       stripLeadFence = false;
       lines.push(...renderToolNode(node, byCall), '');
     } else if (node.type === 'note') {
-      flush();
+      flush({ interrupter: 'note' });
       flushThoughts();
       stripLeadFence = false;
       lines.push(...renderNote(node), '');
+    } else if (node.type === 'unknownResponse') {
+      // Never inline unreviewed content. While a fence is open the JSON waits for the run to end.
+      if (fenceOpen()) {
+        held.push(...renderUnknownResponse(node), '');
+        continue;
+      }
+      flush();
+      flushThoughts();
+      stripLeadFence = false;
+      lines.push(...renderUnknownResponse(node), '');
     } else if (node.type === 'edit' && node.uri) {
-      flush({ trailingEdit: node.inline });
+      flush({ trailingEdit: node.inline, interrupter: 'edit' });
       flushThoughts();
       const verbs: Record<string, string> = { created: 'Created', deleted: 'Deleted', renamed: 'Renamed' };
       const verb = verbs[node.op] || 'Edited';
@@ -658,6 +739,12 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       // Only an inline edit preview is wrapped in stray fences by the response stream.
       stripLeadFence = Boolean(node.inline);
     }
+  }
+  const unclosed = openFenceTicks(pending());
+  if (unclosed) {
+    run.push(`${run.join('').endsWith('\n') ? '' : '\n'}${unclosed}\n`);
+    fenceRepairs && (fenceRepairs.turnEnd += 1);
+    held.unshift('> _Representation change: the exporter closed an unterminated code fence at the end of this turn._', '');
   }
   flush();
   flushThoughts();
@@ -815,6 +902,8 @@ export interface DocumentContext {
   generatedAt: string;
   /** Where over-long tool text is saved in full. Omit it to keep every text inline. */
   overflow?: TextOverflow;
+  /** Collects the code fences the renderer closed itself. */
+  fenceRepairs?: FenceRepairs;
   /** Where the conversation came from; changes only the descriptive wording. Default: the Local chat journal. */
   source?: 'journal' | 'sdk-events';
 }
@@ -932,10 +1021,12 @@ function subagentSummaryLine (toolNodes: ToolNode[]): string[] {
 
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
   overflow = context.overflow ?? null;
+  fenceRepairs = context.fenceRepairs ?? null;
   try {
     return buildDocumentBody(session, context);
   } finally {
     overflow = null;
+    fenceRepairs = null;
   }
 }
 

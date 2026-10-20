@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
 import { setWorkspaceRoot } from '../src/host.ts';
-import { copySource, markdownBody, renderTurnBody, toolFriendly, turnCost, turnInfo } from '../src/markdown.ts';
+import { buildDocument, copySource, markdownBody, renderTurnBody, toolFriendly, turnCost, turnInfo } from '../src/markdown.ts';
+import type { FenceRepairs } from '../src/markdown.ts';
+import { fenceFor, openFenceTicks } from '../src/text.ts';
+import type { CompanionArtifact } from '../src/export-policy.ts';
 import type { EditOperation, Turn, TurnNode } from '../src/types.ts';
-import { testTool, testTurn } from './helpers.ts';
+import { testSession, testTool, testTurn } from './helpers.ts';
 
 const ROOT = path.join(path.sep, 'proj');
 setWorkspaceRoot(ROOT);
@@ -13,6 +16,21 @@ const render = (body: TurnNode[], over: Partial<Turn> = {}) => renderTurnBody(
   testTurn({ body, ...over }),
   new Map(),
 ).join('\n');
+
+const documentContext = (over: Partial<Parameters<typeof buildDocument>[1]> = {}): Parameters<typeof buildDocument>[1] => ({
+  location: {
+    sessionId: 'a0a0a0a0-1111-4111-8111-111111111111',
+    sessionPath: path.join(ROOT, 'session.jsonl'),
+    hashRoot: ROOT,
+  },
+  resources: { resources: [], byCall: new Map(), resourceRoot: ROOT },
+  versions: { copilotVersion: 'unknown', vscodeVersion: 'unknown' },
+  memory: { session: [], repo: [], user: [] },
+  outputPath: path.join(ROOT, 'export.md'),
+  gitStatus: '',
+  generatedAt: '2026-01-01T00:00:00.000Z',
+  ...over,
+});
 
 test('toolFriendly drops the prefixes nobody reads', () => {
   assert.equal(toolFriendly('copilot_readFile'), 'readFile');
@@ -33,6 +51,246 @@ test('a turn body renders in recorded order, never bucketed by type', () => {
   const afterAt = output.indexOf('after the tool');
   assert.ok(beforeAt < toolAt, 'prose before the call comes first');
   assert.ok(toolAt < afterAt, 'prose after the call comes last');
+});
+
+test('unknown response JSON is collapsed, redacted, and kept in its recorded position', () => {
+  const output = render([
+    { type: 'text', text: 'before unknown response' },
+    {
+      type: 'unknownResponse',
+      kind: 'futureResponse',
+      payload: JSON.stringify({ kind: 'futureResponse', password: 'synthetic-secret' }, null, 2),
+    },
+    { type: 'text', text: 'after unknown response' },
+  ]);
+
+  assert.ok(output.indexOf('before unknown response') < output.indexOf('futureResponse'));
+  assert.ok(output.indexOf('futureResponse') < output.indexOf('after unknown response'));
+  assert.match(output, /<details><summary>.*Unreviewed response kind/);
+  assert.match(output, /\[REDACTED\]/);
+  assert.doesNotMatch(output, /synthetic-secret/);
+});
+
+test('markdownVuln text joins the code fence it was streamed into, and its warning follows the run', () => {
+  // Request 5 of a real journal: VS Code merges the vuln text into the surrounding Markdown, so
+  // the brace belongs to the code line and the 4-backtick fence never breaks.
+  const output = render([
+    { type: 'text', text: 'Here is the fix:\n\n````javascript\nif (stats.isSymbolicLink())' },
+    {
+      type: 'text',
+      text: ' {\n',
+      vulnerabilities: [{ title: 'path-injection', description: 'Unvalidated input in path value creation' }],
+      omittedDisplayMetadata: ['supportThemeIcons', 'supportHtml', 'uris'],
+    },
+    { type: 'text', text: '    console.log("link");\n}\n````\n\nDone.' },
+  ]);
+
+  const fenceLines = output.split('\n').filter((line) => /^\s*`{3,}/.test(line));
+  assert.deepEqual(fenceLines.map((line) => line.trim()), ['````javascript', '````'], 'one continuous fence');
+  assert.match(output, /if \(stats\.isSymbolicLink\(\)\) \{\n {4}console\.log/);
+  const warningAt = output.indexOf('Code-safety warning');
+  assert.ok(warningAt > output.indexOf('Done.'), 'the warning comes after the text run');
+  assert.match(output, /recorded by the chat source, not validated by the exporter/);
+  assert.match(output, /\*\*path-injection\*\* - Unvalidated input in path value creation/);
+  assert.match(output, /supportThemeIcons, supportHtml, uris/);
+});
+
+test('an unknown kind inside an open fence never splits it; its JSON follows the run and round-trips', () => {
+  const payload = JSON.stringify({ kind: 'futureKind', content: { value: 'const b = 2;\n' } }, null, 2);
+  const output = render([
+    { type: 'text', text: '```js\nconst a = 1;\n' },
+    { type: 'unknownResponse', kind: 'futureKind', payload },
+    { type: 'text', text: 'const c = 3;\n```\n\nAfter the code.' },
+  ]);
+
+  assert.match(output, /const a = 1;\nconst c = 3;\n```/, 'one continuous fence');
+  assert.doesNotMatch(output, /^const b = 2;$/m, 'unreviewed content.value is not inlined');
+  assert.ok(output.indexOf('Unreviewed response kind') > output.indexOf('After the code.'), 'JSON follows the run');
+  const json = output.match(/```json\n([\s\S]*?)\n\s*```/);
+  assert.ok(json, 'the JSON block is present');
+  const dedented = json![1].split('\n').map((line) => line.replace(/^ {4}/, '')).join('\n');
+  assert.deepEqual(JSON.parse(dedented), JSON.parse(payload));
+});
+
+test('a tilde fence holds markdownVuln warnings and unknown JSON until it closes', () => {
+  const payload = JSON.stringify({ kind: 'futureKind', n: 1 }, null, 2);
+  const output = render([
+    { type: 'text', text: '~~~js\nconst a = 1;\n' },
+    {
+      type: 'text',
+      text: 'const b = 2;\n',
+      vulnerabilities: [{ title: 'synthetic', description: 'synthetic warning' }],
+    },
+    { type: 'unknownResponse', kind: 'futureKind', payload },
+    { type: 'text', text: 'const c = 3;\n~~~\n\nAfter the code.' },
+  ]);
+
+  assert.match(output, /~~~js\nconst a = 1;\nconst b = 2;\nconst c = 3;\n~~~/, 'one continuous tilde fence');
+  const after = output.indexOf('After the code.');
+  assert.ok(output.indexOf('Code-safety warning') > after, 'the warning follows the run');
+  assert.ok(output.indexOf('Unreviewed response kind') > after, 'the JSON follows the run');
+  assert.doesNotMatch(output, /Representation change/);
+});
+
+test('an unterminated tilde fence is closed with tildes at the end of the turn', () => {
+  const output = render([{ type: 'text', text: '~~~js\nconst a = 1;' }]);
+  assert.match(output, /const a = 1;\n~~~/);
+  assert.match(output, /closed an unterminated code fence at the end of this turn/);
+});
+
+test('notes still flush the run in recorded order', () => {
+  const output = render([
+    { type: 'text', text: 'before\n' },
+    { type: 'note', title: 'A recorded note' },
+    { type: 'text', text: 'after' },
+  ]);
+
+  assert.ok(output.indexOf('before') < output.indexOf('A recorded note'));
+  assert.ok(output.indexOf('A recorded note') < output.indexOf('after'));
+  assert.doesNotMatch(output, /Representation change/);
+});
+
+test('a node that interrupts an open fence is recorded as an early close and noted after the run', () => {
+  const output = render([
+    { type: 'text', text: '```js\nconst a = 1;\n' },
+    { type: 'note', title: 'A recorded note' },
+    { type: 'text', text: 'const b = 2;\n```' },
+  ]);
+
+  assert.match(output, /closed a code fence early because a note record interrupted it/);
+  assert.ok(output.indexOf('const a = 1;') < output.indexOf('closed a code fence early'));
+  assert.ok(output.indexOf('closed a code fence early') < output.indexOf('A recorded note'));
+});
+
+test('the fence repair sink counts early closes by kind and turn-end closes', () => {
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+  buildDocument(testSession({
+    turns: [
+      testTurn({ prompt: 'q1', body: [
+        { type: 'text', text: '```js\nconst a = 1;\n' },
+        testTool({ toolId: 'read_file', toolCallId: 'c1', invocation: 'Read a file' }),
+        { type: 'text', text: 'const b = 2;\n```' },
+      ] }),
+      testTurn({ prompt: 'q2', body: [{ type: 'text', text: '```\nunterminated\n' }] }),
+    ],
+  }), documentContext({ fenceRepairs }));
+
+  assert.deepEqual(fenceRepairs.early.map((item) => item.kind), ['tool']);
+  // Turn 1 cascades: once the tool splits the fence, the continuation's closing ``` opens a new
+  // fence that is only closed at turn end. Turn 2 is a plain unterminated fence.
+  assert.equal(fenceRepairs.turnEnd, 2);
+});
+
+test('the stray fence that hugs an inline edit preview is not counted as an open fence', () => {
+  // VS Code frames an inline edit preview with bare fences: one closes the run before the edit,
+  // one opens the run after it. Both are dropped, so nothing is left open at turn end.
+  const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0 };
+  const output = buildDocument(testSession({
+    turns: [testTurn({ prompt: 'q', body: [
+      { type: 'text', text: 'Updating the file.\n```\n' },
+      { type: 'edit', uri: '/proj/src/a.ts', op: 'modified', inline: true },
+      { type: 'text', text: '```\nThe file is updated.' },
+    ] })],
+  }), documentContext({ fenceRepairs }));
+
+  assert.deepEqual(fenceRepairs, { early: [], turnEnd: 0 });
+  assert.doesNotMatch(output, /Representation change/);
+  assert.match(output, /The file is updated\./);
+});
+
+test('fenceFor makes a JSON fence longer than the longest backtick run in its content', () => {
+  assert.deepEqual(fenceFor('{"a": 1}', 'json'), { open: '```json', close: '```' });
+  assert.equal(fenceFor('{"a": "```"}').close, '````');
+  assert.equal(fenceFor('{"a": "``````"}').close, '```````');
+});
+
+test('openFenceTicks tracks the opening fence until a closing run at least as long', () => {
+  assert.equal(openFenceTicks('````md\n```js\nx\n```\n'), '````');
+  assert.equal(openFenceTicks('````md\n```js\nx\n```\n````\n'), '');
+  assert.equal(openFenceTicks('plain `inline` text'), '');
+});
+
+test('a fence still open at turn end is closed and recorded as a representation change', () => {
+  const output = render([
+    { type: 'text', text: '````\nunterminated code\n' },
+    { type: 'unknownResponse', kind: 'futureKind', payload: '{}' },
+  ]);
+
+  const lines = output.split('\n');
+  const codeAt = lines.findIndex((line) => line === 'unterminated code');
+  assert.equal(lines.slice(codeAt + 1).find((line) => /^`{3,}/.test(line)), '````');
+  assert.match(output, /Representation change: the exporter closed an unterminated code fence/);
+  assert.ok(output.indexOf('Representation change') < output.indexOf('Unreviewed response kind'));
+});
+
+test('long unknown response JSON uses a complete companion and a short preview', () => {
+  const payload = JSON.stringify({
+    kind: 'futureResponse',
+    lines: Array.from({ length: 301 }, (_, index) => `line ${index}: ${'x'.repeat(100)}`),
+  }, null, 2);
+  const companions: CompanionArtifact[] = [];
+  const output = buildDocument(testSession({
+    turns: [testTurn({
+      prompt: 'question',
+      body: [{ type: 'unknownResponse', kind: 'futureResponse', payload }],
+    })],
+  }), {
+    location: {
+      sessionId: 'a0a0a0a0-1111-4111-8111-111111111111',
+      sessionPath: path.join(ROOT, 'session.jsonl'),
+      hashRoot: ROOT,
+    },
+    resources: { resources: [], byCall: new Map(), resourceRoot: ROOT },
+    versions: { copilotVersion: 'unknown', vscodeVersion: 'unknown' },
+    memory: { session: [], repo: [], user: [] },
+    outputPath: path.join(ROOT, 'export.md'),
+    gitStatus: '',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    overflow: { assetsDirectory: 'export-assets', companions },
+  });
+
+  assert.match(output, /first 10 lines, full text linked/);
+  assert.match(output, /Full text: \[unreviewed-response-/);
+  assert.equal(companions.length, 1);
+  assert.equal(companions[0].kind, 'metadata');
+  assert.equal(companions[0].location.field, 'unreviewed-response');
+  assert.equal(Buffer.from(companions[0].bytes).toString('utf8'), payload);
+});
+
+const renderUnknownWithCompanions = (payload: string) => {
+  const companions: CompanionArtifact[] = [];
+  const output = buildDocument(testSession({
+    turns: [testTurn({ prompt: 'question', body: [{ type: 'unknownResponse', kind: 'futureResponse', payload }] })],
+  }), documentContext({ overflow: { assetsDirectory: 'export-assets', companions } }));
+  return { output, companions };
+};
+
+test('a 5 MB single-line unknown payload goes to a companion with a byte-capped preview', () => {
+  const payload = JSON.stringify({ kind: 'futureResponse', blob: 'x'.repeat(5 * 1024 * 1024) });
+  const { output, companions } = renderUnknownWithCompanions(payload);
+
+  assert.equal(companions.length, 1);
+  assert.equal(Buffer.from(companions[0].bytes).toString('utf8'), payload);
+  assert.ok(output.length < 64 * 1024, `the Markdown stays small (${output.length} chars)`);
+  assert.match(output, /preview, full text linked/);
+  assert.match(output, /Showing the first 2,048 of 5,242,9\d\d bytes \(1 line\)\. Full text: \[unreviewed-response-/);
+});
+
+test('unknown payloads use a companion when they are over 300 lines OR over 15 KiB', () => {
+  const manyShortLines = JSON.stringify({ kind: 'futureResponse', lines: Array.from({ length: 301 }, (_, index) => index) }, null, 2);
+  const fewLongLines = JSON.stringify({ kind: 'futureResponse', lines: Array.from({ length: 40 }, () => 'y'.repeat(500)) }, null, 2);
+  const small = JSON.stringify({ kind: 'futureResponse', value: 'small' }, null, 2);
+
+  assert.ok(Buffer.byteLength(manyShortLines) < 15 * 1024);
+  assert.equal(renderUnknownWithCompanions(manyShortLines).companions.length, 1, 'over 300 lines');
+  assert.equal(renderUnknownWithCompanions(fewLongLines).companions.length, 1, 'over 15 KiB');
+  assert.equal(renderUnknownWithCompanions(small).companions.length, 0, 'small payload stays inline');
+});
+
+test('the byte-capped preview never splits a surrogate pair', () => {
+  const payload = `${'a'.repeat(2047)}😀${'b'.repeat(20 * 1024)}`;
+  const { output } = renderUnknownWithCompanions(payload);
+  assert.doesNotMatch(output, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/, 'no lone high surrogate');
 });
 
 test('reasoning is collapsed and kept where it happened', () => {

@@ -6,6 +6,7 @@
 // parsed into an empty export.
 
 import { createReadStream, promises as fs } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { DatabaseSync } from 'node:sqlite';
@@ -171,6 +172,32 @@ export async function listSessions ({ withTitles = false, userDataRoot }: {
       }
     }
   }
+  const globalStorageRoot = path.join(root, 'User', 'globalStorage');
+  const emptyWindowDir = path.join(globalStorageRoot, 'emptyWindowChatSessions');
+  const indexedTitles = readIndexedTitles(globalStorageRoot);
+  let emptyWindowFiles: Dirent[] = [];
+  try {
+    emptyWindowFiles = await fs.readdir(emptyWindowDir, { withFileTypes: true });
+  } catch {
+    // Empty-window storage is optional.
+  }
+  for (const file of emptyWindowFiles) {
+    const sessionId = path.basename(file.name, '.jsonl');
+    if (!file.isFile() || !SESSION_ID_PATTERN.test(sessionId))
+      continue;
+    const sessionPath = path.join(emptyWindowDir, file.name);
+    const stat = await fs.stat(sessionPath);
+    const indexedTitle = indexedTitles.get(sessionId) ?? '';
+    let title = indexedTitle;
+    if (withTitles && !title) {
+      try {
+        title = await readSessionTitle(sessionPath);
+      } catch {
+        // Title is best-effort.
+      }
+    }
+    sessions.push({ sessionId, hashRoot: globalStorageRoot, sessionPath, mtimeMs: stat.mtimeMs, title, indexedTitle });
+  }
   return sessions.sort((left, right) => right.mtimeMs - left.mtimeMs);
 }
 
@@ -212,19 +239,26 @@ export async function resolveSession (sourceArgument?: string, options: SessionS
   if (sourceArgument) {
     const sessions = await listSessions({ userDataRoot: root });
     const isPrefix = SESSION_ID_PREFIX_PATTERN.test(sourceArgument);
-    const matches = sessions.filter((session) => isPrefix
+    const candidates = sessions.filter((session) => isPrefix
       ? session.sessionId.replaceAll('-', '').toLowerCase().startsWith(sourceArgument.toLowerCase())
       : session.sessionId.toLowerCase() === sourceArgument.toLowerCase());
+    const distinctByPath = new Map();
+    for (const candidate of candidates) {
+      const resolvedPath = path.resolve(candidate.sessionPath);
+      const key = process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath;
+      distinctByPath.set(key, candidate);
+    }
+    const matches = [...distinctByPath.values()];
     const matchingIds = [...new Set(matches.map((match) => match.sessionId))];
     if (isPrefix && matchingIds.length > 1)
       throw new Error(`Session ID prefix ${sourceArgument} is ambiguous. Matching Local IDs:\n${matchingIds.map((id) => `  ${id}`).join('\n')}\nPass a longer unique prefix or an exact .jsonl path.`);
     if (matches.length > 1)
-      throw new Error(`Session ${sourceArgument} occurs in multiple workspaces. Pass an exact .jsonl path:\n${matches.map((match) => `  ${match.sessionPath}`).join('\n')}`);
+      throw new Error(`Session ${sourceArgument} occurs in multiple journal files. Pass an exact .jsonl path to select one:\n${matches.map((match) => `  ${match.sessionPath}`).join('\n')}`);
     if (matches.length === 1) {
       await validateJournalIdentity(matches[0].sessionPath, matches[0].sessionId);
       return matches[0];
     }
-    throw new Error(`No chat session found for ${sourceArgument}.`);
+    throw new Error(`No Local chat session matching ${sourceArgument} was found under ${root}. Run --list to see available sessions, set --user-data-root to the correct VS Code profile, or pass the exact .jsonl path.`);
   }
   const current = currentSessionFromEnv();
   if (!current)

@@ -81,45 +81,59 @@ const STRUCTURAL_TAG = /<(\/?)(details|summary|div)\b/gi;
 // live it opens collapsibles that never close and swallows the rest of the document, so
 // escape it outside fenced code (inside a fence it is already inert).
 export function neutralizeStructuralHtml (value: unknown) {
-  let fenceLen = 0;
+  let marker = '';
   return String(value).split('\n').map((line) => {
-    const match = /^\s*(`{3,})\s*(\S*)\s*$/.exec(line);
-    if (fenceLen === 0) {
-      if (match) {
-        fenceLen = match[1].length;
-        return line;
-      }
-      return line.replace(STRUCTURAL_TAG, (all, slash, tag) => `&lt;${slash}${tag}`);
+    if (!marker) {
+      marker = fenceOpener(line);
+      return marker ? line : line.replace(STRUCTURAL_TAG, (all, slash, tag) => `&lt;${slash}${tag}`);
     }
-    if (match && match[1].length >= fenceLen && !match[2])
-      fenceLen = 0;
+    fenceCloses(line, marker) && (marker = '');
     return line;
   }).join('\n');
 }
 
+// CommonMark fences: a run of 3+ backticks or 3+ tildes opens; only a run of the same
+// character, at least as long, with nothing after it, closes. A backtick opener's info
+// string cannot contain a backtick (that line is inline code, not a fence). Indentation
+// is accepted leniently, matching the exporter's historical behavior.
+const FENCE_OPENER = /^\s*(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSER = /^\s*(`{3,}|~{3,})\s*$/;
+
+/** The fence marker (for example '```' or '~~~~') when `line` opens a code fence, else ''. */
+export function fenceOpener (line: string) {
+  const match = FENCE_OPENER.exec(line);
+  if (!match || (match[1][0] === '`' && match[2].includes('`')))
+    return '';
+  return match[1];
+}
+
+/** True when `line` closes a fence opened with `marker`. */
+export function fenceCloses (line: string, marker: string) {
+  const match = FENCE_CLOSER.exec(line);
+  return Boolean(match && match[1][0] === marker[0] && match[1].length >= marker.length);
+}
+
 // A model's raw reasoning (and, rarely, a truncated response) can contain an ODD number of
-// ``` fence lines. Embedded live inside a <div>, that dangling open fence swallows the closing
+// ``` or ~~~ fence lines. Embedded live inside a <div>, that dangling open fence swallows the closing
 // </div>/</details> and every section after it, so the page stops rendering. Append a matching
 // close so the fence cannot escape its block. Detection mirrors stripFencedRegions in
 // verify/layers.ts, so the render self-check and the renderer agree on where fences end.
 export function closeUnbalancedFences (value: unknown) {
   const text = String(value);
-  let fenceLen = 0;
-  let ticks = '';
+  const ticks = openFenceTicks(text);
+  return ticks ? `${text}\n${ticks}` : text;
+}
+
+/** The marker (backticks or tildes) of a code fence still open at the end of `text`, or '' when every fence is closed. */
+export function openFenceTicks (text: string) {
+  let marker = '';
   for (const line of text.split('\n')) {
-    if (fenceLen === 0) {
-      const open = /^\s*(`{3,})/.exec(line);
-      if (open) {
-        fenceLen = open[1].length;
-        ticks = open[1];
-      }
-    } else {
-      const close = /^\s*(`{3,})\s*$/.exec(line);
-      if (close && close[1].length >= fenceLen)
-        fenceLen = 0;
-    }
+    if (!marker)
+      marker = fenceOpener(line);
+    else if (fenceCloses(line, marker))
+      marker = '';
   }
-  return fenceLen > 0 ? `${text}\n${ticks}` : text;
+  return marker;
 }
 
 // --- parsing and cleaning ---

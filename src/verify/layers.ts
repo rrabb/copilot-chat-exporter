@@ -6,7 +6,8 @@
 //   Layer B  buildVerificationReport - re-summarises each request and compares it to the parsed
 //            turn. This one deliberately mirrors the parser's merge rule rather than calling it.
 //   Layer C  buildRenderReport       - reads the finished Markdown back and checks it reflects
-//            the turns: anchors, headings, tool badges, balanced collapsibles.
+//            the turns: anchors, headings, tool badges, balanced collapsibles, and a JSON
+//            round-trip of every unreviewed-response block.
 //
 // The duplication in Layers A and B is on purpose. A check that reuses the code it is checking
 // agrees with it by construction. If you unify them to remove the repetition, you still have
@@ -17,7 +18,7 @@
 import type { ParsedSession, ToolNode, Turn, TurnNode } from '../types.ts';
 import { classifyNode, thinkingText } from '../session/classify.ts';
 import { flattenItems, messageText, requestValues } from '../session/journal.ts';
-import { MARK, clip, reEscape, sectionAnchor } from '../text.ts';
+import { MARK, clip, fenceCloses, fenceOpener, reEscape, redact, sectionAnchor } from '../text.ts';
 
 // The comparable shape of one turn. Layer A derives it twice - once by replaying the journal,
 // once from the parsed turns - and every mismatch it reports is a field of this.
@@ -327,23 +328,18 @@ export function buildJournalCrossCheck (session: ParsedSession, rawText: string)
 
 // Fence-aware line filter: drops fenced code blocks so counts of rendered markers are not
 // inflated by prior exports embedded inside tool-result/terminal fences (this export is
-// often self-referential). Close only on a backtick run at least as long as the opener,
-// because fenceFor emits 4+ backtick wrappers around content that itself contains ``` lines.
+// often self-referential). Uses the renderer's fence rules (backtick or tilde; close only on
+// the same character, at least as long as the opener), because fenceFor emits 4+ backtick
+// wrappers around content that itself contains ``` lines.
 function stripFencedRegions (text: string) {
   const out = [];
-  let fenceLen = null;
+  let marker = '';
   for (const line of text.split('\n')) {
-    if (fenceLen == null) {
-      const open = /^\s*(`{3,})/.exec(line);
-      if (open) {
-        fenceLen = open[1].length;
-        continue;
-      }
-      out.push(line);
-    } else {
-      const close = /^\s*(`{3,})\s*$/.exec(line);
-      if (close && close[1].length >= fenceLen)
-        fenceLen = null;
+    if (!marker) {
+      marker = fenceOpener(line);
+      marker || out.push(line);
+    } else if (fenceCloses(line, marker)) {
+      marker = '';
     }
   }
   return out.join('\n');
@@ -359,6 +355,85 @@ function scaffoldText (markdown: string) {
     .split('\n')
     .filter((line) => !/^\s*>/.test(line))
     .join('\n');
+}
+
+const UNKNOWN_SUMMARY = 'Unreviewed response kind:';
+
+// Reads back the JSON block under each scaffold-level "Unreviewed response kind" summary, in
+// file order. A block whose summary says "full text linked" is a preview of a companion file,
+// so its JSON is incomplete by design and only counted.
+function unknownBlocks (markdown: string) {
+  const blocks: Array<{ linked: boolean; json: string | null }> = [];
+  let marker = '';
+  let pending: { linked: boolean } | null = null;
+  let capture: string[] | null = null;
+  for (const line of markdown.split('\n')) {
+    if (marker) {
+      if (fenceCloses(line, marker)) {
+        marker = '';
+        if (capture && pending) {
+          blocks.push({ linked: pending.linked, json: capture.join('\n') });
+          pending = null;
+        }
+        capture = null;
+      } else {
+        capture?.push(line);
+      }
+      continue;
+    }
+    marker = fenceOpener(line);
+    if (marker) {
+      capture = pending ? [] : null;
+      continue;
+    }
+    if (/^\s*>/.test(line))
+      continue;
+    if (line.startsWith('<details><summary>') && line.includes(UNKNOWN_SUMMARY)) {
+      pending && blocks.push({ linked: pending.linked, json: null });
+      pending = { linked: line.includes('full text linked') };
+    } else if (pending && line.startsWith('</details>')) {
+      blocks.push({ linked: pending.linked, json: null });
+      pending = null;
+    }
+  }
+  pending && blocks.push({ linked: pending.linked, json: null });
+  return blocks;
+}
+
+const canonicalJson = (text: string) => JSON.stringify(JSON.parse(text));
+
+// Layer C round-trip: every unknown response must appear once, in order, and its inline JSON
+// must parse to the same value as the redacted payload. Catches fence breakage, truncation
+// and anything that edits the block between render and write.
+function checkUnknownRoundTrip (session: ParsedSession, markdown: string) {
+  const nodes = session.turns.flatMap((turn: Turn) => turn.body.filter((node: TurnNode) => node.type === 'unknownResponse'));
+  const blocks = unknownBlocks(markdown);
+  if (!nodes.length && !blocks.length)
+    return { ok: true, detail: 'no unknown responses' };
+  const problems: string[] = [];
+  let checked = 0;
+  let linked = 0;
+  blocks.length !== nodes.length && problems.push(`blocks=${blocks.length}, nodes=${nodes.length}`);
+  for (let i = 0; i < Math.min(blocks.length, nodes.length); i += 1) {
+    const block = blocks[i];
+    const node = nodes[i] as Extract<TurnNode, { type: 'unknownResponse' }>;
+    if (block.linked) {
+      linked += 1;
+      continue;
+    }
+    if (block.json == null) {
+      problems.push(`#${i + 1} ${node.kind}: no JSON block`);
+      continue;
+    }
+    try {
+      const expected = canonicalJson(redact(node.payload));
+      canonicalJson(block.json) === expected ? (checked += 1) : problems.push(`#${i + 1} ${node.kind}: value differs`);
+    } catch {
+      problems.push(`#${i + 1} ${node.kind}: JSON does not parse`);
+    }
+  }
+  const summary = `${checked} round-tripped, ${linked} linked`;
+  return problems.length ? { ok: false, detail: `${summary}; ${problems.slice(0, 4).join('; ')}` } : { ok: true, detail: summary };
 }
 
 function sliceTurnSections (text: string) {
@@ -431,6 +506,9 @@ export function buildRenderReport (session: ParsedSession, markdown: string) {
     compactDetail.push(`Q${turn.number}:${expected ? (present ? 'ok' : 'MISSING') : 'no recorded confirmation'}`);
   }
   add('compact confirmation under its /compact turn', compactOk, compactTurns.length ? compactDetail.join(' ') : 'no /compact turns');
+
+  const unknown = checkUnknownRoundTrip(session, markdown);
+  add('unknown-response JSON round-trips', unknown.ok, unknown.detail);
 
   return {
     checks,

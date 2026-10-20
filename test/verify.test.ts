@@ -217,6 +217,14 @@ test('render report ignores its own markers quoted in fences and blockquotes', (
   assert.equal(report.counts.toc, 1);
 });
 
+test('render report ignores markers inside tilde fences', () => {
+  const turns = [turn({ number: 1 })];
+  const noise = ['~~~html', '<details><summary>unclosed on purpose', '```', userMessageAnchor(99), '~~~'].join('\n');
+  const report = buildRenderReport(testSession({ turns }), `${renderFor(turns)}\n${noise}\n`);
+  assert.equal(report.failed, false, JSON.stringify(report.checks.filter((c) => !c.ok)));
+  assert.equal(report.counts.anchors, 1);
+});
+
 test('render report catches a recorded compact confirmation dropped from its turn', () => {
   const compact = turn({ number: 1, prompt: '/compact', body: [{ type: 'text', text: 'Compacted conversation.' }] });
   const withIt = buildRenderReport(testSession({ turns: [compact] }), renderFor([compact]));
@@ -225,6 +233,54 @@ test('render report catches a recorded compact confirmation dropped from its tur
   const stripped = renderFor([compact]).replace('Compacted conversation.', '');
   const without = buildRenderReport(testSession({ turns: [compact] }), stripped);
   assert.equal(checkNamed(without, 'compact confirmation under its /compact turn').ok, false);
+});
+
+test('render report round-trips every unknown-response JSON block against its redacted payload', () => {
+  const payload = JSON.stringify({ kind: 'futureKind', content: { value: 'has ``` inside' }, n: 1 }, null, 2);
+  const unknownTurn = turn({ number: 1, body: [{ type: 'unknownResponse', kind: 'futureKind', payload }] });
+  const block = [
+    '<details><summary><sub>⚠️ Unreviewed response kind: futureKind</sub></summary>',
+    '',
+    '<div style="margin-left:2em">',
+    '',
+    '````json',
+    payload,
+    '````',
+    '',
+    '</div>',
+    '',
+    '</details>',
+  ].join('\n');
+  const good = buildRenderReport(testSession({ turns: [unknownTurn] }), `${renderFor([unknownTurn])}\n${block}\n`);
+  assert.equal(checkNamed(good, 'unknown-response JSON round-trips').ok, true, checkNamed(good, 'unknown-response JSON round-trips').detail);
+
+  const tampered = buildRenderReport(testSession({ turns: [unknownTurn] }), `${renderFor([unknownTurn])}\n${block.replace('"n": 1', '"n": 2')}\n`);
+  assert.equal(checkNamed(tampered, 'unknown-response JSON round-trips').ok, false);
+  assert.equal(tampered.failed, true);
+
+  const missing = buildRenderReport(testSession({ turns: [unknownTurn] }), renderFor([unknownTurn]));
+  assert.equal(checkNamed(missing, 'unknown-response JSON round-trips').ok, false);
+
+  const broken = buildRenderReport(testSession({ turns: [unknownTurn] }), `${renderFor([unknownTurn])}\n${block.replace('"n": 1', '"n": ')}\n`);
+  assert.equal(checkNamed(broken, 'unknown-response JSON round-trips').ok, false);
+});
+
+test('render report skips linked unknown-response previews but still counts them', () => {
+  const payload = JSON.stringify({ kind: 'futureKind' });
+  const unknownTurn = turn({ number: 1, body: [{ type: 'unknownResponse', kind: 'futureKind', payload }] });
+  const block = [
+    '<details><summary><sub>⚠️ Unreviewed response kind: futureKind - preview, full text linked</sub></summary>',
+    '',
+    '```json',
+    '{ "kind": "fut',
+    '```',
+    '',
+    '</details>',
+  ].join('\n');
+  const report = buildRenderReport(testSession({ turns: [unknownTurn] }), `${renderFor([unknownTurn])}\n${block}\n`);
+  const check = checkNamed(report, 'unknown-response JSON round-trips');
+  assert.equal(check.ok, true, check.detail);
+  assert.match(check.detail, /1 linked/);
 });
 
 // --- the recorded checks ----------------------------------------------------------------------

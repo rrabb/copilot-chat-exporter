@@ -46,6 +46,23 @@ test('Layer D detects recorded text rendered out of order', () => {
   assert.equal(account.failed, true);
 });
 
+test('a short markdownVuln fragment inside a code line is checked through its whole merged line', () => {
+  const raw = [request([
+    { value: '```js\nfunction run()' },
+    { kind: 'markdownVuln', content: { value: ' {\n' }, vulnerabilities: [{ title: 'Unsafe call', description: 'Avoid eval here.' }] },
+    { value: '  return 1;\n}\n```' },
+  ])];
+  const intact = 'Please explain the build failure\n```js\nfunction run() {\n  return 1;\n}\n```\nUnsafe call: Avoid eval here.';
+  const account = buildLossAccount(raw, intact);
+  assert.deepEqual(summary(account), {
+    prompt: '1/0/0', 'assistant-text': '2/0/0', 'assistant-text-joined': '1/0/0', vulnerability: '2/0/0',
+  });
+  assert.equal(account.failed, false);
+  const broken = buildLossAccount(raw, intact.replace('function run() {', 'function run()'));
+  assert.deepEqual(broken.unaccounted.map((item) => [item.category, item.status]), [['assistant-text-joined', 'absent']]);
+  assert.equal(broken.failed, true);
+});
+
 test('Layer D detects repeated recorded text rendered only once', () => {
   const account = buildLossAccount([
     request([{ value: 'Repeated response fragment.' }, { value: 'Repeated response fragment.' }]),

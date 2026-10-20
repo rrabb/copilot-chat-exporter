@@ -154,22 +154,27 @@ function pieces (request: unknown): Piece[] {
   }];
   const errorMessage = request.result?.errorDetails?.message;
   typeof errorMessage === 'string' && result.push({ category: 'request-error', text: errorMessage });
+  let fragments: string[] = [];
+  const endStream = () => {
+    for (const fragment of fragments)
+      result.push({ category: 'assistant-text', text: fragment, orderGroup: 'local', checkMultiplicity: true });
+    for (const line of joinedLines(fragments))
+      result.push({ category: 'assistant-text-joined', text: line });
+    fragments = [];
+  };
   for (const leaf of leaves(request.response)) {
     const kind = typeof leaf.kind === 'string' ? leaf.kind : '';
+    const streamText = assistantStreamText(kind, leaf);
+    if (streamText !== null) {
+      fragments.push(streamText);
+      kind === 'markdownVuln' && result.push(...vulnerabilityPieces(leaf.vulnerabilities));
+      continue;
+    }
+    endStream();
     if (NON_CONTENT_KINDS.has(kind))
       continue;
     if (kind === 'thinking') {
       result.push({ category: 'reasoning', text: reasoningText(leaf.value) });
-    } else if (kind === 'markdownContent') {
-      result.push({
-        category: 'assistant-text', text: text(leaf.content),
-        orderGroup: 'local', checkMultiplicity: true,
-      });
-    } else if (kind === '') {
-      typeof leaf.value === 'string' && result.push({
-        category: 'assistant-text', text: leaf.value,
-        orderGroup: 'local', checkMultiplicity: true,
-      });
     } else if (kind === 'toolInvocationSerialized') {
       const details = leaf.resultDetails;
       const data = leaf.toolSpecificData;
@@ -192,7 +197,52 @@ function pieces (request: unknown): Piece[] {
         result.push({ category: `other:${kind}`, text: value });
     }
   }
+  endStream();
   return result;
+}
+
+/**
+ * Adjacent text leaves are one Markdown stream to VS Code and to the renderer. A fragment too short
+ * to check alone (" {" inside a code line) is checked through the whole stream lines it touches.
+ * Standalone short pieces, whose line holds nothing else, stay unchecked.
+ */
+function joinedLines (fragments: readonly string[]): string[] {
+  const joined = fragments.join('');
+  const lines = new Set<string>();
+  let start = 0;
+  for (const fragment of fragments) {
+    const end = start + fragment.length;
+    const short = fragment.trim() && !meaningful(normalizeForLoss(fragment));
+    if (short) {
+      const lineStart = joined.lastIndexOf('\n', start - 1) + 1;
+      const newline = joined.indexOf('\n', Math.max(start, end - 1));
+      const lineEnd = newline < 0 ? joined.length : newline;
+      for (const line of joined.slice(lineStart, lineEnd).split('\n'))
+        line.trim() !== fragment.trim() && meaningful(normalizeForLoss(line)) && lines.add(line);
+    }
+    start = end;
+  }
+  return [...lines];
+}
+
+/** Text a leaf adds to the assistant's Markdown stream, or null when the leaf is not stream text. */
+function assistantStreamText (kind: string, leaf: Record<string, any>): string | null {
+  if (kind === 'markdownContent')
+    return text(leaf.content);
+  if (kind === '')
+    return typeof leaf.value === 'string' ? leaf.value : null;
+  if (kind === 'markdownVuln' && isRecord(leaf.content) && typeof leaf.content.value === 'string' && vulnerabilityPieces(leaf.vulnerabilities).length)
+    return leaf.content.value;
+  return null;
+}
+
+function vulnerabilityPieces (value: unknown): Piece[] {
+  const valid = Array.isArray(value) && value.length > 0
+    && value.every((entry) => isRecord(entry) && typeof entry.title === 'string' && typeof entry.description === 'string');
+  // Title and description are separate pieces: the export bolds the title between them.
+  return valid
+    ? value.flatMap((entry) => [{ category: 'vulnerability', text: entry.title }, { category: 'vulnerability', text: entry.description }])
+    : [];
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': '\'' };

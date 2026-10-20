@@ -86,6 +86,22 @@ test('closeUnbalancedFences appends a matching close only when one is missing', 
   assert.equal(closeUnbalancedFences('no fences here'), 'no fences here');
 });
 
+test('tilde fences are tracked like backtick fences, and the two never close each other', () => {
+  assert.equal(closeUnbalancedFences('open\n~~~js\ncode'), 'open\n~~~js\ncode\n~~~');
+  assert.equal(closeUnbalancedFences('~~~~\ninner ~~~ run'), '~~~~\ninner ~~~ run\n~~~~');
+  assert.equal(closeUnbalancedFences('~~~\ncode\n```'), '~~~\ncode\n```\n~~~', 'backticks do not close a tilde fence');
+  assert.equal(closeUnbalancedFences('```\ncode\n~~~'), '```\ncode\n~~~\n```', 'tildes do not close a backtick fence');
+  const balanced = ['~~~', 'code', '~~~~', 'after'].join('\n');
+  assert.equal(closeUnbalancedFences(balanced), balanced, 'a longer closing run closes the fence');
+});
+
+test('neutralizeStructuralHtml leaves markup inside a tilde fence alone', () => {
+  const lines = neutralizeStructuralHtml(['~~~html', '<details>', '```', '</details>', '~~~', '<details>'].join('\n')).split('\n');
+  assert.equal(lines[1], '<details>');
+  assert.equal(lines[3], '</details>', 'a backtick line does not end a tilde fence');
+  assert.equal(lines[5], '&lt;details>');
+});
+
 test('extractUri decodes a file URI or yields nothing', () => {
   assert.equal(extractUri('see file:///c%3A/tmp/a.md for more'), 'c:/tmp/a.md');
   assert.equal(extractUri('no uri here'), '');

@@ -193,15 +193,31 @@ test('duplicate IDs require a path and explicit current selects the evidenced wo
     await fs.rm(root, { recursive: true, force: true });
   });
   const storage = path.join(root, 'User', 'workspaceStorage');
+  const journalPaths: string[] = [];
   for (const workspace of ['one', 'two']) {
     const directory = path.join(storage, workspace, 'chatSessions');
     await fs.mkdir(directory, { recursive: true });
-    await fs.writeFile(path.join(directory, `${UUID}.jsonl`), JSON.stringify({
+    const sessionPath = path.join(directory, `${UUID}.jsonl`);
+    journalPaths.push(sessionPath);
+    await fs.writeFile(sessionPath, JSON.stringify({
       kind: 0, v: { version: 3, sessionId: UUID, requests: [] },
     }));
   }
-  await assert.rejects(resolveSession(UUID, { userDataRoot: root }), /multiple workspaces/);
-  await assert.rejects(resolveSession(UUID.slice(0, 8), { userDataRoot: root }), /multiple workspaces/);
+  const emptyWindowDir = path.join(root, 'User', 'globalStorage', 'emptyWindowChatSessions');
+  await fs.mkdir(emptyWindowDir, { recursive: true });
+  const emptyWindowPath = path.join(emptyWindowDir, `${UUID}.jsonl`);
+  journalPaths.push(emptyWindowPath);
+  await fs.writeFile(emptyWindowPath, JSON.stringify({
+    kind: 0, v: { version: 3, sessionId: UUID, requests: [] },
+  }));
+  const requiresPath = (source: string) => assert.rejects(resolveSession(source, { userDataRoot: root }), (error: Error) => {
+    assert.match(error.message, /multiple journal files/);
+    for (const sessionPath of journalPaths)
+      assert.ok(error.message.includes(sessionPath), `lists ${sessionPath}`);
+    return true;
+  });
+  await requiresPath(UUID);
+  await requiresPath(UUID.slice(0, 8));
   process.env.VSCODE_TARGET_SESSION_LOG = path.join(storage, 'two', 'GitHub.copilot-chat', 'debug-logs', UUID);
   const current = await resolveSession(undefined, { current: true, userDataRoot: root });
   assert.equal(current.hashRoot, path.join(storage, 'two'));
@@ -231,4 +247,41 @@ test('short UUID prefixes must uniquely identify a Local journal', async (contex
   assert.equal(longer.sessionId, ids[0]);
   const unique = await resolveSession('fedcba98', { userDataRoot: root });
   assert.equal(unique.sessionId, ids[2]);
+});
+
+test('UUID and prefix lookup include empty-window Local journals', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-empty-window-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const sessionId = '7c11e329-5b29-41bf-940b-8f7f5d7ac624';
+  const directory = path.join(root, 'User', 'globalStorage', 'emptyWindowChatSessions');
+  await fs.mkdir(directory, { recursive: true });
+  const sessionPath = path.join(directory, `${sessionId}.jsonl`);
+  await fs.writeFile(sessionPath, JSON.stringify({
+    kind: 0,
+    v: { version: 3, sessionId, requests: [] },
+  }));
+
+  const listed = await listSessions({ userDataRoot: root });
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].sessionPath, sessionPath);
+
+  const byId = await resolveSession(sessionId, { userDataRoot: root });
+  const byPrefix = await resolveSession(sessionId.slice(0, 8), { userDataRoot: root });
+  const byPath = await resolveSession(sessionPath, { userDataRoot: root });
+  assert.equal(byId.sessionPath, sessionPath);
+  assert.equal(byPrefix.sessionPath, sessionPath);
+  assert.equal(byPath.sessionPath, sessionPath);
+  assert.equal(byPath.hashRoot, path.join(root, 'User', 'globalStorage'));
+});
+
+test('a missing Local ID explains how to find and select its journal', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-no-match-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+
+  await assert.rejects(resolveSession(UUID, { userDataRoot: root }), (error: Error) => {
+    assert.match(error.message, /--list/);
+    assert.match(error.message, /--user-data-root/);
+    assert.match(error.message, /exact .*\.jsonl path/);
+    return true;
+  });
 });

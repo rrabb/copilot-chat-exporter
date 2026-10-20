@@ -70,14 +70,19 @@ function firstLines (text: string, limit: number): string {
   return text;
 }
 
-/** Text goes to a companion only when it is long in lines AND large in bytes, so many short file views stay inline. */
+/** Tool text goes to a companion only when it is long in lines AND large in bytes, so many short file views stay inline. */
 export const COMPANION_MIN_LINES = 300;
 export const COMPANION_MIN_BYTES = 15 * 1024;
 
-/** Tool text follows the same policy in ordinary and high-fidelity exports. */
-export function planToolText (text: string): TextPresentation {
+/**
+ * Tool text follows the same policy in ordinary and high-fidelity exports. `either` moves text that is long in
+ * lines OR large in bytes; unreviewed payloads use it so one huge line cannot land in the Markdown.
+ */
+export function planToolText (text: string, rule: 'both' | 'either' = 'both'): TextPresentation {
   const lineCount = recordedLineCount(text);
-  const companionText = lineCount > COMPANION_MIN_LINES && Buffer.byteLength(text, 'utf8') > COMPANION_MIN_BYTES ? text : null;
+  const longLines = lineCount > COMPANION_MIN_LINES;
+  const largeBytes = Buffer.byteLength(text, 'utf8') > COMPANION_MIN_BYTES;
+  const companionText = (rule === 'either' ? longLines || largeBytes : longLines && largeBytes) ? text : null;
   return {
     lineCount,
     collapsed: lineCount > 10,

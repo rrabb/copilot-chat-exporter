@@ -19,7 +19,7 @@ export type RawRequest = Record<string, unknown>;
 export interface SessionLocation {
   sessionId: string;
   sessionPath: string;
-  /** The `workspaceStorage/<hash>` directory the optional stores sit under. */
+  /** The storage directory whose optional stores belong to this session. */
   hashRoot: string;
   mtimeMs?: number;
   /** Best available display title, used by `--list`. */
@@ -80,6 +80,13 @@ export interface ToolPatch {
 export interface TextNode {
   type: 'text';
   text: string;
+  /**
+   * Code-safety warnings a `markdownVuln` record attached to this text. Recorded by the chat source
+   * and shown after the text run; the exporter does not validate them.
+   */
+  vulnerabilities?: { title: string; description: string }[];
+  /** Display-only fields of the source record that the export does not show. */
+  omittedDisplayMetadata?: string[];
 }
 
 /** One reasoning thought, kept at its recorded position rather than hoisted. */
@@ -145,7 +152,7 @@ export interface ToolNode {
   patchFiles: PatchFileChange[];
 }
 
-export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode | NoteNode;
+export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode | NoteNode | UnknownResponseNode;
 
 /** Recorded model usage, summed. Credits are nano-AIU / 1,000,000,000 (1 AIU = 1 AI credit = $0.01). */
 export interface UsageFigures {
@@ -240,6 +247,13 @@ export interface NoteNode {
   image?: { href: string; alt: string };
 }
 
+/** A response kind with no reviewed renderer, kept as redacted raw JSON for inspection. */
+export interface UnknownResponseNode {
+  type: 'unknownResponse';
+  kind: string;
+  payload: string;
+}
+
 /** The model Auto resolved to for one request. Kept on the turn scalars, never in the body. */
 export interface AutoModelResolution {
   modelId: string;
@@ -330,15 +344,14 @@ export interface Turn {
 
 /**
  * Schema-drift tally. `seen` counts every response item by kind; `dropped` counts those that
- * classified to nothing. A kind is only *unhandled* when it is absent from the dispatch table -
- * a handled kind can legitimately produce nothing, as empty streamed `thinking` partials do.
+ * classified to nothing. `unhandled` also includes unknown kinds kept as raw JSON until review.
  */
 export interface Census {
   seen: Map<string, number>;
   dropped: Map<string, number>;
   /** `toolSpecificData.kind` counts, for spotting a renamed tool payload. */
   toolData: Map<string, number>;
-  /** Kind and count, descending. Non-empty means content was dropped in silence. */
+  /** Kind and count, descending. Non-empty means a response kind still needs review. */
   unhandled: Array<[string, number]>;
   /** Payload kinds neither lifted into fields nor reviewed as generic. Content still renders. */
   unrecognizedToolData: Array<[string, number]>;

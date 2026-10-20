@@ -19,7 +19,7 @@ import { COLLATOR, parseJson } from '../text.ts';
 import { workspacePath } from '../host.ts';
 import {
   GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
-  IGNORED_RESPONSE_KINDS, classifyNode, fileOperation, thinkingText,
+  GENERIC_RESPONSE_KINDS, IGNORED_RESPONSE_KINDS, classifyNode, fileOperation, thinkingText,
 } from './classify.ts';
 
 // Per-request metadata copied straight through. Some are collected but not yet rendered.
@@ -241,6 +241,7 @@ export function parseChatSession (
   const census = {
     seen: new Map<string, number>(),
     dropped: new Map<string, number>(),
+    unreviewed: new Map<string, number>(),
     toolData: new Map<string, number>(),
   };
   const tally = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1);
@@ -270,6 +271,8 @@ export function parseChatSession (
             continue;
           }
           for (const node of classified) {
+            if (node.type === 'unknownResponse' && !GENERIC_RESPONSE_KINDS.has(node.kind))
+              tally(census.unreviewed, node.kind);
             if (node.type === 'autoModel') {
               const { type: _type, ...resolution } = node;
               autoModelResolutions.push(resolution as AutoModelResolution);
@@ -347,6 +350,15 @@ export function parseChatSession (
 
   const customTitle = header.customTitle || '';
   const defaultTitle = defaultSessionTitle(turns[0]?.prompt ?? '');
+  // A handled kind can still be unreviewed when its record is malformed (markdownVuln falls back
+  // to JSON), so the handled/ignored filter applies only to dropped kinds.
+  const droppedUnhandled = [...census.dropped.keys()]
+    .filter((kind) => !HANDLED_RESPONSE_KINDS.has(kind) && !IGNORED_RESPONSE_KINDS.has(kind)
+      && !GENERIC_RESPONSE_KINDS.has(kind) && kind !== '(no kind or value)');
+  const unhandledKinds = [...new Set([...droppedUnhandled, ...census.unreviewed.keys()])]
+    .map((kind): [string, number] => [kind,
+      (droppedUnhandled.includes(kind) ? census.dropped.get(kind) ?? 0 : 0) + (census.unreviewed.get(kind) ?? 0)])
+    .sort((left, right) => right[1] - left[1]);
 
   return {
     title: customTitle || defaultTitle,
@@ -366,11 +378,8 @@ export function parseChatSession (
       seen: census.seen,
       dropped: census.dropped,
       toolData: census.toolData,
-      // A dropped kind that is neither dispatched on nor deliberately ignored is content this
-      // build does not know about.
-      unhandled: [...census.dropped.entries()]
-        .filter(([kind]) => !HANDLED_RESPONSE_KINDS.has(kind) && !IGNORED_RESPONSE_KINDS.has(kind) && kind !== '(no kind or value)')
-        .sort((left, right) => right[1] - left[1]),
+      // Generic fallback remains strict until each kind has been reviewed or approved above.
+      unhandled: unhandledKinds,
       // Weaker signal than `unhandled` - the content still reaches the page, just generically.
       // Reported because an unnoticed rename of `terminal` would strip every command block,
       // exit code and duration from the export while every other check stayed green.
