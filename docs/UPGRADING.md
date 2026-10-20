@@ -129,7 +129,7 @@ The census block is the part that matters:
 ```
 Schema census (response items vs handled kinds)
 - Response items walked: 1,404 across 10 distinct kind(s)
-- Validated against: VS Code 1.134 / Copilot Chat 0.62 (journal schema kinds 0/1/2/3)
+- Validated against: VS Code 1.134 / Copilot Chat 0.62 and VS Code 1.141.2 (commit 16507d91) / Copilot Chat 0.69.0 (journal schema kinds 0/1/2/3)
 - Handled kinds: toolInvocationSerialized=557, thinking=474, ...
 - Handled but empty (streamed partials): ...
 - Dropped by design: undoStop=155, codeblockUri=155, ...
@@ -304,7 +304,7 @@ Not everything is a new kind. Match the symptom to the owner:
 
 | What changed | Where you work | Signal |
 |---|---|---|
-| A response item kind | `classifyNode` (`session/classify.ts`) | Census reports unhandled |
+| A response item kind | `classifyNode` (`session/classify.ts`) | Unknown payload is kept as redacted JSON; strict verification reports it until reviewed |
 | `toolSpecificData` shape for a tool | `classifyNode` | Tool renders with no command or output |
 | Delta encoding - kind 0 snapshot, kind 1 set, kind 2 truncate/push, kind 3 delete | `parseChatSession` (`session/journal.ts`) | Extra/missing turns, shifted responses, or zero turns |
 | Where VS Code stores sessions; a new channel or renamed folder | `host.ts` | `--list` finds nothing |
@@ -312,6 +312,8 @@ Not everything is a new kind. Match the symptom to the owner:
 | Model metadata in `debug-logs/<id>/models.json` | `readModelNames` (`session/enrich.ts`) | Raw model ids appear instead of friendly names |
 | Nothing - the parse is fine, the page looks wrong | `markdown.ts` | Census clean, saved-copy checks fail |
 | A check reports a difference that is not real | `verify/layers.ts`, or the masking rules in `verify/golden.ts` | A green export fails a check |
+
+Unknown response kinds now stay in order as collapsed, redacted JSON instead of disappearing. Keep strict verification failing while the kind is unreviewed. Add a semantic renderer, add a reviewed kind to `GENERIC_RESPONSE_KINDS` if JSON is sufficient, or add it to the ignored list only after confirming that it carries no needed content.
 
 ## Traps that have actually bitten people here
 

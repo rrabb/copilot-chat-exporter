@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Local UUID and prefix selection now searches both workspace journals and empty-window journals. Duplicate IDs still require an exact `.jsonl` path; missing IDs explain how to list sessions and choose the correct user-data root.
+- Unknown Local response kinds are kept as collapsed, redacted JSON only, held until an open code fence closes, with companion files for payloads over 300 lines OR 15 KiB. They remain visible in the schema census and fail strict verification until reviewed. Layer C checks that each block round-trips through `JSON.parse`.
+- `markdownVuln` response items render semantically: their text joins the surrounding run so code blocks stay continuous, and their warnings follow the run, labeled as unvalidated.
+- Layer D scores adjacent text fragments joined into whole lines (`assistant-text-joined`), so short fragments next to code are checked.
 - Optional `--detailed --compression gzip|brotli` output, with `--compressed` preserved as a gzip alias: standalone compressed HTML with the complete overview/Session TOC visible before evidence decoding, queued filters/links, same-document insertion and explicit unsupported/corrupt-file messages. Brotli uses quality 8, embeds a build-only WASM decoder and notices, and checks stream completion, byte count, CRC32 and UTF-8. Conventional HTML remains the default and retains no-JS evidence reading. No runtime npm dependency, iframe, CDN or records/renderer redesign; basic HTML is unchanged.
 - Compressed-report re-save resilience: deterministic content-derived CSP nonces with retained hashes, single-line ASCII loader/decoder scripts, correctly encoded Unicode shell/CSS and whitespace-tolerant payload/WASM base64. Actual-CSP Chrome/Edge regression tests cover format-only re-saves, literal script text, corruption and rejection of script elements, event handlers and javascript URLs; generated-asset verification checks the pinned decoder/WASM without rewriting stale output. The CLI warns when explicitly requested Brotli is larger than gzip without switching codecs.
 
@@ -71,6 +75,9 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- A non-text response item inside a code block no longer closes the fence early. Unbalanced fences close only at the end of a turn; an early close is reported and fails `--strict`. A close at the end of a turn is recorded as a representation change and does not fail `--strict`.
+- Fence tracking in the renderer and in Layer C now recognizes `~~~` fences as well as backtick fences. A closer must use the same character and be at least as long as the opener. This removes three Layer C `<details>` false positives in the real corpus. The edit-preview strips stay backtick-only, because the exporter writes those fences itself.
+- The classifier's validated-version label now names VS Code 1.141.2 (commit 16507d91) / Copilot Chat 0.69.0, the version bundled in that build's `resources/app/extensions/copilot/package.json`.
 - Detailed subagent headings now use real titles from alternate workspace references or uniquely bound recorded delegation descriptions/names instead of a synthetic agent UUID. Parent workspace and fallback titles remain presentation-only.
 - Detailed `--show-ignored` no longer duplicates complete ignored cards in both main and ignored sections.
 - Detailed headers, filters, initial ordering and TOC now use all recorded child task/follow-up entries and latest exact-scope SDK event activity. The compact console's existing prompt-count policy remains unchanged.
