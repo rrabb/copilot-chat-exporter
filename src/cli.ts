@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import { keepFailedExportCopy, readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
-import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listSourceCache, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
+import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listFailureLogs, listSourceCache, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
 import { exportFailureFromReport, failureDetails, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
 import path from 'node:path';
@@ -212,20 +212,24 @@ if (cacheMode) {
         console.log(`  Export: ${output}`);
     }
     console.log(`Total: ${entries.length} captures, ${entries.reduce((sum, entry) => sum + entry.bytes, 0)} bytes.`);
+    for (const log of result?.failureLogs ?? await listFailureLogs()) {
+      console.log(`Failure log | ${log.modifiedAt} | ${Math.max(0, (Date.now() - Date.parse(log.modifiedAt)) / 86_400_000).toFixed(2)} days | ${log.bytes} bytes | ${log.file}`);
+      result && console.log(`  ${result.selectedFailureLogs.some((target) => target.file === log.file) ? 'Eligible' : 'Skipped'}`);
+    }
     for (const legacy of await legacySourceCacheSizes())
       console.log(`Legacy cache (report only): ${legacy.directory} | ${legacy.bytes} bytes | ${legacy.files} files`);
-    if (result && !dryRun && result.selected.length) {
+    if (result && !dryRun && (result.selected.length || result.selectedFailureLogs.length)) {
       let approved = yes;
       if (!approved && process.stdin.isTTY && process.stdout.isTTY) {
         const prompt = createInterface({ input: process.stdin, output: process.stdout });
         try {
-          approved = /^(?:y|yes)$/iu.test((await prompt.question('Delete the eligible captures and their receipts? [y/N] ')).trim());
+          approved = /^(?:y|yes)$/iu.test((await prompt.question('Delete the eligible captures, their receipts and cached failure logs? [y/N] ')).trim());
         } finally {
           prompt.close();
         }
       }
       if (approved)
-        result = await cleanSourceCache({ yes: true, includeCorpus, olderThanDays: olderThanDays ?? undefined, targets: result.selected });
+        result = await cleanSourceCache({ yes: true, includeCorpus, olderThanDays: olderThanDays ?? undefined, targets: result.selected, failureLogTargets: result.selectedFailureLogs });
       else
         console.log('Nothing deleted. Noninteractive deletion requires --yes; interactive confirmation defaults to No.');
     }
@@ -234,8 +238,8 @@ if (cacheMode) {
       console.log(`Cache directory: ${size.bytes} bytes including receipts and registrations; external corpus snapshots: ${size.externalSnapshotBytes} bytes.`);
     }
     if (result)
-      console.log(`${result.dryRun ? 'Would remove' : 'Removed'} ${result.selected.length} captures and their receipts; ${result.dryRun
-        ? result.selected.reduce((sum, entry) => sum + entry.bytes, 0) : result.freedBytes} bytes ${result.dryRun ? 'eligible' : 'freed'}.`);
+      console.log(`${result.dryRun ? 'Would remove' : 'Removed'} ${result.selected.length} captures and their receipts; ${result.selectedFailureLogs.length} cached failure logs; ${result.dryRun
+        ? result.selected.reduce((sum, entry) => sum + entry.bytes, 0) + result.selectedFailureLogs.reduce((sum, log) => sum + log.bytes, 0) : result.freedBytes} bytes ${result.dryRun ? 'eligible' : 'freed'}.`);
     process.exit(0);
   } catch (error) {
     console.error(errorLabel(error));

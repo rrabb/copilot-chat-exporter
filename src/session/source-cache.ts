@@ -292,15 +292,51 @@ export async function legacySourceCacheSizes () {
   return results;
 }
 
+export interface CachedFailureLog {
+  file: string;
+  bytes: number;
+  modifiedAt: string;
+  identity: string;
+}
+
+export async function listFailureLogs (): Promise<CachedFailureLog[]> {
+  const directory = path.join(sourceCacheRoot(), 'failures');
+  const logs: CachedFailureLog[] = [];
+  try {
+    await noLinks(directory);
+    for (const name of await fs.readdir(directory)) {
+      if (!/^failed-[a-zA-Z0-9_-]+-\d{6}_\d{6}(?:-\d+)?\.log$/u.test(name))
+        continue;
+      const file = path.join(directory, name);
+      await noLinks(file);
+      const stat = await fs.stat(file);
+      if (!stat.isFile())
+        throw new Error('Failure log is not a regular file; cleanup refused.');
+      logs.push({
+        file, bytes: stat.size, modifiedAt: stat.mtime.toISOString(),
+        identity: `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,
+      });
+    }
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
+      throw error;
+  }
+  return logs;
+}
+
 export async function cleanSourceCache (options: {
   olderThanDays?: number; dryRun?: boolean; yes?: boolean; includeCorpus?: boolean;
   targets?: CacheEntry[];
+  failureLogTargets?: CachedFailureLog[];
 } = {}) {
   const days = options.olderThanDays ?? 0;
   if (!Number.isFinite(days) || days < 0)
     throw new Error('--older-than requires a nonnegative number of days.');
   const cutoff = Date.now() - days * 86_400_000;
   const entries = await listSourceCache();
+  const failureLogs = await listFailureLogs();
+  const selectedFailureLogs = failureLogs.filter((log) => Date.parse(log.modifiedAt) <= cutoff
+    && (!options.failureLogTargets || options.failureLogTargets.some((target) => target.file === log.file && target.identity === log.identity)));
   const selected = entries.filter((entry) => entry.kept && !entry.active && Date.parse(entry.createdAt) <= cutoff
     && (entry.kind !== 'corpus' || options.includeCorpus)
     && (!options.targets || options.targets.some((target) => target.directory === entry.directory && target.ownerId === entry.ownerId)));
@@ -312,5 +348,13 @@ export async function cleanSourceCache (options: {
         throw new Error('The source capture changed or is in use; cleanup refused.');
       freedBytes += await discardCapture(entry.directory);
     }
-  return { entries, selected, freedBytes, dryRun: options.dryRun === true || !options.yes };
+  if (options.yes && !options.dryRun)
+    for (const log of selectedFailureLogs) {
+      const current = (await listFailureLogs()).find((item) => item.file === log.file);
+      if (!current || current.identity !== log.identity)
+        throw new Error('Failure log changed after preview; cleanup refused.');
+      await fs.unlink(log.file);
+      freedBytes += log.bytes;
+    }
+  return { entries, selected, failureLogs, selectedFailureLogs, freedBytes, dryRun: options.dryRun === true || !options.yes };
 }

@@ -328,6 +328,32 @@ test('cache reporting includes legacy temp captures without deleting them', asyn
   assert.ok(await fs.stat(legacy));
 });
 
+test('CLI cleanup previews and age-deletes cache failure logs without touching logs beside exports', async (context) => {
+  const { home, env, invoke } = await fixture(context);
+  const directory = path.join(env.CCE_CACHE_DIR, 'failures');
+  await fs.mkdir(directory, { recursive: true });
+  const old = path.join(directory, 'failed-synthetic-261001_120000.log');
+  const recent = path.join(directory, 'failed-synthetic-261021_120000.log');
+  const beside = path.join(home, 'failed-beside-261001_120000.log');
+  for (const file of [old, recent, beside])
+    await fs.writeFile(file, 'WARNING: This log may contain session content.\n{}\n');
+  await fs.utimes(old, new Date(0), new Date(0));
+  assert.ok(invoke('--cache').stdout.includes(old));
+  const preview = invoke('--clean', '--older-than', '7');
+  assert.equal(preview.status, 0, preview.stderr);
+  assert.ok(preview.stdout.includes(old));
+  assert.match(preview.stdout, /Nothing deleted/u);
+  assert.ok(await fs.stat(old));
+  const dry = invoke('--clean', '--older-than', '7', '--yes', '--dry-run');
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.ok(await fs.stat(old));
+  const clean = invoke('--clean', '--older-than', '7', '--yes');
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout, /1 cached failure logs/u);
+  await assert.rejects(fs.stat(old), { code: 'ENOENT' });
+  assert.ok(await fs.stat(recent));
+  assert.ok(await fs.stat(beside));
+});
 
 for (const sdk of [false, true]) {
   for (const failure of sdk ? ['missing-content', 'read-error', 'missing-companion'] : ['missing-content', 'read-error']) {

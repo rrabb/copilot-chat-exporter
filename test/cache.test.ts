@@ -5,6 +5,46 @@ import test from 'node:test';
 import { readExportCopy, saveExportCopy } from '../src/session/source-snapshot.ts';
 import { cleanSourceCache, createSourceCacheDirectory, finishCapture, leaseCapture, listSourceCache, registerCapture } from '../src/session/source-cache.ts';
 
+test('cleanup lists and ages cache failure logs but leaves export-side logs and unknown files alone', async () => {
+  const root = process.env.CCE_CACHE_DIR!;
+  const failures = path.join(root, 'failures');
+  await fs.mkdir(failures, { recursive: true });
+  const old = path.join(failures, 'failed-synthetic-261001_120000.log');
+  const recent = path.join(failures, 'failed-synthetic-261021_120000.log');
+  const other = path.join(failures, 'unrelated.txt');
+  const besideExport = path.join(root, 'failed-beside-export-261001_120000.log');
+  for (const file of [old, recent, other, besideExport])
+    await fs.writeFile(file, 'WARNING: This log may contain session content.\n{}\n');
+  await fs.utimes(old, new Date(0), new Date(0));
+  const preview = await cleanSourceCache({ olderThanDays: 7 });
+  assert.ok(preview.failureLogs.some((item) => item.file === old));
+  assert.ok(preview.selectedFailureLogs.some((item) => item.file === old));
+  assert.ok(!preview.selectedFailureLogs.some((item) => item.file === recent));
+  assert.equal(await fs.readFile(old, 'utf8'), 'WARNING: This log may contain session content.\n{}\n');
+  await cleanSourceCache({ yes: true, olderThanDays: 7 });
+  await assert.rejects(fs.stat(old), { code: 'ENOENT' });
+  for (const file of [recent, other, besideExport])
+    assert.ok(await fs.stat(file));
+});
+
+test('cleanup does not delete cached logs changed after preview and refuses linked logs', async () => {
+  const directory = path.join(process.env.CCE_CACHE_DIR!, 'failures');
+  await fs.mkdir(directory, { recursive: true });
+  const file = path.join(directory, 'failed-changed-261001_120000.log');
+  await fs.writeFile(file, 'Original');
+  const preview = await cleanSourceCache();
+  await fs.appendFile(file, ' changed');
+  const result = await cleanSourceCache({ yes: true, failureLogTargets: preview.selectedFailureLogs });
+  assert.ok(!result.selectedFailureLogs.some((item) => item.file === file));
+  assert.equal(await fs.readFile(file, 'utf8'), 'Original changed');
+  const target = path.join(directory, 'log-target');
+  await fs.mkdir(target);
+  const link = path.join(directory, 'failed-linked-261001_120000.log');
+  await fs.symlink(target, link, 'junction');
+  await assert.rejects(cleanSourceCache({ yes: true }), /link/u);
+  await fs.unlink(link);
+});
+
 test('re-export replaces its capture; cleanup removes kept captures and receipts together', async () => {
   const root = process.env.CCE_CACHE_DIR!;
   const output = path.join(root, 'lifecycle.md');
