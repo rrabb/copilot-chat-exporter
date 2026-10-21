@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { keepFailedExportCopy, readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
 import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listSourceCache, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
-import { exportFailureFromReport, failureDetails, failureWarning, writeFailureLog } from './verify/export-failure.ts';
+import { exportFailureFromReport, failureDetails, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -408,14 +408,14 @@ if (verifyMode) {
   if (jsonMode)
     process.stdout.write(`${JSON.stringify(json)}\n`);
   process.exitCode = json.exitCode;
-  const verificationFailure = exportFailureFromReport(json);
+  const verificationFailure = exportFailureFromReport(json, lossAccount.unaccounted);
   if (verificationFailure && loaded.copiedSource.captureDirectory) {
     await finishCapture(loaded.copiedSource.captureDirectory, true);
     const diagnostics = path.join(sourceCacheRoot(), 'failures');
     await fs.mkdir(diagnostics, { recursive: true });
     const log = await writeFailureLog(path.join(diagnostics, 'verification.md'), location.sessionId,
-      verificationFailure, loaded.copiedSource.captureDirectory, new Date().toISOString(), loaded.copiedSource.sha256);
-    console.error(failureWarning(verificationFailure, loaded.copiedSource.captureDirectory));
+      verificationFailure, loaded.copiedSource.captureDirectory, new Date().toISOString(), loaded.copiedSource.sha256, loaded.versions);
+    console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
     console.error(failureDetails(verificationFailure));
     console.error(`Failure log: ${log}`);
   }
@@ -472,9 +472,9 @@ try {
     outputPath, generatedAt: new Date().toISOString(), overwrite: goldenMode || overwriteMode,
     ...(!goldenMode ? { verification: {
       capture: loaded.copiedSource.captureDirectory!, sessionId: location.sessionId, sourceHash: loaded.copiedSource.sha256,
+      versions: loaded.versions,
       keep: async () => {
         await keepCaptureDuringFailure(loaded.copiedSource.captureDirectory!);
-        console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
       },
       check: async (stagePath: string): Promise<ExportFailure | null> => {
         const savedMarkdown = await fs.readFile(stagePath, 'utf8');
@@ -493,16 +493,16 @@ try {
           render: buildRenderReport(session, savedMarkdown), renderSkipReason: null,
           fenceRepairs: exportFenceRepairs, loss: account, lossTarget: 'file', parser, images,
         });
-        return exportFailureFromReport(result);
+        return exportFailureFromReport(result, account.unaccounted);
       },
     } } : {}),
-    plan: (assetsDirectory) => {
+    plan: (assetsDirectory, artifactPath) => {
       const overflow = { assetsDirectory, companions: [] as CompanionArtifact[] };
       exportFenceRepairs.early = [];
       exportFenceRepairs.turnEnd = 0;
       exportFenceRepairs.html = [];
       rendered = renderSession(loaded, {
-        outputPath,
+        outputPath: artifactPath,
         gitStatus: loaded.host.gitStatus(),
         generatedAt: new Date().toISOString(),
         overflow,
@@ -520,7 +520,6 @@ try {
   outputPath = written.outputPath;
   exportFailure = written.verificationFailure;
   if (exportFailure) {
-    console.error(failureWarning(exportFailure, loaded.copiedSource.captureDirectory!));
     console.error(failureDetails(exportFailure));
     console.error(`Failure log: ${written.failureLog}`);
     console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
@@ -537,6 +536,7 @@ for (const line of formatExportSummary({
   resourceCount: loaded.resources.resources.length,
   outputPath: workspacePath(outputPath),
   outputSize,
+  verificationFailed: exportFailure !== null,
 }))
   console.log(line);
 assetsPath && console.log(`Companion files: ${companionCount} in ${workspacePath(assetsPath)} (full text of tool output over 300 lines and 15 KiB)`);

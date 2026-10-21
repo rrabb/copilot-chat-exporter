@@ -7,6 +7,10 @@ import { writeArchive } from '../src/archive-writer.ts';
 import type { PlannedArchive } from '../src/export-policy.ts';
 
 const generatedAt = '2026-10-08T20:00:01Z';
+const localStamp = (value: string) => {
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().replace(/[-:]/gu, '').slice(2, 15).replace('T', '_');
+};
 
 async function fixture (context: test.TestContext) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-writer-'));
@@ -14,14 +18,14 @@ async function fixture (context: test.TestContext) {
   return { root, outputPath: path.join(root, 'archive.md') };
 }
 
-function plan (folder: string, withCompanions = true): PlannedArchive {
+function plan (folder: string): PlannedArchive {
   return {
-    markdown: withCompanions ? `[Full output](./${folder}/output.txt)\n` : 'Complete inline text\n',
-    companions: withCompanions ? [{
+    markdown: `[Full output](./${folder}/output.txt)\n`,
+    companions: [{
       id: 'one', kind: 'tool-result', mediaType: 'text/plain',
       relativePath: `${folder}/output.txt`, bytes: Buffer.from('Original\r\nUnicode: \u{1f600}\r\n'),
       location: { sourceId: 'synthetic', field: 'tool.result' },
-    }] : [],
+    }],
     diagnostics: [], policy: { highFidelity: false, redact: true },
   };
 }
@@ -29,7 +33,7 @@ function plan (folder: string, withCompanions = true): PlannedArchive {
 test('writer saves exact companion bytes and relative links before reporting success', async (context) => {
   const { root, outputPath } = await fixture(context);
   const result = await writeArchive({ outputPath, generatedAt, plan });
-  assert.equal(path.basename(result.assetsPath!), 'archive_assets_261008_200001');
+  assert.equal(path.basename(result.assetsPath!), `archive_assets_${localStamp(generatedAt)}`);
   assert.equal(await fs.readFile(outputPath, 'utf8'), result.archive.markdown);
   assert.deepEqual(await fs.readFile(result.companionPaths[0]), result.archive.companions[0].bytes);
   assert.equal(result.markdownBytes, Buffer.byteLength(result.archive.markdown));
@@ -38,9 +42,36 @@ test('writer saves exact companion bytes and relative links before reporting suc
 
 test('inline-only archive creates no assets or staging residue', async (context) => {
   const { root, outputPath } = await fixture(context);
-  const result = await writeArchive({ outputPath, generatedAt, plan: (folder) => plan(folder, false) });
+  const result = await writeArchive({
+    outputPath, generatedAt, plan: (folder) => ({ ...plan(folder), markdown: 'Complete inline text\n', companions: [] }),
+  });
   assert.equal(result.assetsPath, null);
   assert.deepEqual(await fs.readdir(root), ['archive.md']);
+});
+
+test('failed artifact metadata and log use the collision-resolved output and a shared local timestamp', async (context) => {
+  const { root, outputPath } = await fixture(context);
+  context.mock.method(Date.prototype, 'getTimezoneOffset', () => 240);
+  await fs.writeFile(path.join(root, 'archive.verify-failed.md'), 'Previous failure');
+  const result = await writeArchive({
+    outputPath, generatedAt,
+    plan: (folder, artifactPath) => ({
+      ...plan(folder), markdown: `${plan(folder).markdown}\n### Chat Export Artifact\n\n- \`${artifactPath}\`\n\nRecorded text: archive.md`,
+    }),
+    verification: {
+      capture: 'private-copy', sourceHash: 'a'.repeat(64), sessionId: 'synthetic',
+      keep: async () => {}, check: async () => ({
+        failureReasons: ['verification-error'], categories: {}, details: { message: 'Synthetic failure' },
+      }),
+    },
+  });
+  assert.equal(path.basename(result.assetsPath!), 'archive_assets_261008_160001');
+  assert.equal(path.basename(result.failureLog!), 'failed-synthetic-261008_160001.log');
+  const text = await fs.readFile(result.outputPath, 'utf8');
+  assert.ok(text.includes(`- \`${result.outputPath}\``));
+  assert.ok(text.includes('Recorded text: archive.md'));
+  const log = await fs.readFile(result.failureLog!, 'utf8');
+  assert.equal(JSON.parse(log.slice(log.indexOf('\n') + 1)).output, result.outputPath);
 });
 
 test('verification failure publishes warning and companions without replacing earlier success or failure files', async (context) => {
@@ -79,8 +110,8 @@ test('existing destinations refuse by default; overwrite keeps prior companion f
   await assert.rejects(writeArchive({ outputPath, generatedAt, plan }), /already exists/);
   const second = await writeArchive({ outputPath, generatedAt, plan, overwrite: true });
   assert.notEqual(second.assetsPath, first.assetsPath);
-  assert.equal(path.basename(second.assetsPath!), 'archive_assets_261008_200001_1');
-  assert.match(await fs.readFile(outputPath, 'utf8'), /200001_1/);
+  assert.equal(path.basename(second.assetsPath!), `archive_assets_${localStamp(generatedAt)}_1`);
+  assert.ok((await fs.readFile(outputPath, 'utf8')).includes(`${localStamp(generatedAt)}_1`));
   assert.deepEqual(await fs.readFile(first.companionPaths[0]), first.archive.companions[0].bytes);
 });
 

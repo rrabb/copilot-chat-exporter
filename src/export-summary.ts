@@ -18,6 +18,7 @@ export function formatExportSummary (options: {
   resourceCount: number;
   outputPath: string;
   outputSize: number;
+  verificationFailed?: boolean;
 }) {
   const { sessionId, session, resourceCount, outputPath, outputSize } = options;
   const firstPrompt = session.turns[0]?.prompt ?? '';
@@ -31,7 +32,7 @@ export function formatExportSummary (options: {
   const thoughtCount = session.turns.reduce((sum, turn) => sum + turn.reasoning.length, 0);
   const title = session.title || '(untitled)';
   const lines = [
-    `Exported session ${sessionId}:`,
+    options.verificationFailed ? `Export failed verification; written as ${outputPath}` : `Exported session ${sessionId}:`,
     `Title: ${title}`,
   ];
 

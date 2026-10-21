@@ -19,6 +19,7 @@ import type { CompanionArtifact, CompanionKind } from './export-policy.ts';
 import { collectRecordedImages, saveImageCompanion } from './images.ts';
 import type { RecordedImage } from './images.ts';
 import { sourceCopyNotice } from './session/source-snapshot.ts';
+import { exporterCommit, exporterVersion } from './version.ts';
 import type { SourceCopy } from './session/source-snapshot.ts';
 import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
@@ -28,7 +29,7 @@ import { modelName } from './session/enrich.ts';
 import {
   COLLATOR, COMMAND_CODE, FILE_LINK_COLOR, MARK, MUTED, MUTED_CODE, NESTED_INDENT, PROMPT_BADGE,
   PROMPT_BOX, assistantBlock, backToContents, blockquote, clip, closeUnbalancedFences, hasUnclosedInlineCode, openFenceCloser, openFenceTicks, scanFences,
-  esc, extractUri, fenceFor, fmtAiCredits, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp,
+  esc, extractUri, fenceFor, fmtAiCredits, fmtCredits, headerTimestamp, humanDuration, indentBlock, isoTimestamp, localTimestamp,
   escapeUnclosedHtml, mutedSummary, neutralizeStructuralHtml, redact, sectionAnchor, stripMarkdown, thousands,
   userMessageAnchor, userMessageHref,
 } from './text.ts';
@@ -1232,7 +1233,8 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     `- **Title:** ${redact(session.title || '(untitled)')}`,
     `- **Session started:** ${isoTimestamp(firstTs)}`,
     `- **Export covers through:** ${isoTimestamp(lastTs)}`,
-    `- **Export generated:** ${isoTimestamp(generatedAt)}`,
+    `- **Export generated:** ${localTimestamp(generatedAt)}`,
+    `- **Exporter:** \`${exporterVersion}\` (commit \`${exporterCommit}\`)`,
     `- **Copilot version:** \`${versions.copilotVersion}\``,
     `- **VS Code version:** \`${versions.vscodeVersion}\``,
     `- **Responder:** ${redact(session.responderUsername || 'GitHub Copilot')}`,

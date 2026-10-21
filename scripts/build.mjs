@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const require = createRequire(import.meta.url);
+const commit = execFileSync('git', ['describe', '--always', '--dirty'], { cwd: root, encoding: 'utf8' }).trim();
+if (!commit)
+  throw new Error('git describe returned an empty exporter build identity.');
+const define = { __CCE_BUILD_COMMIT__: JSON.stringify(commit) };
 
 await import('./generate-brotli.mjs');
 await rm(dist, { recursive: true, force: true });
@@ -20,6 +24,7 @@ await build({
   format: 'esm',
   target: 'node22.18',
   packages: 'external',
+  define,
   banner: { js: '#!/usr/bin/env node' },
   logLevel: 'info',
 });
@@ -32,6 +37,7 @@ await build({
   format: 'esm',
   target: 'node22.18',
   packages: 'external',
+  define,
   logLevel: 'info',
 });
 

@@ -34,6 +34,13 @@ const documentContext = (over: Partial<Parameters<typeof buildDocument>[1]> = {}
   ...over,
 });
 
+test('export provenance includes exporter version and local generation time with its UTC offset', (context) => {
+  context.mock.method(Date.prototype, 'getTimezoneOffset', () => 240);
+  const output = buildDocument(testSession(), documentContext({ generatedAt: '2026-10-21T22:00:45.128Z' }));
+  assert.match(output, /Export generated:\*\* 2026-10-21 18:00:45\.128 UTC-04:00/u);
+  assert.match(output, /Exporter:\*\* `\d+\.\d+\.\d+` \(commit `[^`]+`\)/u);
+});
+
 test('toolFriendly drops the prefixes nobody reads', () => {
   assert.equal(toolFriendly('copilot_readFile'), 'readFile');
   assert.equal(toolFriendly('mcp_context7_query'), 'context7_query');

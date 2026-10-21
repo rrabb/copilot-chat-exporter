@@ -328,8 +328,9 @@ test('cache reporting includes legacy temp captures without deleting them', asyn
   assert.ok(await fs.stat(legacy));
 });
 
+
 for (const sdk of [false, true]) {
-  for (const failure of ['missing-content', 'read-error']) {
+  for (const failure of sdk ? ['missing-content', 'read-error', 'missing-companion'] : ['missing-content', 'read-error']) {
     for (const keepSource of [false, true]) {
     test(`failed ${sdk ? 'SDK' : 'Local'} ${keepSource ? 'kept' : 'default'} export keeps its capture after ${failure}`, async (context) => {
       const { home, root, sessionPath, env, invoke } = await fixture(context);
@@ -347,7 +348,7 @@ for (const sdk of [false, true]) {
         const events = path.join(env.COPILOT_HOME, 'session-state', 'failure-fixture', 'events.jsonl');
         await fs.mkdir(path.dirname(events), { recursive: true });
         await fs.writeFile(events, [
-          { type: 'session.start', data: { sessionId: 'failure-fixture', version: 1 } },
+          { type: 'session.start', data: { sessionId: 'failure-fixture', version: 1, copilotVersion: 'test-copilot', vscodeVersion: 'test-vscode' } },
           { type: 'system.message', data: { role: 'system', content: 'Companion system instructions' } },
           { type: 'user.message', data: { content: 'Question' } },
           { type: 'assistant.message', data: { content: 'Answer' } },
@@ -358,11 +359,19 @@ for (const sdk of [false, true]) {
       await fs.writeFile(preload, `
 import { promises as fs } from 'node:fs';
 const original = fs.readFile;
+let stagedRead = false;
 fs.readFile = async function (file, ...args) {
+  ${failure === 'missing-companion' ? `
+  if (stagedRead && String(file).includes('_assets_') && String(file).includes('system-prompt-')) {
+    const bytes = await original.call(this, file, ...args);
+    return typeof bytes === 'string' ? bytes.replaceAll('Companion system instructions', 'Removed companion text')
+      : Buffer.from(bytes.toString('utf8').replaceAll('Companion system instructions', 'Removed companion text'));
+  }` : ''}
   if (String(file).startsWith(${JSON.stringify(path.join(home, '.chat-export-'))}) && args[0] === 'utf8') {
+    stagedRead = true;
     ${failure === 'read-error' ? "throw new Error('Synthetic saved-file read failure');" : ''}
     const bytes = await original.call(this, file, ...args);
-    return typeof bytes === 'string' ? bytes.replaceAll('Question', 'Removed!') : bytes;
+    return typeof bytes === 'string' && ${failure !== 'missing-companion'} ? bytes.replaceAll('Question', 'Removed!') : bytes;
   }
   return original.call(this, file, ...args);
 };
@@ -382,9 +391,34 @@ fs.readFile = async function (file, ...args) {
       const failedMarkdown = await fs.readFile(failed, 'utf8');
       assert.match(failedMarkdown, /^>.*Verification failed/iu);
       assert.ok(failedMarkdown.includes(capture));
+      assert.match(failedMarkdown, /### Chat Export Artifact\s+- `[^`]*failed\.verify-failed\.md`/u);
+      assert.equal((result.stderr.match(/Export verification failed; private source copy kept at:/gu) ?? []).length, 1);
+      assert.doesNotMatch(result.stderr, /"failureReasons"|"stack"|"layerD"/u);
+      assert.doesNotMatch(result.stdout, /Exported session/u);
+      assert.match(result.stdout, /Export failed verification; written as .*failed\.verify-failed\.md/u);
       const logs = (await fs.readdir(home)).filter((name) => /^failed-.+-\d{6}_\d{6}(?:-\d+)?\.log$/u.test(name));
       assert.equal(logs.length, 1);
-      assert.match(await fs.readFile(path.join(home, logs[0]!), 'utf8'), /failureReasons|verification-error/u);
+      const logText = await fs.readFile(path.join(home, logs[0]!), 'utf8');
+      assert.match(logText, /^WARNING: This log may contain session content\./u);
+      const logData = JSON.parse(logText.slice(logText.indexOf('\n') + 1));
+      assert.equal(logData.output, failed);
+      assert.match(logData.exporterVersion, /^\d+\.\d+\.\d+/u);
+      assert.equal(typeof logData.exporterCommit, 'string');
+      assert.ok(logData.exporterCommit.length > 0);
+      if (process.env.CCE_TEST_CLI) {
+        assert.match(logData.exporterCommit, /^[a-f\d]{7,40}(?:-dirty)?$/u);
+        assert.ok(failedMarkdown.includes(`commit \`${logData.exporterCommit}\``));
+      }
+      assert.equal(typeof logData.vscodeVersion, 'string');
+      assert.equal(typeof logData.copilotVersion, 'string');
+      if (sdk) {
+        assert.equal(logData.vscodeVersion, 'test-vscode');
+        assert.equal(logData.copilotVersion, 'test-copilot');
+      }
+      if (failure !== 'read-error') {
+        assert.equal(logData.details.layerD.target, 'file');
+        assert.ok(failedMarkdown.includes(failure === 'missing-companion' ? 'system-prompt' : 'request 1 prompt'));
+      }
       assert.equal(JSON.parse(await fs.readFile(path.join(capture, '.cce-capture.json'), 'utf8')).kept, true);
       env.NODE_OPTIONS = previousNodeOptions;
       const verify = invoke('--verify', '--strict', selector, failed, '--user-data-root', root);

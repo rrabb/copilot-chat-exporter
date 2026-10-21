@@ -13,6 +13,7 @@
 - **Session started:** 2023-11-14 22:13:21Z
 - **Export covers through:** 2023-11-14 22:15:04Z
 - **Export generated:** <volatile>
+- **Exporter:** `0.1.0` (commit `<volatile>`)
 - **Copilot version:** `unknown`
 - **VS Code version:** `unknown`
 - **Responder:** GitHub Copilot

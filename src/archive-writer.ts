@@ -3,20 +3,21 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { PlannedArchive } from './export-policy.ts';
 import { failedArchivePath, failureWarning, verificationException, writeFailureLog } from './verify/export-failure.ts';
-import type { ExportFailure } from './verify/export-failure.ts';
+import type { ExportFailure, FailureVersions } from './verify/export-failure.ts';
 
 export interface ArchiveWriteOptions {
   outputPath: string;
   generatedAt: string;
   overwrite?: boolean;
-  /** Pure planner; collision retries may call it with a different sibling folder name. */
-  plan: (assetsDirectory: string) => PlannedArchive;
+  /** Pure planner; retries can change the sibling folder or final failed output path. */
+  plan: (assetsDirectory: string, outputPath: string) => PlannedArchive;
   verification?: {
     check: (stagePath: string) => Promise<ExportFailure | null>;
     keep: () => Promise<void>;
     capture: string;
     sessionId: string;
     sourceHash: string;
+    versions?: FailureVersions;
   };
 }
 
@@ -39,7 +40,8 @@ function assetBase (outputPath: string, generatedAt: string) {
   const date = new Date(generatedAt);
   if (!Number.isFinite(date.getTime()))
     throw new Error('Archive generatedAt must be a valid timestamp.');
-  const stamp = date.toISOString().replace(/[-:]/g, '').slice(2, 15).replace('T', '_');
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  const stamp = local.toISOString().replace(/[-:]/g, '').slice(2, 15).replace('T', '_');
   const name = path.basename(outputPath, path.extname(outputPath));
   return `${name}_assets_${stamp}`;
 }
@@ -97,7 +99,7 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
     let folder = base;
     for (let suffix = 0; ; suffix += 1) {
       folder = suffix === 0 ? base : `${base}_${suffix}`;
-      archive = options.plan(folder);
+      archive = options.plan(folder, outputPath);
       validatePlan(archive, folder);
       if (!archive.companions.length)
         break;
@@ -133,13 +135,8 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
       } catch (error) {
         failure = verificationException(error);
       }
-      if (failure) {
+      if (failure)
         await options.verification.keep();
-        const warning = failureWarning(failure, options.verification.capture);
-        await fs.writeFile(stage, `${warning}${archive.markdown}`, { mode: 0o600 });
-        failureLog = await writeFailureLog(outputPath, options.verification.sessionId, failure,
-          options.verification.capture, options.generatedAt, options.verification.sourceHash);
-      }
     }
     let olderFailedArchive: string | null = null;
     if (!failure) {
@@ -152,9 +149,17 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
     if (failure) {
       for (let suffix = 0; ; suffix++) {
         const candidate = failedArchivePath(options.outputPath, suffix);
+        const failedPlan = options.plan(folder, path.resolve(candidate));
+        validatePlan(failedPlan, folder);
+        if (failedPlan.companions.length !== archive.companions.length || failedPlan.companions.some((item, index) =>
+          item.relativePath !== archive.companions[index].relativePath
+          || !Buffer.from(item.bytes).equals(Buffer.from(archive.companions[index].bytes))))
+          throw new Error('Failed archive planning changed previously verified companion bytes.');
+        await fs.writeFile(stage, `${failureWarning(failure, options.verification!.capture)}${failedPlan.markdown}`, { mode: 0o600 });
         try {
           await fs.link(stage, candidate);
           outputPath = path.resolve(candidate);
+          archive = failedPlan;
           break;
         } catch (error) {
           if (code(error) !== 'EEXIST')
@@ -170,6 +175,9 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
       await fs.link(stage, outputPath);
     }
     published = true;
+    if (failure && options.verification)
+      failureLog = await writeFailureLog(outputPath, options.verification.sessionId, failure,
+        options.verification.capture, options.generatedAt, options.verification.sourceHash, options.verification.versions);
     if (stage !== null) {
       await fs.unlink(stage);
       stage = null;

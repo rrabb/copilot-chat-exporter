@@ -359,6 +359,16 @@ export function isoTimestamp (value: string | number | null | undefined) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toISOString().replace('T', ' ').replace('.000Z', 'Z');
 }
 
+export function localTimestamp (value: string | number) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime()))
+    throw new Error('Local timestamp requires a valid date.');
+  const minutes = -date.getTimezoneOffset();
+  const local = new Date(date.getTime() + minutes * 60_000).toISOString().slice(0, -1).replace('T', ' ');
+  const offset = Math.abs(minutes);
+  return `${local} UTC${minutes < 0 ? '-' : '+'}${String(Math.floor(offset / 60)).padStart(2, '0')}:${String(offset % 60).padStart(2, '0')}`;
+}
+
 export function headerTimestamp (value: string | number | null | undefined) {
   const date = new Date(value ?? NaN);
   if (Number.isNaN(date.getTime()))

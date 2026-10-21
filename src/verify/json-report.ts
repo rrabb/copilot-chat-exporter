@@ -140,6 +140,7 @@ export function buildSdkVerifyJson (input: {
   parser: ParserCheckResult;
   fenceRepairs: FenceRepairs;
   images?: ImageAccount;
+  lossTarget?: 'file' | 'in-memory';
 }) {
   const { strict, census, loss } = input;
   const reasons: string[] = [];
@@ -157,7 +158,7 @@ export function buildSdkVerifyJson (input: {
     census: censusJson(census),
     leftOut: Object.fromEntries(input.leftOut),
     fenceRepairs: fenceRepairsJson(input.fenceRepairs),
-    layerD: { target: 'in-memory' as const, ...lossJson(loss) },
+    layerD: { target: input.lossTarget ?? 'in-memory', ...lossJson(loss) },
     ...(input.images ? { images: input.images } : {}),
     parser: parserCheckJson(input.parser),
   };

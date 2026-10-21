@@ -19,7 +19,7 @@ import { existingUserDataSnapshot, keepFailedExportCopy, readExportCopy, saveExp
 import { snapshotSdkSelection } from './session/sdk-capture.ts';
 import type { SdkCapture } from './session/sdk-capture.ts';
 import { discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, sourceCacheRoot } from './session/source-cache.ts';
-import { exportFailureFromReport, failureDetails, failureWarning, verificationException, writeFailureLog } from './verify/export-failure.ts';
+import { exportFailureFromReport, failureDetails, verificationException, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
 
 export interface SdkCommandOptions {
@@ -87,6 +87,9 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
   sourceCopy.kept = options.keepSource === true || !keepSnapshot;
   const displaySource = { ...source, path: sourceCopy.source };
   const title = occurrence.title || '(untitled)';
+  const versions = {
+    vscodeVersion: 'not recorded', copilotVersion: 'not recorded',
+  };
   let writtenOutput: string | undefined;
   const keepVerificationFailure = async (failure: ExportFailure) => {
     keepSnapshot?.();
@@ -94,8 +97,8 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     const diagnostics = path.join(sourceCacheRoot(), 'failures');
     await fs.mkdir(diagnostics, { recursive: true });
     const log = await writeFailureLog(path.join(diagnostics, 'verification.md'), source.sessionId,
-      failure, capture.directory, new Date().toISOString(), sourceCopy.sha256);
-    console.error(failureWarning(failure, capture.directory));
+      failure, capture.directory, new Date().toISOString(), sourceCopy.sha256, versions);
+    console.error(`Export verification failed; private source copy kept at: ${capture.directory}`);
     console.error(failureDetails(failure));
     console.error(`Failure log: ${log}`);
   };
@@ -108,6 +111,9 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
   };
   try {
     const events = await readSdkScope(source);
+    const recordedVersions = events.find((event) => event.type === 'session.start')?.data;
+    versions.vscodeVersion = typeof recordedVersions?.vscodeVersion === 'string' ? recordedVersions.vscodeVersion : 'not recorded';
+    versions.copilotVersion = typeof recordedVersions?.copilotVersion === 'string' ? recordedVersions.copilotVersion : 'not recorded';
     const ledger = readUsageForSource(source);
     if (options.verify) {
       const preview = renderSdkExport(events, displaySource, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger, sourceCopy });
@@ -118,7 +124,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       }
       let failure: ExportFailure | null = null;
       const exitCode = await verifyReport(preview, options.strict, options.json === true, Boolean(options.outputArgument),
-        (report) => { failure = exportFailureFromReport(report); });
+        (report, account) => { failure = exportFailureFromReport(report, account.unaccounted); });
       failure && await keepVerificationFailure(failure);
       return exitCode;
     }
@@ -138,10 +144,10 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       outputPath, generatedAt, overwrite: options.overwrite,
       verification: {
         capture: capture.directory, sessionId: source.sessionId, sourceHash: sourceCopy.sha256,
+        versions,
         keep: async () => {
           keepSnapshot?.();
           await keepCaptureDuringFailure(capture.directory);
-          console.error(`Export verification failed; private source copy kept at: ${capture.directory}`);
         },
         check: async (stagePath) => {
           if (!last)
@@ -149,14 +155,14 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           last.markdown = await fs.readFile(stagePath, 'utf8');
           last.companions = await readLinkedArchiveCompanions(last.markdown, outputPath);
           let failure: ExportFailure | null = null;
-          await verifyReport(last, options.strict, false, true, (report) => {
-            failure = exportFailureFromReport(report);
+          await verifyReport(last, options.strict, false, true, (report, account) => {
+            failure = exportFailureFromReport(report, account.unaccounted);
           });
           return failure;
         },
       },
-      plan: (assetsDirectory) => {
-        last = renderSdkExport(events, displaySource, { title, assetsDirectory, outputPath, generatedAt, ledger, sourceCopy });
+      plan: (assetsDirectory, artifactPath) => {
+        last = renderSdkExport(events, displaySource, { title, assetsDirectory, outputPath: artifactPath, generatedAt, ledger, sourceCopy });
         return { markdown: last.markdown, companions: last.companions, diagnostics: [], policy: { ...DEFAULT_EXPORT_POLICY } };
       },
     });
@@ -166,7 +172,6 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       throw new Error('The export plan was not produced.');
     const exitCode = written.verificationFailure ? 2 : 0;
     if (written.verificationFailure) {
-      console.error(failureWarning(written.verificationFailure, capture.directory));
       console.error(failureDetails(written.verificationFailure));
       console.error(`Failure log: ${written.failureLog}`);
       await keepFailure(written.outputPath, JSON.stringify(written.verificationFailure));
@@ -180,6 +185,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     for (const line of formatExportSummary({
       sessionId: occurrence.sessionId, session: result.session, resourceCount: written.companionPaths.length,
       outputPath: workspacePath(written.outputPath), outputSize: written.markdownBytes,
+      verificationFailed: written.verificationFailure !== null,
     }))
       console.log(line);
     written.assetsPath && console.log(`Companion files: ${written.companionPaths.length} in ${workspacePath(written.assetsPath)} (system prompts, skill files, images)`);
@@ -202,13 +208,13 @@ function companionText (result: SdkExport): string {
 }
 
 async function verifyReport (preview: SdkExport, strict: boolean, json: boolean, savedArchive: boolean,
-  onReport?: (report: ReturnType<typeof buildSdkVerifyJson>) => void): Promise<number> {
+  onReport?: (report: ReturnType<typeof buildSdkVerifyJson>, account: ReturnType<typeof buildSdkLossAccount>) => void): Promise<number> {
   const account = buildSdkLossAccount(preview.events, preview.markdown, companionText(preview));
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
   const drift = preview.session.census.unhandled;
-  const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, parser, fenceRepairs: preview.fenceRepairs, images });
-  onReport?.(report);
+  const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, lossTarget: savedArchive ? 'file' : 'in-memory', parser, fenceRepairs: preview.fenceRepairs, images });
+  onReport?.(report, account);
   if (json) {
     process.stdout.write(`${JSON.stringify(report)}\n`);
     return report.exitCode;
