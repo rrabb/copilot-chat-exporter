@@ -26,6 +26,7 @@ import {
 import { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
 import { buildLossAccount } from './verify/loss-account.ts';
 import { buildLocalVerifyJson } from './verify/json-report.ts';
+import { readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { runSdkCommand } from './sdk-cli.ts';
@@ -348,13 +349,17 @@ if (verifyMode) {
     : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!))}`);
   !jsonMode && printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
   const parserCheck = buildParserCheck(renderedMarkdown ?? built, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
+  const imageAccount = verifyLocalImages(session.rawRequests ?? [], raw, renderedMarkdown ?? built,
+    renderedMarkdown === null ? overflow.companions : await readLinkedImageCompanions(renderedMarkdown, path.resolve(getWorkspaceRoot(), outputArgument!)));
+  !jsonMode && console.log(`Images: ${imageAccount.unique} unique, ${imageAccount.found} found, ${imageAccount.missing} missing; ${imageAccount.unresolved} unresolved, ${imageAccount.referenceOnly} reference-only, ${imageAccount.excludedNotSubmitted} excluded-not-submitted.`);
   !jsonMode && console.log(formatParserCheck(parserCheck, renderedMarkdown === null ? 'in-memory build' : 'the given file').join('\n'));
-  const failed = report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || Boolean(renderReport?.failed) || parserCheck.failed
+  const failed = imageAccount.failed || report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || Boolean(renderReport?.failed) || parserCheck.failed
     || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0 || lossAccount.failed || fenceRepairs.early.length > 0));
   if (jsonMode) {
     const json = buildLocalVerifyJson({
       strict: strictMode, report, census: session.census, crossCheck, render: renderReport, renderSkipReason,
       fenceRepairs, loss: lossAccount, lossTarget: renderedMarkdown === null ? 'in-memory' : 'file', parser: parserCheck,
+      images: imageAccount,
     });
     process.stdout.write(`${JSON.stringify(json)}\n`);
     process.exitCode = json.exitCode;

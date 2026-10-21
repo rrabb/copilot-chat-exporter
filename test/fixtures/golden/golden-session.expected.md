@@ -4,6 +4,8 @@
 
 > Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.
 
+> Images bypass text redaction and may contain private information. Review image companions before sharing.
+
 ## Session Metadata
 
 - **Session ID:** `00000000-0000-4000-8000-000000000000`
@@ -165,6 +167,9 @@ c:/fixture/src/added.ts
 <div style="color:#1fbfeb;background:black;font-family:Tahoma;font-size:1.25rem;line-height:2rem;padding:6px 14px;border-radius:4px;">
 
 > Summarize how the exporter script parses tool calls.
+
+![Synthetic pixel](golden.render_assets_<volatile>/image-3d4a54149f8ae39e287b6c7d547d3c7cee6f19115098ce09938f8d36b7c84170.png)
+68 bytes; SHA-256 `3d4a54149f8a`.
 
 </div>
 

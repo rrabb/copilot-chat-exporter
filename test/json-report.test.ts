@@ -4,6 +4,7 @@ import { buildLocalVerifyJson, buildSdkVerifyJson } from '../src/verify/json-rep
 import type { LossAccount } from '../src/verify/loss-account.ts';
 import type { Census } from '../src/types.ts';
 import type { ParserCheckResult } from '../src/verify/parser-check.ts';
+import { verifyLocalImages } from '../src/verify/images.ts';
 
 const SECRET = 'PROMPT-SECRET-TEXT';
 const TOOL_ID = 'toolu_SECRET_ID';
@@ -96,7 +97,7 @@ test('a failed parser check is a failure reason with or without --strict', () =>
     assert.equal(json.parser.checks[0].ok, false);
   }
   assert.equal(local(true).parser.failed, false);
-  assert.equal(local(true).version, 2);
+  assert.equal(local(true).version, 3);
 });
 
 test('SDK repairs fail strict only for early closes, not turn-end closes or HTML escapes', () => {
@@ -108,4 +109,24 @@ test('SDK repairs fail strict only for early closes, not turn-end closes or HTML
   assert.equal(clean.exitCode, 0);
   assert.equal(clean.fenceRepairs.turnEnd, 2);
   assert.equal(clean.fenceRepairs.htmlEscaped, 1);
+});
+
+test('image loss fails Local and SDK verification JSON even without strict', () => {
+  const images = verifyLocalImages([{ kind: 'image', mimeType: 'image/png', data: 'AQID' }], '', '', []);
+  for (const strict of [false, true]) {
+    const sdk = buildSdkVerifyJson({ strict, census: census(), leftOut: new Map(), loss: loss(), parser: parser(),
+      fenceRepairs: { early: [], turnEnd: 0, html: [] }, images });
+    assert.equal(sdk.exitCode, 2);
+    assert.deepEqual(sdk.failureReasons, ['image-loss']);
+    assert.equal(sdk.images?.missing, 1);
+    const local = buildLocalVerifyJson({
+      strict, report: { rawRequestCount: 1, parsedTurnCount: 1, missingTurns: 0, extraTurns: 0, crossTurnDuplicates: [], mismatches: [] },
+      census: census(), crossCheck: { rawToolIds: 0, parsedToolIds: 0, rawThinking: 0, dropped: [], invented: [], failed: false },
+      render: { checks: [], failed: false }, renderSkipReason: null, loss: loss(), lossTarget: 'file',
+      parser: parser(), fenceRepairs: { early: [], turnEnd: 0, html: [] }, images,
+    });
+    assert.equal(local.exitCode, 2);
+    assert.deepEqual(local.failureReasons, ['image-loss']);
+    assert.deepEqual(JSON.parse(JSON.stringify(local)), local);
+  }
 });

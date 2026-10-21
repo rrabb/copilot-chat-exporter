@@ -14,8 +14,8 @@
 // Source-safe message sequences are checked in order and for exact repeated occurrences.
 // Other text still gets presence accounting; overlapping or aggregated source records are not
 // treated as separate emitted messages.
-// This cannot see loss of content that is not text (images, opaque data). Treat "absent" as
-// proof of loss and "present" as necessary, not sufficient.
+// Images have a separate independent byte/hash check in images.ts. This text check cannot
+// verify opaque data. Treat "absent" as proof of loss and "present" as necessary, not sufficient.
 
 import { redactText } from '../redaction.ts';
 import { stripAnsi } from '../text.ts';

@@ -39,6 +39,7 @@ An unreviewed Local response kind is rendered as a collapsed, redacted JSON bloc
 
 Fence repair: a fence still open at the end of a turn is closed there and counted as a representation change. A non-text node no longer closes a fence in the middle of a turn. If a fence is ever closed before the end of a turn, the export reports the turn and interrupting kind, and `--strict` fails. A turn-end close does not fail `--strict`. Fence tracking recognizes both backtick and `~~~` fences (CommonMark rules: a closer uses the same character and is at least as long as the opener; a backtick opener whose info string contains a backtick is not a fence). Layer C's fence stripping uses the same rules. The edit-preview strips stay backtick-only, because the exporter writes those fences itself. Real data (83 Local journals): one early close before this rule (a `markdownVuln`), none after, and no turn-end closes.
 
+
 ### Agent chat export policy (approved October 14)
 
 Verification applies the same fence-repair rules to SDK and Local exports: early closes fail strict verification, while turn-end closes and HTML escapes are recorded without failing strict. The independent `markdown-it` check is loaded only for verification and tests. An unavailable parser fails `--verify --strict`.
@@ -62,7 +63,7 @@ Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backin
 | Turn and model-call boundary records | Used only for turn timing | Turn info elapsed time |
 | System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at the turn where it changed |
 | Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note in the turn |
-| Images | Keep | Companion file `image-<id>.<ext>`, shown inline |
+| Images | Keep | Exact recorded bytes in a companion file, deduplicated by SHA-256, linked at the recorded position with size and short hash |
 | Other binary attachments | Left out | A one-line note with type, MIME type and size |
 | Permission prompts and results, permission-change records | Left out, counted | "Left out of this export" |
 | Hook records | Left out, counted | Same |
@@ -71,6 +72,18 @@ Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backin
 | Usage and cache checkpoints | Left out, counted; the last running total is shown in the Cost section | Same |
 
 An event type outside both the kept and the left-out lists is reported as schema drift and fails `--verify --strict`, so a new SDK record cannot be dropped in silence. Nothing here deletes or modifies session data.
+### Recorded image policy
+
+Local prompt attachments and tool results use the same companion-file helper as SDK image assets. The exporter decodes recorded direct Base64 strings, `$base64` objects, byte arrays and numeric-keyed byte objects. It writes exact decoded bytes without resizing, re-encoding or an exporter size cap. It never opens a recorded image path or fetches a URL. Archives with image companions warn that images bypass text redaction and may contain private information.
+
+One file per unique SHA-256 is saved in the approved timestamped sibling folder. Every recorded position links to it with byte size and a 12-character SHA-256 label. Local prompt images appear in their prompt block. Tool images appear in their tool block, replacing raw encoded payloads. When only result metadata survives, a labeled image note follows that request's response. Draft `inputState.attachments` and `pendingRequests` copies are not extra submitted prompt positions; verification counts these draft records as `excludedNotSubmitted`. A matching submitted copy is still exported and hash-verified. This field counts excluded draft entries, not images that never appear in submitted requests.
+
+The recorded MIME type selects the extension. Missing or unsupported MIME types use `.bin` and a representation-change note. Recorded paths without bytes remain reference-only links. An image record with neither usable bytes nor a location gets an unresolved note and count. SDK `assetId` descriptors resolve against recorded binary assets and are not separate missing images. Image MIME telemetry without a payload is not an image record.
+
+All images remain companions in this pass, including unknown-origin terminal results and screenshot tools. `--inline-images` is deferred. Remote URLs are image references only when the record has an image type/MIME or the target has an image extension. Image URLs already inside exported text need no additional link. Non-image binaries and opaque reasoning remain metadata-only. Images bypass text redaction and can contain private information.
+
+Independent image verification reads final replayed Local requests and kept SDK image events with its own decoder, not the export helper. Every unique expected byte hash must match a linked companion. For an existing Local export, verification reads only its linked sibling companions, not recorded source-image paths. Missing, unlinked or corrupted companions fail verification, including without `--strict`. The text categories are unchanged: Base64 image fields were not counted as tool-output text before this check.
+
 ### Agent usage and credits (approved October 14)
 
 GitHub documents the per-call `assistant.usage` event as ephemeral and not replayed on resume, so the event log carries no per-call usage. Three recorded sources are used, most detailed first; the first one with rows wins and they are never added together.
@@ -754,8 +767,7 @@ are not failures by themselves.
 Layer D does not infer that adjacent text needs a separator: VS Code 1.141.2's version-matched
 [`chatModel.ts`](https://github.com/microsoft/vscode/blob/16507d91be0dc1ce4f94c04d4d0430210b8685d9/src/vs/workbench/contrib/chat/common/model/chatModel.ts)
 joins Markdown response parts with an empty separator. Persisted records do not retain enough provenance to decide
-whether any particular boundary needs a separator. The check also cannot see non-text content such as images or opaque
-data, and a distinct block whose text is a prefix of another remains ambiguous. Treat `absent` as proof of loss and
+whether any particular boundary needs a separator. This text check cannot verify opaque data. Images now have a separate independent hash check in [images.ts](../src/verify/images.ts); earlier Layer D results did not cover images. A distinct block whose text is a prefix of another remains ambiguous. Treat `absent` as proof of loss and
 `present` as necessary, not sufficient. Real-data baseline for the Local export, before the companion rule (82 journals,
 26,258 pieces on one development machine): assistant text and reasoning 100% present; 54 absent (request-error messages
 30, warnings 1, a few single huge output lines) and 141 partial (clipped tool and terminal output and 9 prompts). After

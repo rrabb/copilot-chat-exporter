@@ -8,9 +8,11 @@ import type { FenceRepairs } from '../markdown.ts';
 import type { LossAccount } from './loss-account.ts';
 import { parserCheckJson } from './parser-check.ts';
 import type { ParserCheckResult } from './parser-check.ts';
+import type { ImageAccount } from './images.ts';
 
 // Version 2 added the `parser` section and the `parser-check` failure reason.
-export const VERIFY_JSON_VERSION = 2;
+// Version 3 adds independent image accounting and the `image-loss` failure reason.
+export const VERIFY_JSON_VERSION = 3;
 
 interface VerificationCounts {
   rawRequestCount: number;
@@ -80,6 +82,7 @@ export function buildLocalVerifyJson (input: {
   loss: LossAccount;
   lossTarget: 'file' | 'in-memory';
   parser: ParserCheckResult;
+  images?: ImageAccount;
 }) {
   const { strict, report, census, crossCheck, render, fenceRepairs, loss } = input;
   // Same conditions as the text report's exit code, named so a corpus run can group failures.
@@ -89,6 +92,7 @@ export function buildLocalVerifyJson (input: {
   crossCheck.failed && reasons.push('layer-a-tool-ids');
   render?.failed && reasons.push('layer-c');
   input.parser.failed && reasons.push('parser-check');
+  input.images?.failed && reasons.push('image-loss');
   if (strict) {
     census.unhandled.length && reasons.push('unhandled-kind');
     census.unrecognizedToolData.length && reasons.push('unrecognized-tool-data');
@@ -122,6 +126,7 @@ export function buildLocalVerifyJson (input: {
       : { skipped: input.renderSkipReason, checks: [], failed: false },
     fenceRepairs: fenceRepairsJson(fenceRepairs),
     layerD: { target: input.lossTarget, ...lossJson(loss) },
+    ...(input.images ? { images: input.images } : {}),
     parser: parserCheckJson(input.parser),
   };
 }
@@ -133,10 +138,12 @@ export function buildSdkVerifyJson (input: {
   loss: LossAccount;
   parser: ParserCheckResult;
   fenceRepairs: FenceRepairs;
+  images?: ImageAccount;
 }) {
   const { strict, census, loss } = input;
   const reasons: string[] = [];
   input.parser.failed && reasons.push('parser-check');
+  input.images?.failed && reasons.push('image-loss');
   if (strict) {
     census.unhandled.length && reasons.push('unhandled-kind');
     loss.failed && reasons.push('layer-d');
@@ -152,6 +159,7 @@ export function buildSdkVerifyJson (input: {
     leftOut: Object.fromEntries(input.leftOut),
     fenceRepairs: fenceRepairsJson(input.fenceRepairs),
     layerD: { target: 'in-memory' as const, ...lossJson(loss) },
+    ...(input.images ? { images: input.images } : {}),
     parser: parserCheckJson(input.parser),
   };
 }

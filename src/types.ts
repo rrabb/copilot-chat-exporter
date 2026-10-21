@@ -12,6 +12,8 @@
 // Nothing in this file emits runtime code, so it can be edited without re-saving the recorded
 // exports the checks compare against.
 
+import type { RecordedImage } from './images.ts';
+
 /** Opaque journal request. Only `verify/` reads these - its cross-check must see raw data. */
 export type RawRequest = Record<string, unknown>;
 
@@ -111,6 +113,7 @@ export interface EditNode {
 
 export interface ToolNode {
   type: 'tool';
+  images?: RecordedImage[];
   toolId: string;
   /** The source passed the reviewed metadata-only field check. */
   noRecordedContent?: true;
@@ -241,6 +244,7 @@ export interface SubagentInfo {
  */
 export interface NoteNode {
   type: 'note';
+  images?: RecordedImage[];
   title: string;
   /** Full text shown in a collapsed block under the title. */
   text?: string;
@@ -323,6 +327,7 @@ export interface TurnScalars {
 
 /** One user prompt and everything the assistant did in reply. */
 export interface Turn {
+  promptImages?: RecordedImage[];
   /** Journal id, or a synthetic one when the journal omitted it. */
   requestId: string;
   ts: number | null;

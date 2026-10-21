@@ -14,6 +14,7 @@
 
 import { createHash } from 'node:crypto';
 import type { CompanionArtifact } from '../export-policy.ts';
+import { collectRecordedImages, saveImageCompanion } from '../images.ts';
 import type { Census, NoteNode, ParsedSession, ToolNode, Turn, TurnNode, TurnScalars } from '../types.ts';
 import { isRecord } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
@@ -437,14 +438,19 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
       case 'session.binary_asset': {
         const mime = text(data.mimeType);
         const encoded = text(data.data);
-        if (!mime.startsWith('image/') || !encoded) {
+        if ((!mime.startsWith('image/') && data.type !== 'image') || !encoded) {
           note({ type: 'note', title: `📎 Attachment not exported: ${text(data.type) || 'binary'} ${mime} (${(typeof data.byteLength === 'number' ? data.byteLength : 0).toLocaleString('en-US')} bytes)` });
           break;
         }
-        const extension = mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1]?.replace(/[^a-z0-9]/giu, '') || 'img';
-        const file = `image-${safeName(text(data.assetId) || digest(encoded))}.${extension}`;
-        const href = companion(file, mime, Buffer.from(encoded, 'base64'), 'image', event);
-        note({ type: 'note', title: `🖼️ Image${text(data.description) ? `: ${text(data.description)}` : ''}`, image: { href, alt: text(data.description) || file } });
+        const image = collectRecordedImages(data, { sourceId: 'sdk-events', recordId: event.id, field: 'session.binary_asset' })[0];
+        if (!image?.bytes) {
+          note({ type: 'note', title: 'Image unresolved: recorded bytes could not be decoded.' });
+          break;
+        }
+        const saved = saveImageCompanion(image, { assetsDirectory: options.assetsDirectory, companions }, `image-${safeName(text(data.assetId) || digest(encoded))}`);
+        const href = saved.href!;
+        const label = `${saved.size.toLocaleString('en-US')} bytes; SHA-256 ${saved.sha256!.slice(0, 12)}`;
+        note({ type: 'note', title: `🖼️ Image${text(data.description) ? `: ${text(data.description)}` : ''} (${label})${saved.representationChange ? ` - Representation change: ${saved.representationChange}` : ''}`, image: { href, alt: text(data.description) || 'Recorded image' } });
         break;
       }
       default:

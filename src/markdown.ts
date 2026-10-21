@@ -16,6 +16,8 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { planToolText } from './export-policy.ts';
 import type { CompanionArtifact, CompanionKind } from './export-policy.ts';
+import { collectRecordedImages, saveImageCompanion } from './images.ts';
+import type { RecordedImage } from './images.ts';
 import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
@@ -31,6 +33,36 @@ import {
 
 const MAX_EMBEDDED_RESOURCE_BYTES = 96 * 1024;
 const MAX_COPY_SOURCE_BYTES = 32 * 1024;
+let imageReplacements: Array<{ encoded: string; label: string }> = [];
+
+function imageResourceText (content: unknown): string {
+  let value = String(content ?? '');
+  for (const image of imageReplacements)
+    value = value.replaceAll(image.encoded, image.label);
+  return value;
+}
+
+function renderImages (images: RecordedImage[] = []): string[] {
+  const seen = new Set<string>();
+  return images.flatMap((image) => {
+    const identity = image.bytes ? createHash('sha256').update(image.bytes).digest('hex') : image.recordedLocation ?? image.alt;
+    if (seen.has(identity))
+      return [];
+    seen.add(identity);
+    if (!overflow)
+      return ['> Image unresolved: companion destination was not supplied.', ''];
+    const saved = saveImageCompanion(image, overflow);
+    if (!saved.href)
+      return ['> Image unresolved: the record has neither decodable bytes nor a location.', ''];
+    const href = saved.href.replaceAll('%', '%25').replaceAll(' ', '%20').replaceAll('(', '%28').replaceAll(')', '%29').replaceAll('<', '%3C').replaceAll('>', '%3E');
+    const alt = esc(image.alt).replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]');
+    return [
+      image.bytes ? `![${alt}](${href})` : `[${alt}](${href})`,
+      saved.sha256 ? `${saved.size.toLocaleString('en-US')} bytes; SHA-256 \`${saved.sha256.slice(0, 12)}\`.` : 'Image reference only; bytes were not recorded.',
+      ...(saved.representationChange ? [`> Representation change: ${saved.representationChange}`] : []), '',
+    ];
+  });
+}
 // A summary wraps to the next line rather than truncating, so the cap only exists to stop a
 // pathological one-liner (a multi-KB generated command) from burying the rows around it.
 const MAX_SUMMARY_CHARS = 1000;
@@ -122,7 +154,7 @@ export function markdownBody (content: unknown, sourcePath = '') {
 function resourceBody (resource: Resource) {
   if (resource.content == null)
     return [`> Non-text resource (${thousands(resource.bytes)} bytes): \`${workspacePath(resource.filePath)}\``];
-  const content = redact(resource.content);
+  const content = redact(imageResourceText(resource.content));
   const withinLimit = Buffer.byteLength(content, 'utf8') <= MAX_EMBEDDED_RESOURCE_BYTES;
   if (withinLimit && /\.md$/i.test(resource.filePath ?? ''))
     return markdownBody(content);
@@ -358,7 +390,8 @@ function unrenderedResultDetails (node: ToolNode): unknown | null {
       if (!part || typeof part !== 'object')
         return true;
       const outputPart = part as Record<string, unknown>;
-      return outputPart.isText !== true || typeof outputPart.value !== 'string';
+      return !(overflow && node.images?.length && collectRecordedImages(outputPart).length)
+        && (outputPart.isText !== true || typeof outputPart.value !== 'string');
     });
     if (unrenderedOutput.length)
       remainder.output = unrenderedOutput;
@@ -431,7 +464,7 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
   const head = `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: ${summaryHtml}`;
   const hasDetails = node.toolSpecificData && node.toolSpecificData.kind !== 'terminal' && node.toolSpecificData.kind !== 'todoList';
   const resultDetails = unrenderedResultDetails(node);
-  const hasBody = node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
+  const hasBody = node.images?.length || node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
   // Nothing to expand: render a plain line rather than an empty collapsible.
   if (!hasBody)
     return [`- ${mutedSummary(node.noRecordedContent
@@ -482,6 +515,7 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
   }
   if (node.resultText)
     body.push(...toolTextBlock(`📦 Tool result (${thousands(node.resultText.split('\n').length)} lines)`, redact(node.resultText), 'text', { kind: 'tool-result', label: 'tool-result', toolCallId: node.toolCallId }));
+  body.push(...renderImages(node.images));
   if (node.resultError)
     body.push(...toolTextBlock('⚠️ Tool error', redact(node.resultError), 'text', { kind: 'tool-result', label: 'tool-error', toolCallId: node.toolCallId }));
   if (node.detailText) {
@@ -521,7 +555,7 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
 // A recorded event that is not prose, reasoning or a tool call. One line when it has no body.
 function renderNote (node: NoteNode) {
   const link = node.link ? ` - [${esc(node.link.label)}](${node.link.href.replaceAll(' ', '%20')})` : '';
-  const image = node.image ? [`![${esc(node.image.alt)}](${node.image.href.replaceAll(' ', '%20')})`, ''] : [];
+  const image = [...(node.image ? [`![${esc(node.image.alt)}](${node.image.href.replaceAll(' ', '%20')})`, ''] : []), ...renderImages(node.images)];
   if (!node.text)
     return [`> ${esc(node.title)}${link}`, '', ...image];
   const text = closeUnbalancedFences(neutralizeStructuralHtml(redact(node.text)));
@@ -671,7 +705,7 @@ function continuationOf (node: ToolNode, turn: number, previous: Map<string, Pre
   const fields: Array<keyof ToolNode> = [
     'toolId', 'invocation', 'pastTense', 'title', 'command', 'promptText', 'inputText', 'inputLanguage',
     'resultDetails', 'todos', 'output', 'exitCode', 'duration', 'resultText', 'resultError',
-    'detailText', 'intent', 'subagent', 'fileUri', 'patchFiles', 'toolSpecificData', 'isComplete',
+    'detailText', 'intent', 'subagent', 'fileUri', 'patchFiles', 'toolSpecificData', 'isComplete', 'images',
   ];
   const original = history.find((entry) => entry.turn < turn
     && fields.every((key) => containsRecordedValue(entry.node[key], node[key])));
@@ -772,6 +806,10 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
         `- ${mutedSummary(`${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: continued from turn ${from}.`)}`,
       ]), '');
     } else if (node.type === 'note') {
+      if (node.images?.length && fenceOpen()) {
+        held.push(...renderNote(node), '');
+        continue;
+      }
       flush({ interrupter: 'note' });
       flushThoughts();
       stripLeadFence = false;
@@ -1078,11 +1116,22 @@ function subagentSummaryLine (toolNodes: ToolNode[]): string[] {
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
   overflow = context.overflow ?? null;
   fenceRepairs = context.fenceRepairs ?? null;
+  const collect = (turns: Turn[]): RecordedImage[] => turns.flatMap((turn) => [
+    ...(turn.promptImages ?? []),
+    ...turn.body.flatMap((node) => node.type === 'tool'
+      ? [...(node.images ?? []), ...(node.subagent ? collect(node.subagent.turns) : [])]
+      : node.type === 'note' ? node.images ?? [] : []),
+  ]);
+  imageReplacements = [...new Map(collect(session.turns).filter((image) => image.bytes).map((image) => [
+    Buffer.from(image.bytes!).toString('base64'),
+    `[recorded image saved separately; SHA-256 ${createHash('sha256').update(image.bytes!).digest('hex').slice(0, 12)}]`,
+  ])).entries()].map(([encoded, label]) => ({ encoded, label }));
   try {
     return buildDocumentBody(session, context);
   } finally {
     overflow = null;
     fenceRepairs = null;
+    imageReplacements = [];
   }
 }
 
@@ -1136,6 +1185,8 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     sdk
       ? '> Conversation archive sourced from the Copilot SDK event log (Agent Host / Copilot CLI): prompts, readable reasoning, assistant messages, tool calls with inputs, outputs and errors, code blocks and timing.'
       : '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',
+    ...(imageReplacements.length || context.overflow?.companions.some((item) => item.kind === 'image')
+      ? ['', '> Images bypass text redaction and may contain private information. Review image companions before sharing.'] : []),
     '',
     '## Session Metadata',
     '',
@@ -1296,6 +1347,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       '',
       prompt,
       '',
+      ...renderImages(turn.promptImages),
       '</div>',
       '',
       ...promptNotes,

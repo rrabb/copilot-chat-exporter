@@ -50,6 +50,7 @@ export const GOLDEN_SYNTHETIC_NOTES = [
 export function normalizeRender (markdown: string): string {
   return String(markdown)
     .replace(/^- \*\*Export generated:\*\* .*$/m, '- **Export generated:** <volatile>')
+    .replace(/\bgolden\.render_assets_\d{6}_\d{6}(?:_\d+)?\//gu, 'golden.render_assets_<volatile>/')
     .replace(/(### Current Worktree Snapshot\n\n```text\n)[\s\S]*?(\n```)/, '$1<volatile>$2')
     .replace(/(### Chat Export Artifact\n\n)- `[^`]*`$/m, '$1- `<volatile>`')
     .replace(/^(- (?:✏️|🆕) (?:modified|created) `[^`]+`)(?: \((?:[\d,]+|<volatile>) lines\))?$/gm, '$1');

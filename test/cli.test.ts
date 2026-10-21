@@ -168,7 +168,7 @@ test('--verify --json writes one JSON document with counts and the same exit cod
   const lines = result.stdout.trim().split('\n');
   assert.equal(lines.length, 1, 'JSON mode prints nothing but the document');
   const report = JSON.parse(lines[0]!);
-  assert.equal(report.version, 2);
+  assert.equal(report.version, 3);
   assert.equal(report.path, 'local');
   assert.equal(report.parser.failed, false);
   assert.equal(report.parser.skipped, null, 'the dev parser is installed, so the check runs');

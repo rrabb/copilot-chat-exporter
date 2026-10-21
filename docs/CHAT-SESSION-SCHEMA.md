@@ -12,6 +12,14 @@ in this project's local sessions. Every section labels which kind of evidence it
 
 ## Start Here
 
+### Recorded image bytes
+
+**Observed here:** Local final requests contain image attachments under `variableData.variables[].value`, including objects with a `$base64` string. Tool images appear in `result.metadata.toolCallResults[toolCallId].content[].data` and response `resultDetails.output[].value` as direct Base64 strings paired with image MIME types. Draft attachment mutations also contain a numeric-keyed byte object. Draft attachments are not submitted prompts and are counted separately.
+
+**Observed here:** SDK `session.binary_asset` events contain recorded image bytes. Tool-result and user-attachment descriptors refer to them through `assetId`; the descriptor alone is not proof that bytes are missing. MIME telemetry objects do not contain another image.
+
+**Exporter policy:** [images.ts](../src/images.ts) decodes recorded bytes and plans shared companions. [verify/images.ts](../src/verify/images.ts) independently decodes raw final requests and kept SDK events, then compares expected SHA-256 hashes with linked companions. It does not call the export decoder. See [the image policy](SPEC.md#recorded-image-policy) for destination, exclusions and unresolved records.
+
 ### Detailed listing enrichment
 
 **Observed here / exporter policy:** [listing-evidence.ts](../src/session/listing-evidence.ts) adds read-only identification metadata after inventory verification. Its typed [contracts](../src/session/listing-evidence-types.ts) preserve title/date provenance, prompts, answering versus selected model evidence, edit/history state, artifacts, scoped sizes and diagnostics. Journal metadata comes from the same final replayed state as the exporter; a callback on `parseChatSession` observes that state without changing ordinary export output. Supported editing-history operations are counted only for matching recorded request IDs.

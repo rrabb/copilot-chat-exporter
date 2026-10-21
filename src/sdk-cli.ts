@@ -12,6 +12,7 @@ import { printLossAccount } from './verify/loss-report.ts';
 import { buildSdkVerifyJson } from './verify/json-report.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { errorLabel } from './text.ts';
+import { verifySdkImages } from './verify/images.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -78,8 +79,10 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
     const drift = result.session.census.unhandled;
     drift.length && console.log(`Schema drift: ${drift.length} unhandled SDK event type(s) - ${drift.map(([kind, count]) => `${kind}=${count}`).join(', ')}.`);
     const account = buildSdkLossAccount(result.events, result.markdown, companionText(result));
+    const images = verifySdkImages(result.events, result.markdown, result.companions);
     printLossAccount(account, 'the exported Markdown and its companion files');
-    return options.strict && (account.failed || drift.length) ? 2 : 0;
+    console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved.`);
+    return images.failed || (options.strict && (account.failed || drift.length)) ? 2 : 0;
   } catch (error) {
     console.error(errorLabel(error));
     return 1;
@@ -93,9 +96,10 @@ function companionText (result: SdkExport): string {
 async function verifyReport (preview: SdkExport, strict: boolean, json: boolean): Promise<number> {
   const account = buildSdkLossAccount(preview.events, preview.markdown, companionText(preview));
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
+  const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
   const drift = preview.session.census.unhandled;
   if (json) {
-    const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, parser, fenceRepairs: preview.fenceRepairs });
+    const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, parser, fenceRepairs: preview.fenceRepairs, images });
     process.stdout.write(`${JSON.stringify(report)}\n`);
     return report.exitCode;
   }
@@ -106,8 +110,9 @@ async function verifyReport (preview: SdkExport, strict: boolean, json: boolean)
     : console.log('- Unhandled event types: none');
   console.log(`- Left out on purpose: ${[...preview.leftOut].map(([name, count]) => `${name} ${count}`).join('; ') || 'nothing'}`);
   printLossAccount(account, 'the Markdown this build would write');
+  console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved, ${images.referenceOnly} reference-only.`);
   console.log(formatParserCheck(parser, 'in-memory build').join('\n'));
   const { early, turnEnd, html } = preview.fenceRepairs;
   console.log(`Code fences closed by the exporter: ${early.length} before the end of a turn, ${turnEnd} at the end of a turn; HTML escapes: ${html.length}. Only early closes fail --strict.`);
-  return parser.failed || (strict && (account.failed || drift.length > 0 || early.length > 0)) ? 2 : 0;
+  return images.failed || parser.failed || (strict && (account.failed || drift.length > 0 || early.length > 0)) ? 2 : 0;
 }

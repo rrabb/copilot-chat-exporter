@@ -17,6 +17,7 @@
 import type { AutoModelResolution, ParsedSession } from '../types.ts';
 import { COLLATOR, parseJson } from '../text.ts';
 import { workspacePath } from '../host.ts';
+import { collectRecordedImages } from '../images.ts';
 import {
   GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
   GENERIC_RESPONSE_KINDS, IGNORED_RESPONSE_KINDS, classifyNode, fileOperation, thinkingText,
@@ -218,6 +219,7 @@ export function parseChatSession (
     next.resultDetails != null && (target.resultDetails = next.resultDetails);
     next.output && (target.output = next.output);
     next.resultText && (target.resultText = next.resultText);
+    next.images?.length && (target.images = next.images);
     next.fileUri && !target.fileUri && (target.fileUri = next.fileUri);
     next.toolSpecificData && (target.toolSpecificData = next.toolSpecificData);
     Array.isArray(next.todos) && next.todos.length && (target.todos = next.todos);
@@ -251,7 +253,7 @@ export function parseChatSession (
     .map((request: any) => {
       const requestId = request?.requestId || `synthetic_request_${++syntheticRequestId}`;
       const promptText = messageText(request?.message).trim();
-      if (!promptText)
+      if (!promptText && !collectRecordedImages(request.variableData).length)
         return null;
 
       const nodes = [];
@@ -308,6 +310,25 @@ export function parseChatSession (
       collectThinking(request, thoughts);
       const reasoning = collapsePrefixes(thoughts);
 
+    for (const node of nodes) {
+      if (node.type !== 'tool')
+        continue;
+      const images = [
+        ...collectRecordedImages(node.resultDetails, { sourceId: 'local-journal', requestId, toolCallId: node.toolCallId, field: 'resultDetails' }),
+        ...collectRecordedImages(request.result?.metadata?.toolCallResults?.[node.toolCallId], {
+          sourceId: 'local-journal', requestId, toolCallId: node.toolCallId, field: 'toolCallResults',
+        }),
+      ];
+      images.length && (node.images = images);
+    }
+    // A result can survive without its response node. Keep it at the end of that request rather
+    // than attaching it to another tool with similar text.
+    for (const [id, result] of Object.entries(request.result?.metadata?.toolCallResults ?? {})) {
+      if (nodes.some((node) => node.type === 'tool' && node.toolCallId === id))
+        continue;
+      const images = collectRecordedImages(result, { sourceId: 'local-journal', requestId, toolCallId: id, field: 'toolCallResults' });
+      images.length && nodes.push({ type: 'note' as const, title: 'Recorded image result without a response tool record', images });
+    }
     const prose = nodes.filter((node) => node.type === 'text' || node.type === 'ref');
     const toolNodes = nodes.filter((node) => node.type === 'tool');
     const todosNode = [...toolNodes].reverse().find((node) => Array.isArray(node.todos) && node.todos.length);
@@ -344,6 +365,7 @@ export function parseChatSession (
       const requestError = typeof request?.result?.errorDetails?.message === 'string' ? request.result.errorDetails.message : '';
       return {
         requestId, ts: request?.timestamp ?? null, prompt: promptText, reasoning, prose, body,
+        promptImages: collectRecordedImages(request.variableData, { sourceId: 'local-journal', requestId, field: 'variableData' }),
         toolNodes, todos, filesTouched, scalar, ...(requestError ? { requestError } : {}),
       };
     })

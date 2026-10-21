@@ -48,6 +48,10 @@ export { buildDocument } from './markdown.ts';
 export type { FenceRepairs, TextOverflow } from './markdown.ts';
 export { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
 export { buildLossAccount } from './verify/loss-account.ts';
+export { collectRecordedImages, saveImageCompanion } from './images.ts';
+export type { RecordedImage } from './images.ts';
+export { verifyLocalImages, verifySdkImages } from './verify/images.ts';
+export type { ImageAccount } from './verify/images.ts';
 export { VALIDATED_AGAINST } from './session/classify.ts';
 
 /**
