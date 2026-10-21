@@ -5,10 +5,16 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 // @ts-expect-error The corpus runner is a plain .mjs script without declarations.
-import { countBase64LikeStrings, runCorpus, scanBase64, selectCorpusSources, sourceChanged, totalize } from '../scripts/verify-corpus.mjs';
+import { countBase64LikeStrings, defaultCorpusPath, runCorpus, scanBase64, selectCorpusSources, sourceChanged, totalize } from '../scripts/verify-corpus.mjs';
 
 const LOCAL = '11111111-1111-4111-8111-111111111111';
 const AGENT = 'cccccccc-1111-4111-8111-111111111111';
+
+test('the default corpus filename comes from generatedAt and distinguishes runs on the same date', () => {
+  assert.equal(path.basename(defaultCorpusPath('2026-10-21T03:59:59.000Z', 240)), 'corpus-2026-10-20T23-59-59-000-04-00.json');
+  assert.equal(path.basename(defaultCorpusPath('2026-10-20T20:00:00.000Z', -330)), 'corpus-2026-10-21T01-30-00-000+05-30.json');
+  assert.notEqual(defaultCorpusPath('2026-10-20T23:59:59.000Z', 240), defaultCorpusPath('2026-10-20T23:59:59.001Z', 240));
+});
 
 test('base64 trigger counts string values at 64 KiB, not keys or shorter runs', () => {
   const value = 'Ab09+/'.repeat(10923);
@@ -92,7 +98,7 @@ test('the corpus runner verifies every Local journal and SDK chat and writes one
   assert.deepEqual(sdk.failureReasons, ['unhandled-kind']);
   assert.deepEqual(report.totals.failureReasons, { 'unhandled-kind': 1 });
   assert.deepEqual(report.totals.byExitCode, { 0: 1, 2: 1 });
-  assert.equal(report.version, 4);
+  assert.equal(report.version, 5);
   assert.deepEqual(local.base64Like, { count: 0, thresholdBytes: 65536, invalidLines: 0 });
   assert.deepEqual(report.totals.changedDuringRun, []);
   assert.equal(local.changedDuringRun, false);
@@ -139,4 +145,22 @@ test('sources whose size or mtime changed during the run are listed and excluded
   assert.equal(sourceChanged({ size: 1, mtimeMs: 1 }, { size: 2, mtimeMs: 1 }), true);
   assert.equal(sourceChanged({ size: 1, mtimeMs: 1 }, { size: 1, mtimeMs: 2 }), true);
   assert.equal(sourceChanged(null, { size: 1, mtimeMs: 1 }), true, 'a source that could not be read counts as changed');
+});
+
+test('corpus image totals deduplicate by format and keep a hash missing if any source loses it', () => {
+  const item = (kind: string, missing: boolean, changedDuringRun = false) => ({
+    label: 'fixture', kind, changedDuringRun, exitCode: missing ? 2 : 0, failureReasons: missing ? ['image-loss'] : [],
+    checked: 0, categories: {}, parserMs: 0,
+    images: { hashes: ['same-hash'], foundHashes: missing ? [] : ['same-hash'], missingHashes: missing ? ['same-hash'] : [],
+      unresolved: 0, referenceOnly: 0, excludedNotSubmitted: 0 },
+  });
+  const complete = totalize([item('local', false), item('local', false), item('sdk:agent-host', false), item('local', true, true)]);
+  assert.equal(complete.images.Local.unique, 1);
+  assert.equal(complete.images.Local.found, 1);
+  assert.equal(complete.images.Local.missing, 0);
+  assert.equal(complete.images.SDK.unique, 1, 'Local and SDK totals are independent');
+  const loss = totalize([item('local', false), item('local', true)]);
+  assert.equal(loss.images.Local.unique, 1);
+  assert.equal(loss.images.Local.found, 0, 'another export having the bytes does not excuse this source losing them');
+  assert.equal(loss.images.Local.missing, 1);
 });

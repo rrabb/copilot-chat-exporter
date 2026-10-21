@@ -2,7 +2,11 @@
 
 ## Current status
 
-Snapshot: October 20, 2026, after the approved corrections. The committed fence pass (`e9a84ff`, `22a2f5d`, `70f0898`) is unchanged. This checkpoint completes the eight approved commits; nothing has been pushed. The parser now fails strict verification when unavailable; markdown-it 14.3.3 and its types 14.2.0 are pinned. SDK fence repairs are reported and strict-gated like Local. The ID-only exemption was replaced with a reviewed metadata-only field check and an explicit missing-data note, counted separately as `tool-no-content`. Redundant cross-turn tool copies get identity-keyed continuation notes; new content and hidden tool calls are kept. Unclosed `pre` tags now join the HTML escapes, which remain recorded changes rather than strict failures. Forward-only privacy replacements and a guard test are done; Git history and session data are unchanged. Both final `npm run verify` runs passed 532/532 tests, including the browser test, and matched the golden output exactly ([run 1](temp-tool-output/verify-approved-final1-20261020.log), [run 2](temp-tool-output/verify-approved-final2-20261020.log), local-only). Build passed ([log](temp-tool-output/build-final-20261020.log), local-only). Latest runner report: [corpus-2026-10-20-corrections-final.json](reports/corpus/corpus-2026-10-20-corrections-final.json), local-only and gitignored. All 109 sources exited 0; S023 changed during its run and is excluded from totals and comparisons. The 108 stable sources contain 88,182 content pieces, all present, plus 288 `tool-no-content` representations. There are no parser failures, skips or early/turn-end fence closes. Stable SDK sources have 3 recorded HTML escapes; Local has none. The base64 trigger fired: 370 qualifying string values across 21 stable sources, with 0 invalid scan lines. Extraction remains backlog work. The log's structure, decision table and research requirement are unchanged. There is no losslessness claim.
+**Current image pass (October 21, 2026, local UTC-04:00):** the user approved commits 1-3 after the read-only answers and added a local-offset corpus filename, synthetic golden image and Local image warning. Commit 1 is `942d7b2` (532/532 tests and build). Commit 2 is `29859ca` (540/540 and build). Both were verified as isolated cumulative index snapshots at the normal sibling-folder depth. Commit 3 is being prepared. Local prompt and tool images use exact-byte, SHA-256-deduplicated companions through a helper shared with SDK exports. Layer D has an independent image decoder/hash check. All earlier Layer D results below covered text, not images. Inline images remain deferred. The latest runner verified 109 stable sources, all exit 0, with 114/114 Local and 124/124 SDK hashes found, zero missing/unresolved, and 100,404 text pieces present ([JSON](reports/corpus/corpus-2026-10-21T00-07-11-852-04-00.json), local-only and gitignored). Reports now use local time with offset in filenames and keep UTC `generatedAt`. No native session data or Git history was changed.
+
+### Previous pushed baseline
+
+Snapshot: October 20, 2026, after the approved corrections and push. The committed fence pass (`e9a84ff`, `22a2f5d`, `70f0898`) is unchanged. All eight approved commits are complete and pushed; `git ls-remote --heads origin main` confirmed remote HEAD matches `3cc3a704265314bb6abd1f97156fc9744fa038a5`. The parser now fails strict verification when unavailable; markdown-it 14.3.3 and its types 14.2.0 are pinned. SDK fence repairs are reported and strict-gated like Local. The ID-only exemption was replaced with a reviewed metadata-only field check and an explicit missing-data note, counted separately as `tool-no-content`. Redundant cross-turn tool copies get identity-keyed continuation notes; new content and hidden tool calls are kept. Unclosed `pre` tags now join the HTML escapes, which remain recorded changes rather than strict failures. Forward-only privacy replacements and a guard test are done; Git history and session data are unchanged. Both final `npm run verify` runs passed 532/532 tests, including the browser test, and matched the golden output exactly ([run 1](temp-tool-output/verify-approved-final1-20261020.log), [run 2](temp-tool-output/verify-approved-final2-20261020.log), local-only). Build passed ([log](temp-tool-output/build-final-20261020.log), local-only). Latest runner report: [corpus-2026-10-20-corrections-final.json](reports/corpus/corpus-2026-10-20-corrections-final.json), local-only and gitignored. All 109 sources exited 0; S023 changed during its run and is excluded from totals and comparisons. The 108 stable sources contain 88,182 content pieces, all present, plus 288 `tool-no-content` representations. There are no parser failures, skips or early/turn-end fence closes. Stable SDK sources have 3 recorded HTML escapes; Local has none. The base64 trigger fired: 370 qualifying string values across 21 stable sources, with 0 invalid scan lines. Extraction remains backlog work. The log's structure, decision table and research requirement are unchanged. There is no losslessness claim.
 
 | Workstream | Tasks | State | Evidence / what remains |
 | --- | --- | --- | --- |
@@ -15,11 +19,11 @@ Snapshot: October 20, 2026, after the approved corrections. The committed fence 
 | Source-aware verification and schema drift | #10, #11 | Committed: JSON reports, corpus runner, parser, fuzz, D1-D6 and approved corrections | SDK gate and continuation notes done; no losslessness claim |
 | Documentation | #12, #24, #27, #28 | README and SPEC now document JSON verification, corpus checks and the approved tool/HTML policies | Final cross-surface review remains |
 | Acceptance | #13 | Both final full suites pass; all sources exit 0, with S023 excluded from comparisons because it changed | Interactive terminal acceptance remains |
-| Repository state | #31, #32 | Eight approved commits complete; not pushed | Five user-owned customization changes remain excluded. Graph last re-indexed October 14 and is stale |
+| Repository state | #31, #32 | Eight approved commits complete and pushed | Five user-owned customization changes remain excluded. This post-push log receipt is unstaged; no ninth commit was made. Graph last re-indexed October 14 and is stale |
 
 ## Next action
 
-Next: finish the parent's privacy/research review, then push the approved commits. No push has run. The eight groups below were validated as cumulative index snapshots in a sibling folder at the same depth as the project, isolated from later unstaged edits. User-owned customization files stay out. No history rewrite. Work-log restructuring is deferred to the next pass.
+Next: verify and commit approved group 3, then push all three. After push, restructure the work log, then implement terminal delta rendering, then profile S015 verification without optimizing it. User-owned customization files stay out. No history rewrite. The eight groups below are the previously pushed baseline.
 
 | Group | Commit / scope | `npm run verify` tests | `npm run build` |
 | --- | --- | --- | --- |
@@ -30,9 +34,9 @@ Next: finish the parent's privacy/research review, then push the approved commit
 | 5 | `3eb404a`: reviewed missing-tool-content representation | 504/504 | Passed |
 | 6 | `05a9326`: container fences, BOM and HTML repairs | 516/516 | Passed |
 | 7 | `932b7cb`: deterministic fuzz tests | 530/530 | Passed |
-| 8 | This checkpoint: ignore rules, log and forward-only privacy scrub | 532/532 | Passed |
+| 8 | `3cc3a70`: ignore rules, log and forward-only privacy scrub | 532/532 | Passed |
 
-Evidence: local-only `temp-tool-output/approved-snapshot-N-verify.log` and `approved-snapshot-N-build.log` for groups 1-8. Group 1's passing verify log has the suffix `-verify-retry.log`. Its first run failed the generated-asset check because the committed generated license string reflects CRLF in `docs/BROTLI-NOTICES.txt`, while an index checkout produced LF. Validation used CRLF for that notice file, matching the existing Windows worktree without changing its normalized Git blob. This checkout sensitivity remains a limitation, not a clean-LF verification claim. All subsequent snapshot runs passed generated checks, both typechecks, tests and golden checks. No browser retry was needed in this series.
+Evidence: local-only `temp-tool-output/approved-snapshot-N-verify.log` and `approved-snapshot-N-build.log` for groups 1-8. Group 1's passing verify log has the suffix `-verify-retry.log`. Its first run failed the generated-asset check because the committed generated license string reflects CRLF in `docs/BROTLI-NOTICES.txt`, while an index checkout produced LF. Validation used CRLF for that notice file, matching the existing Windows worktree without changing its normalized Git blob. This was a limitation at that checkpoint. The separate clean-checkout fix below removes it without changing the notice text. All subsequent snapshot runs passed generated checks, both typechecks, tests and golden checks. No browser retry was needed in this series.
 
 The earlier `corpus-2026-10-21.json` filename is mislabeled: its `generatedAt` is `2026-10-20T18:37:05.940Z`. The final report records `2026-10-20T20:05:36.967Z`. October 20 is the correct UTC date. Both artifacts remain unchanged.
 
@@ -40,7 +44,97 @@ Read-only follow-up evidence: local-only `temp-tool-output/base64-field-audit-20
 
 The read-only backup audit found 26 journals in `%APPDATA%\Code\User\workspaceStorage\<workspace-hash>\bkup2\chatSessions`. The 418-occurrence inventory contains no `bkup2` entries. Four terminal carryovers with new content currently render the entire later copy: `continuationOf` returns null, then `renderToolNode` renders it. Rendering just the delta is proposed, not implemented.
 
-## Layer D category totals
+## Local image pass: final results
+
+The implementation handles recorded direct Base64, `$base64` objects, byte arrays and numeric-keyed byte objects. It saves exact bytes, deduplicates companions by SHA-256 and links them at their recorded prompt/tool positions. Local metadata images without a surviving response tool node get an image note after that request. SDK uses the same helper and keeps its existing preferred filenames unless deduplication or a filename collision requires another name. No image is loaded from a recorded source path or URL. Images bypass text redaction.
+
+The image decoder in `src/verify/images.ts` is independent of `src/images.ts`. Final replayed Local requests define the submitted images. The verifier checks linked companion bytes, not arbitrary equal text elsewhere. Deleted, corrupted, unlinked or fenced-out image companions count as loss. The JSON report fails on image loss even without strict. Unresolved and reference-only records are separate counts. All Layer D results before this change excluded images; their passing text accounts were not evidence that images were kept.
+
+Final evidence: [runner JSON](reports/corpus/corpus-2026-10-21T03-32-34-259Z.json), local-only and gitignored. Command: `node scripts/verify-corpus.mjs --user-data-root "$env:APPDATA\Code" --concurrency 6`. The omitted `--out` exercised the default derived from the full `generatedAt` timestamp. The report records `2026-10-21T03:32:34.259Z`; that is genuinely October 21 UTC, not one of the earlier mislabeled October 20 artifacts. The runner finished in 140,894 ms. It checks 83 Local and 26 SDK sources, all stable during their runs and all exit 0. The text account contains 100,198 pieces, all present. Parser failures and skips are both zero.
+
+| Images | Unique submitted/kept hashes | Found | Missing | Unresolved | Reference-only | Excluded draft entries |
+| --- | --- | --- | --- | --- | --- | --- |
+| Local | 114 | 114 | 0 | 0 | 0 | 11 |
+| SDK | 124 | 124 | 0 | 0 | 0 | 0 |
+
+The excluded Local count is per draft/snapshot image entry, deduplicated within that draft record, not 11 distinct images. Read-only follow-up found 8 distinct hashes among those 11 entries. Ten draft occurrences (7 hashes) also appear in final submitted requests and are exported there. Only the numeric-keyed attachment hash is absent from final requests. The name `excludedNotSubmitted` means these draft copies are not additional submitted positions; it does not mean their bytes never occur in a submitted request. The raw-record audit had 115 Local hashes; the submitted requirement has 114. SDK has 124. There is no Local/SDK overlap among required hashes, so 238 kept/submitted hashes are verified. The raw audit's 239 included the one unsubmitted hash.
+
+### Approval follow-up, October 21
+
+Read-only [reconciliation](temp-tool-output/image-approval-readonly-20261021.json), local-only, compares the 88,182-piece stable baseline with the requested 100,198-piece run. Local and all other SDK sources have zero delta. S023 was previously excluded, not absent from discovery.
+
+| Category delta | S002 growth | S004 growth | S023 newly included | Total |
+| --- | --- | --- | --- | --- |
+| prompt | 2 | 4 | 28 | 34 |
+| assistant-text | 4 | 5 | 368 | 377 |
+| reasoning | 4 | 33 | 1,048 | 1,085 |
+| tool-intent | 12 | 22 | 2,820 | 2,854 |
+| tool-input | 12 | 22 | 2,839 | 2,873 |
+| tool-output | 12 | 21 | 2,938 | 2,971 |
+| tool-detail | 7 | 6 | 1,571 | 1,584 |
+| tool-error | 0 | 1 | 39 | 40 |
+| system-prompt | 1 | 1 | 13 | 15 |
+| skill-file | 0 | 1 | 3 | 4 |
+| compaction-summary | 0 | 0 | 179 | 179 |
+| Total | 54 | 116 | 11,846 | 12,016 |
+
+The 11 draft entries are L021 line 10 `inputState.attachments[1]`, line 550 indices 0/1 and line 553 indices 0/1; L023 lines 222/246 `inputState.attachments[0]`; L025 line 164 `inputState.attachments[1]`; L037 line 51 `inputState.attachments[0]`; L064 line 443 `inputState.attachments[0]` and line 782 `pendingRequests[0].request.variableData.variables[1]`. Only L025's numeric-keyed bytes have no final submitted counterpart. The other ten use `$base64` objects and their submitted copies are kept. Previous wording implying all 11 were never submitted was incorrect.
+
+`src/verify/images.ts` imports Node APIs, the existing fence scanner, and the companion type. It defines `recordedBytes` independently and does not import `src/images.ts` or its `decodeRecordedImage`. The golden fixture now has a synthetic 68-byte PNG. Expected Markdown pins its image link, MIME extension, size and short hash; normalization masks only the volatile companion folder timestamp. Local exports previously lacked the image-redaction warning. Commit 2 adds and tests the warning in the archive itself. Digest data is unchanged, while expected Markdown intentionally adds five lines.
+
+The post-addition [runner report](reports/corpus/corpus-2026-10-21T00-07-11-852-04-00.json), local-only, has 100,404 text pieces, all present, and the same image totals. Its Local Markdown is 40,509,424 bytes, companions 28,280,388 and combined 68,789,812. L023 is 2,340,095 Markdown bytes plus 8,796,274 companion bytes, total 11,136,369. The warning accounts for the Local size increase since the previous image report. Live SDK growth means this newer text total must not be substituted into the earlier reconciliation.
+
+Snapshot validation logs are local-only: `temp-tool-output/image-snapshot-1-verify-retry-20261021.log`, `image-snapshot-1-build-20261021.log`, `image-snapshot-2-verify-20261021.log`, `image-snapshot-2-build-20261021.log`. The first snapshot attempt lacked a Git repository, so the privacy test could not run. Initializing an isolated Git index fixed the harness, not exporter code. The retry passed 532/532. Group 2 passed 540/540. Neither had a browser retry.
+
+### Before and after sizes
+
+Both measurements come from the same reproducible runner in this worktree; its latest changes are not committed yet. The before run passed `cli: 'C:\\_DEV\\copilot-chat-exporter-clean-verify-20261020\\src\\cli.ts'` to `runCorpus`: the `3cc3a70` clean-clone renderer plus the notice-line-ending fix, without image changes. Evidence: [before JSON](reports/corpus/corpus-2026-10-21-images-before.json), [after JSON](reports/corpus/corpus-2026-10-21T03-32-34-259Z.json) and [source-matched comparison](temp-tool-output/image-corpus-comparison-final-20261020.json), all local-only and gitignored. All 83 Local sources match by exact selector, size and mtime across runs. S023 grew between runs, so comparisons exclude it even though each individual run found it stable. The other 108 sources have identical text checked totals before and after: 88,352.
+
+| Local archives | Before bytes | After bytes |
+| --- | --- | --- |
+| Markdown, all 83 | 65,942,257 | 40,508,083 |
+| Companions, all 83 | 6,031,150 | 28,280,388 |
+| Markdown plus companions, all 83 | 71,973,407 | 68,788,471 |
+| Largest combined archive, L023: Markdown | 16,249,739 | 2,339,986 |
+| Largest combined archive, L023: companions | 154,958 | 8,796,274 |
+| Largest combined archive, L023: total | 16,404,697 | 11,136,260 |
+
+### Read-only checks before implementation
+
+The [provenance audit](temp-tool-output/image-provenance-readonly-20261020.json), local-only, confirmed all 25 metadata hashes previously missing everywhere are in final replayed requests. They were current loss, not replaced-request history. The expanded raw inventory had 239 unique hashes across direct Base64, `$base64` and numeric-keyed objects plus SDK assets: 115 Local and 124 SDK. It found 17 submitted attachment occurrences with 15 hashes, all absent before this change. The standalone Local image-URL count was zero. A separate [SDK URL check](temp-tool-output/image-standalone-sdk-urls-20261020.json), local-only, also found zero standalone image-URL records. The previously reported 360 unique explicit image URLs did not require new standalone links.
+
+The 180 large encoded image values were not Layer D tool-output pieces. Image-bearing `embed` parts were not text, and the old metadata text walker did not cover the other image fields. No text pieces were subtracted to add the hash check. All 78 terminal-image hashes remain unknown-origin companions.
+
+The clean-clone fix normalizes only embedded notice line endings before generating the Brotli asset. Assertions stay in the existing generated-assets test, so that fix alone still has 532 tests, not 533. The final 542 includes the image, JSON-loss and corpus regression additions. No packages were added. The fixed-seed fuzz suite, container/HTML handling and unchanged golden output all pass.
+
+Backup journals remain excluded from inventory by decision. One of the 26 `bkup2` journals was exported by its exact path and passed `--verify --strict --json`, with unchanged source size/mtime. [Check](temp-tool-output/backup-exact-path-1792553710101/check.json), local-only. The browser-under-load timeout remains a known-flaky backlog item. Terminal delta rendering and profiling S015 are approved for later, not part of this image change. Source snapshots remain deferred.
+
+### Privacy history, no rewrite
+
+The read-only pickaxe/tree check searched the previously scrubbed username and seven real UUIDs. The current `origin/main` tree has none of those searched values, but 31 earlier pushed commit trees still do. This is a check for those known values, not an exhaustive privacy guarantee. [File ranges](temp-tool-output/privacy-files-by-commit-range-20261020.json) and [history audit](temp-tool-output/privacy-pushed-history-readonly-20261020.json) are local-only. Ranges below are inclusive commit trees containing a value, not introduction/removal diffs.
+
+| File | Oldest containing commit | Newest containing commit | Containing commits |
+| --- | --- | --- | --- |
+| README.md | c884023 | 932b7cb | 28 |
+| docs/CHAT-SESSION-SCHEMA.md | 51f0de2 | 932b7cb | 27 |
+| docs/CHAT-SESSION-TITLES.md | 76741f3 | 932b7cb | 29 |
+| test/baseline.ts | 602c3eb | 932b7cb | 31 |
+| test/enrich.test.ts | 602c3eb | 932b7cb | 31 |
+| test/locate.test.ts | 602c3eb | 932b7cb | 31 |
+| work-log-archive.md | 70f0898 | 932b7cb | 8 |
+| work-log.md | 2f5dffc | 22a2f5d | 16 |
+
+### Approved commit groups
+
+| Group | Scope | Files and hunks |
+| --- | --- | --- |
+| 1 | Make generated Brotli assets independent of checkout line endings | `scripts/generate-brotli.mjs`, `src/generated/brotli-decoder.ts`, `test/generated-report-assets.test.ts`; only the matching clean-checkout bullet in `CHANGELOG.md` |
+| 2 | Save Local images through the shared helper and independently verify image hashes | `src/images.ts`, `src/verify/images.ts`, `src/types.ts`, `src/session/journal.ts`, `src/session/sdk-session.ts`, `src/markdown.ts`, `src/index.ts`, `src/cli.ts`, `src/sdk-cli.ts`, `src/verify/json-report.ts`, `src/verify/loss-account.ts`, `src/verify/golden.ts`, `test/images.test.ts`, `test/json-report.test.ts`, `test/cli.test.ts`, the synthetic golden journal and expected Markdown, `docs/SPEC.md`, `docs/CHAT-SESSION-SCHEMA.md`; first image bullet in `CHANGELOG.md` |
+| 3 | Report corpus image totals and export sizes, default report names, and current work log | `scripts/verify-corpus.mjs`, `test/verify-corpus.test.ts`, `README.md`, `work-log.md`, `work-log-archive.md`; second image-verification/corpus bullet in `CHANGELOG.md` |
+
+Five user-owned customization changes remain excluded: modified `.github/copilot-instructions.md`, modified `.github/instructions/code-style.instructions.md`, deleted `.github/instructions/documentation-style.instructions.md`, and untracked `.github/instructions/__ignore.doc-style.inst.md` / `.github/instructions/writing-style.instructions.md`. All other changed files are accounted for above. The user approved staging, cumulative snapshot validation, commits 1-3 and push on October 21. No history rewrite is authorized.
+
+## Historical text-only Layer D category totals
 
 Source: `node scripts/verify-corpus.mjs --user-data-root "$env:APPDATA\Code" --out reports/corpus/corpus-2026-10-20-corrections-final.json --concurrency 6`. The [JSON](reports/corpus/corpus-2026-10-20-corrections-final.json) is local-only (gitignored). Of 109 sources, S023 changed during its run and is excluded. The 108 stable sources contain 88,182 pieces, all present (0 partial, 0 absent). The separate `representationCounts.tool-no-content` total is 288; it is not added to the content-piece table.
 
@@ -145,13 +239,13 @@ Current priorities as of October 20. Effort: S under half a day, M about a day, 
 | 6a | next-sdk-fence-gate | Pass SDK fence repairs to `--verify` and strict, like Local | Committed in `a8cf283`; latest runner JSON: 0 early and turn-end closes | SDK repairs are no longer silent | S | None |
 | 6b | next-privacy-scrub | Synthetic IDs, generic user paths and a privacy guard | Committed forward-only in this checkpoint; baseline discovers its fixture path without renaming session files | Repository is public | S | None; history remains unchanged |
 | 7 | next-acceptance | Final cross-surface review and interactive root-chooser acceptance (#12, #13) | Open | Closes acceptance and stale-documentation gaps | S to M | A short manual terminal run |
-| 8 | next-base64-companions | Move long base64/data-URI-like strings to companion files with size and hash inline | Detection implemented; extraction not built | Latest runner JSON: trigger met, 370 string values across 21 stable sources; no scan errors | M | Trigger: base64-alphabet run of at least 64 KiB. Review false positives and approve extraction scope first |
+| 8 | next-base64-companions | Review non-image Base64/data-URI-like payloads only; image companions are implemented in the current pass | Detection implemented; non-image extraction not approved | Historical trigger and field audit are below. The remaining qualifying values were opaque reasoning, deliberately omitted, not export candidates | M | Trigger: base64-alphabet run of at least 64 KiB in the corpus runner. Exclude images already handled by the image policy and opaque reasoning |
 | 9 | next-local-fidelity | Research remaining metadata/omission/redaction policy (#15, #16) | Deferred by user | Clarifies high-fidelity scope | M to L | Finish policy research before implementing either flag |
 | 10 | next-graph-reindex | Refresh graph (#32) | October 14 snapshot is stale | Makes later modules discoverable | S | Timing |
 | 11 | next-design-fixture | Anonymized design-guide sample and reference render | Backlog | Reproducible report rebuilds | S | Approval before creating a sample |
 | 12 | next-browser-parallel-flake | Investigate the browser check's known timeout under parallel load | Backlog; latest final runs and all eight snapshot runs passed | A passing retry must not hide the original failure | S to M | Reproduce under load before changing timeouts or scheduling |
-| 13 | next-terminal-delta | Render only new content in same-ID terminal carryovers | Proposed; four observed carryovers still render the whole later copy | Avoid repeated output without dropping updates | M | Approve identity-aware delta rules and tests |
-| 14 | next-backup-inventory | Decide whether nested backup journals belong in discovery | Research only; 26 `bkup2` journals absent from the inventory | Makes backup coverage limits clear | S to M | Approve scope before changing discovery |
+| 13 | next-terminal-delta | Render only new content in same-ID terminal carryovers | Approved for later; four observed carryovers still render the whole later copy | Avoid repeated output without dropping updates | M | Not part of the current image pass |
+| 14 | next-backup-inventory | Keep nested backup journals out of discovery | User decision: exclude `bkup2`; one exact-path export and strict verification passed | Backup access works without duplicating inventory | - | None |
 | - | next-report-size | HTML report-size follow-ups | Other chat owns this | Avoid conflicting edits | M per experiment | None here |
 | - | next-model-icon | Distinct model-chip icon (#21) | Skipped by user | Not active scope | S | None |
 
@@ -215,8 +309,9 @@ The originally referenced "Pasted text #1" was not available as an attachment. T
 | Substantive text in both modes | Preserve complete recorded prompts, answers and readable reasoning in Markdown in both ordinary and high-fidelity exports. Tool inputs/results of 10 lines or fewer stay inline. Text of 11-100 lines goes in a collapsed-by-default section. Text over 100 lines uses that same collapsed section for the first 10 lines plus a link to companion files containing the full text, subject to the approved redaction policy below. Exactly 100 lines is not over the threshold. Companion files are required persistent export artifacts, not temporary resources. `--high-fidelity` controls extra metadata preservation, not conversation-text completeness. |
 | Redaction | Redact by default in both modes, including companion files; report categories, counts and locations without revealing secret values. Explicit `--no-redact` disables all exporter redaction. Keep a clear archive/CLI warning that such output may contain credentials and private content; do not upload it or print secret values in diagnostics. The existing regex detector is not a guarantee of comprehensive secret detection. Test all rendered/exported content paths for consistent policy, including metadata, copy-source and companion files. |
 | Binary/opaque attachments | In both ordinary and high-fidelity exports, record metadata and omission reasons for non-image binary attachments and encrypted/opaque reasoning; do not copy their payloads or interpret them as readable reasoning. Exception: save all available recorded images in both modes, without an exporter size cap or resizing, as local files in the approved timestamped sibling companion folder and link from the main Markdown. Do not fetch remote images or reconstruct unavailable originals. Images can contain sensitive information that text redaction does not remove. |
+| Image storage (October 20) | Save exact decoded bytes recorded in the session, without resizing, re-encoding or an exporter size cap. Never read source-image paths or fetch URLs. Local and SDK share the companion helper. Deduplicate by SHA-256, link at every recorded prompt/tool position, and show byte size plus short hash. Recorded MIME selects the extension; missing/unknown MIME uses `.bin` and a representation note. File-origin and unknown-origin images, including terminal results, stay companions. Without bytes, link the recorded location and count reference-only; without bytes or location, report unresolved. Remote image URLs stay links. Non-image binaries and opaque reasoning remain metadata-only. Images bypass text redaction. The earlier reference-style `--inline-images` proposal is deferred by the latest decision. Draft attachment mutations are excluded-not-submitted, not prompt images. |
 | Loss limits | Apply the approved line-based preview/companion policies, redaction and binary/opaque exclusions. No additional byte cap or silent clipping of substantive text/images is approved. Meaningful formatting/content must survive except documented safety/rendering representation and approved redaction; new unavoidable losses require explicit reporting and, for material policy changes, another user decision. |
-| Inline reference label (October 21) | Use VS Code's order: the recorded `name` first, then a symbol name, then the basename of the URI, Location or path. Where VS Code would show an empty label (a root URI), use the path, then the external URI. A record that still has no label renders as unreviewed JSON and fails strict. |
-| Parser check dependency (October 21) | `markdown-it` 14.x is approved as a devDependency used only by `--verify` and tests; it must not enter the runtime bundle. |
+| Inline reference label (October 20) | Use VS Code's order: the recorded `name` first, then a symbol name, then the basename of the URI, Location or path. Where VS Code would show an empty label (a root URI), use the path, then the external URI. A record that still has no label renders as unreviewed JSON and fails strict. |
+| Parser check dependency (October 20) | `markdown-it` 14.x is approved as a devDependency used only by `--verify` and tests; it must not enter the runtime bundle. |
 
 The user subsequently explicitly approved implementation of these decisions and the revised sequence, with questions required for any new material ambiguity.

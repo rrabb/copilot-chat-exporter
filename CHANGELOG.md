@@ -7,7 +7,7 @@ All notable changes to this project are documented here.
 ### Added
 
 - Local prompt attachments and tool-result images are saved as exact-byte companions through a helper shared with SDK exports. Recorded byte formats include direct Base64, `$base64` objects and numeric-keyed byte objects. Files deduplicate by SHA-256 and links show size and a short hash. Images are never loaded from recorded paths or fetched. Inline images remain deferred.
-
+- Independent Layer D image verification checks linked companion hashes and reports missing, unresolved, reference-only and excluded draft image records. Draft copies can also have submitted counterparts, which are exported and checked. Earlier Layer D results covered text, not images. Corpus reports include deduplicated image totals and Local export sizes. The optional `--out` defaults to a filename derived from `generatedAt` in local time with the UTC offset.
 - Generated Brotli asset verification normalizes notice-file line endings so LF and CRLF checkouts produce identical embedded assets.
 
 - Machine-readable `--verify --json` reports and a reproducible corpus runner, including source-change checks and detection of base64-like strings at 64 KiB. Verification uses a pinned, dev-only Markdown parser; an unavailable parser fails strict verification. SDK fence repairs are reported and gated like Local.

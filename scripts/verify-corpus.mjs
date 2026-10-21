@@ -13,7 +13,8 @@ const DEFAULT_CLI = path.join(ROOT, 'src', 'cli.ts');
 // Version 2 added per-source parser fields and totals.parser.
 // Version 3 added per-source size/mtime before and after, and excludes sources that changed
 // during the run from totals (listed in totals.changedDuringRun instead).
-export const CORPUS_REPORT_VERSION = 4;
+// Version 5 adds independent image hashes and measured Local export sizes.
+export const CORPUS_REPORT_VERSION = 5;
 export const BASE64_TRIGGER_BYTES = 64 * 1024;
 
 /** Counts string values with a base64-alphabet run of at least 64 KiB; this is a heuristic, not decoding. */
@@ -168,6 +169,7 @@ function summarize (kind, selector, label, result, report, durationMs) {
     parserMs: report?.parser?.ms ?? null,
     unhandledKinds: report?.census?.unhandled ?? {},
     representationCounts: report?.census?.representationCounts ?? {},
+    images: report?.images ?? null,
   };
 }
 
@@ -196,6 +198,17 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
         result = exported.exitCode === 0
           ? await run([cli, '--verify', '--strict', '--json', job.selector, markdown], env)
           : { ...exported, stage: 'export' };
+        if (exported.exitCode === 0) {
+          const markdownBytes = (await fs.stat(markdown)).size;
+          let companionBytes = 0;
+          for (const folder of await fs.readdir(path.dirname(markdown), { withFileTypes: true })) {
+            if (!folder.isDirectory())
+              continue;
+            for (const file of await fs.readdir(path.join(path.dirname(markdown), folder.name)))
+              companionBytes += (await fs.stat(path.join(path.dirname(markdown), folder.name, file))).size;
+          }
+          result.exportSizes = { markdownBytes, companionBytes, totalBytes: markdownBytes + companionBytes };
+        }
         await fs.rm(path.dirname(markdown), { recursive: true, force: true });
       } else {
         result = await run([cli, '--verify', '--strict', '--json', job.selector, '--user-data-root', sources.userDataRoot], env);
@@ -205,6 +218,7 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
         ...summarize(job.kind, job.selector, job.label, result, result.stage ? null : parseReport(result.stdout), Date.now() - t0),
         source: { before, after },
         base64Like,
+        exportSizes: result.exportSizes ?? null,
         changedDuringRun: sourceChanged(before, after),
       };
       onProgress(results[index], index + 1, jobs.length);
@@ -218,17 +232,26 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
   const report = {
     version: CORPUS_REPORT_VERSION,
     generatedAt: new Date().toISOString(),
+    cli: path.resolve(cli),
     userDataRoot: sources.userDataRoot,
     command: '--verify --strict --json',
     durationMs: Date.now() - started,
     totals: totalize(results),
     sources: results,
   };
+  out ??= defaultCorpusPath(report.generatedAt);
+  report.outputPath = path.resolve(out);
   if (out) {
     await fs.mkdir(path.dirname(path.resolve(out)), { recursive: true });
     await fs.writeFile(out, `${JSON.stringify(report, null, 2)}\n`);
   }
   return report;
+}
+
+export function defaultCorpusPath (generatedAt, offsetMinutes = new Date(generatedAt).getTimezoneOffset()) {
+  const local = new Date(new Date(generatedAt).getTime() - offsetMinutes * 60_000).toISOString().slice(0, -1);
+  const offset = `${offsetMinutes > 0 ? '-' : '+'}${String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, '0')}-${String(Math.abs(offsetMinutes) % 60).padStart(2, '0')}`;
+  return path.join(ROOT, 'reports', 'corpus', `corpus-${local.replace(/[:.]/gu, '-')}${offset}.json`);
 }
 
 /** Totals over sources that did not change during the run; changed ones are listed, not counted. */
@@ -241,8 +264,25 @@ export function totalize (results) {
     base64Like: { count: 0, thresholdBytes: BASE64_TRIGGER_BYTES, invalidLines: 0 },
     representationCounts: {},
     parser: { failed: 0, skipped: 0, totalMs: 0, maxMs: 0, maxMsLabel: null },
+    images: {},
+    localExportSizes: { markdownBytes: 0, companionBytes: 0, totalBytes: 0, largest: null },
   };
   for (const item of compared) {
+    if (item.images) {
+      const kind = item.kind === 'local' ? 'Local' : 'SDK';
+      const bucket = totals.images[kind] ??= { hashes: new Set(), foundHashes: new Set(), missingHashes: new Set(), unresolved: 0, referenceOnly: 0, excludedNotSubmitted: 0 };
+      for (const key of ['hashes', 'foundHashes', 'missingHashes'])
+        for (const hash of item.images[key] ?? [])
+          bucket[key].add(hash);
+      for (const key of ['unresolved', 'referenceOnly', 'excludedNotSubmitted'])
+        bucket[key] += item.images[key] ?? 0;
+    }
+    if (item.kind === 'local' && item.exportSizes) {
+      for (const key of ['markdownBytes', 'companionBytes', 'totalBytes'])
+        totals.localExportSizes[key] += item.exportSizes[key];
+      if (!totals.localExportSizes.largest || item.exportSizes.totalBytes > totals.localExportSizes.largest.totalBytes)
+        totals.localExportSizes.largest = { label: item.label, ...item.exportSizes };
+    }
     for (const [name, count] of Object.entries(item.representationCounts ?? {}))
       totals.representationCounts[name] = (totals.representationCounts[name] ?? 0) + count;
     totals.base64Like.count += item.base64Like?.count ?? 0;
@@ -261,6 +301,10 @@ export function totalize (results) {
     }
     addCategories(totals.categories, item.categories);
   }
+  totals.images = Object.fromEntries(Object.entries(totals.images).map(([kind, bucket]) => [kind, {
+    unique: bucket.hashes.size, found: [...bucket.foundHashes].filter((hash) => !bucket.missingHashes.has(hash)).length, missing: bucket.missingHashes.size,
+    unresolved: bucket.unresolved, referenceOnly: bucket.referenceOnly, excludedNotSubmitted: bucket.excludedNotSubmitted,
+  }]));
   return totals;
 }
 
@@ -274,8 +318,8 @@ function parseArgs (argv) {
     else if (flag === '--concurrency') options.concurrency = Number(value), index++;
     else throw new Error(`Unknown argument: ${flag}`);
   }
-  if (!options.userDataRoot || !options.out)
-    throw new Error('Usage: node scripts/verify-corpus.mjs --user-data-root <root> --out <report.json> [--concurrency 4]');
+  if (!options.userDataRoot)
+    throw new Error('Usage: node scripts/verify-corpus.mjs --user-data-root <root> [--out <report.json>] [--concurrency 4]');
   return options;
 }
 
@@ -286,7 +330,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       ...options,
       onProgress: (item, done, total) => console.error(`${done}/${total} ${item.label} ${item.kind} exit ${item.exitCode}${item.failureReasons.length ? ` ${item.failureReasons.join(',')}` : ''}`),
     });
-    console.log(JSON.stringify({ out: path.resolve(options.out), totals: report.totals }));
+    console.log(JSON.stringify({ out: report.outputPath, totals: report.totals }));
     process.exit(report.totals.sources === (report.totals.byExitCode[0] ?? 0) ? 0 : 2);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

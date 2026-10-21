@@ -1,6 +1,6 @@
 # Copilot Chat Exporter Work Log Archive
 
-Dated history moved from [work-log.md](work-log.md) on October 21, 2026. Text is unchanged. Older pending or deferred statements here are historical; the current state is in [work-log.md](work-log.md).
+Dated history moved from [work-log.md](work-log.md) on October 20, 2026. Text is unchanged. Older pending or deferred statements here are historical; the current state is in [work-log.md](work-log.md).
 
 ### October 19 Local selector and response-kind follow-up
 
