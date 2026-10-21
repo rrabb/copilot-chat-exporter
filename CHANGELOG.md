@@ -6,6 +6,8 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Generated Brotli asset verification normalizes notice-file line endings so LF and CRLF checkouts produce identical embedded assets.
+
 - Machine-readable `--verify --json` reports and a reproducible corpus runner, including source-change checks and detection of base64-like strings at 64 KiB. Verification uses a pinned, dev-only Markdown parser; an unavailable parser fails strict verification. SDK fence repairs are reported and gated like Local.
 - Git-status snapshots use content-sized fences so recorded backticks cannot end their code block.
 - Inline references keep their recorded labels and stay inline inside code; Layer D scores reference names.

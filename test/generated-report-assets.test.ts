@@ -21,6 +21,18 @@ test('generated verification detects stale script assets and altered embedded WA
   execFileSync(process.execPath, [script, '--check'], { cwd: sandbox });
   const target = path.join(sandbox, 'src', 'generated', 'brotli-decoder.ts');
   const original = await readFile(target, 'utf8');
+  const noticePath = path.join(sandbox, 'docs', 'BROTLI-NOTICES.txt');
+  const notice = await readFile(noticePath, 'utf8');
+  await writeFile(noticePath, notice.replace(/\r\n?/gu, '\n'));
+  execFileSync(process.execPath, [script], { cwd: sandbox });
+  const generatedWithLf = await readFile(target, 'utf8');
+  await writeFile(noticePath, notice.replace(/\r\n?/gu, '\n').replace(/\n/gu, '\r\n'));
+  execFileSync(process.execPath, [script], { cwd: sandbox });
+  const generatedWithCrlf = await readFile(target, 'utf8');
+  assert.equal(generatedWithCrlf, generatedWithLf, 'notice line endings must not change generated assets');
+  await writeFile(noticePath, notice);
+  await writeFile(target, original);
+  execFileSync(process.execPath, [script, '--check'], { cwd: sandbox });
   for (const changed of [
     original.replace('export const gzipListingLoader = "', 'export const gzipListingLoader = " '),
     original.replace(/(export const brotliWasmBase64 = ")[A-Za-z0-9+/]/u, '$1!'),

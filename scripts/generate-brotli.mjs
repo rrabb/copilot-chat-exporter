@@ -14,8 +14,9 @@ const wasm = await readFile(require.resolve('brotli-dec-wasm/web/bg.wasm'));
 const wasmHash = createHash('sha256').update(wasm).digest('hex');
 if (wasmHash !== '79b29cb1790560f0a0f32b4a31d935e2782875e4a367fde23c81d986b327ec3f')
   throw new Error('The pinned Brotli WASM asset changed. Review the decoder and notices before updating its checksum.');
-const license = await readFile(new URL('../node_modules/brotli-dec-wasm/LICENSE-MIT.txt', import.meta.url), 'utf8')
-  + '\n' + await readFile(new URL('../docs/BROTLI-NOTICES.txt', import.meta.url), 'utf8');
+const normalizeLineEndings = (text) => text.replace(/\r\n?/gu, '\n');
+const license = normalizeLineEndings(await readFile(new URL('../node_modules/brotli-dec-wasm/LICENSE-MIT.txt', import.meta.url), 'utf8'))
+  + '\n' + normalizeLineEndings(await readFile(new URL('../docs/BROTLI-NOTICES.txt', import.meta.url), 'utf8'));
 const result = await build({
   stdin: {
     contents: `
