@@ -8,6 +8,8 @@ All notable changes to this project are documented here.
 
 - Active Local and SDK chats export captured sources, omit only an incomplete trailing record with a notice, and report writes during capture. Later file verification reuses the private saved snapshot instead of rereading the running chat. SDK usage uses a SQLite backup; native payloads aren't export companions.
 - Local replay also uses captured resources, transcripts, model data and memory, while keeping original locations in provenance. Truncated final Unicode escapes, number tokens and UTF-8 characters receive the same trailing-record handling.
+- SDK shell inputs keep arguments besides the command, including shell IDs and execution mode. A frozen active-chat check exposed a previously omitted `shellId`; no partial exception hides it.
+- SDK verification with an output path now checks that file and its linked companions against the saved source copy, rather than scoring a regenerated archive.
 - Corpus verification snapshots source and metadata files before inventory, records copy hashes/sizes, and backs up SQLite databases through SQLite. Changed live originals remain reported without excluding frozen results. `--live` keeps the previous mode; `--snapshot-dir` keeps frozen inputs for comparisons.
 
 - Same-ID terminal carryovers show a continuation note and newly recorded content instead of repeating unchanged command/output fields. Appended output emits its suffix; replacement output, new metadata and status are kept. Independent text verification checks those raw output increments across requests.

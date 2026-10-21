@@ -89,12 +89,13 @@ function inventory (value: unknown, assets = new Map<string, string>()): Recorde
   return result;
 }
 
-/** Image links inside fenced code do not prove a displayed image was kept. */
-function imageTargets (markdown: string): Set<string> {
+/** Links inside fenced code do not prove an artifact was kept. */
+function archiveTargets (markdown: string, imagesOnly: boolean): Set<string> {
   const lines = markdown.split(/\r?\n/u);
   const { inside } = scanFences(lines);
   const live = lines.filter((_line, index) => !inside[index]).join('\n');
-  const targets = [...live.matchAll(/!\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu)].map((match) => match[1]!);
+  const pattern = imagesOnly ? /!\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu : /!?\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu;
+  const targets = [...live.matchAll(pattern)].map((match) => match[1]!);
   return new Set(targets.map((target) => {
     try {
       return decodeURIComponent(target);
@@ -107,7 +108,7 @@ function imageTargets (markdown: string): Set<string> {
 }
 
 function account (recorded: RecordedInventory, markdown: string, companions: readonly CompanionArtifact[], excludedNotSubmitted: number): ImageAccount {
-  const targets = imageTargets(markdown);
+  const targets = archiveTargets(markdown, true);
   const available = new Set(companions.filter((item) => targets.has(item.relativePath)).map((item) => hash(item.bytes)));
   const foundHashes = [...recorded.images].filter((value) => available.has(value)).sort();
   const missingHashes = [...recorded.images].filter((value) => !available.has(value)).sort();
@@ -150,10 +151,15 @@ export function verifySdkImages (events: readonly { type: string; data: Record<s
 
 /** Reads only linked companions next to this export, never recorded image paths. */
 export async function readLinkedImageCompanions (markdown: string, outputPath: string): Promise<CompanionArtifact[]> {
+  return readLinkedArchiveCompanions(markdown, outputPath, true);
+}
+
+/** Reads only links into this archive's sibling asset folder, never native session locations. */
+export async function readLinkedArchiveCompanions (markdown: string, outputPath: string, imagesOnly = false): Promise<CompanionArtifact[]> {
   const directory = path.dirname(path.resolve(outputPath));
   const prefix = `${path.basename(outputPath, path.extname(outputPath))}_assets_`;
   const result: CompanionArtifact[] = [];
-  for (const target of imageTargets(markdown)) {
+  for (const target of archiveTargets(markdown, imagesOnly)) {
     const parts = target.split('/');
     if (parts.length !== 2 || !parts[0]!.startsWith(prefix) || parts.some((part) => !part || part === '..' || part.includes('\\')))
       continue;
@@ -162,13 +168,14 @@ export async function readLinkedImageCompanions (markdown: string, outputPath: s
       const linkStat = await fs.lstat(file);
       const folderStat = await fs.lstat(path.dirname(file));
       if (linkStat.isSymbolicLink() || folderStat.isSymbolicLink() || !linkStat.isFile())
-        throw new Error('Image companion is not a regular archive file.');
-      result.push({ id: target, kind: 'image', relativePath: target, mediaType: 'application/octet-stream',
+        throw new Error('Archive companion is not a regular archive file.');
+      const text = /\.(?:txt|json|diff|md)$/iu.test(file);
+      result.push({ id: target, kind: text ? 'metadata' : 'image', relativePath: target, mediaType: text ? 'text/plain' : 'application/octet-stream',
         bytes: await fs.readFile(file), location: { sourceId: 'export', field: 'image-companion' } });
     } catch (error) {
       if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
         throw error;
-      // An absent linked file remains unavailable and is reported as image loss by the caller.
+      // An absent linked file remains unavailable and is reported as loss by the caller.
     }
   }
   return result;

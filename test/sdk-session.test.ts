@@ -16,6 +16,22 @@ const assistant = (data: Record<string, unknown>) => event('assistant.message', 
 
 const build = (events: SdkEvent[]) => buildSdkSession(events, events, { title: 'Agent chat', assetsDirectory: 'chat_assets' });
 
+test('pending SDK shell calls keep shell IDs and other arguments alongside the command', () => {
+  const args = { command: 'synthetic-command', shellId: 'synthetic-terminal-id', description: 'Run a synthetic terminal check', mode: 'async' };
+  const events = [prompt('Run the terminal check'), event('tool.execution_start', {
+    toolCallId: 'pending-shell', toolName: 'powershell', arguments: args,
+  })];
+  const preview = renderSdkExport(events, source(), {
+    title: 'Pending shell', assetsDirectory: 'assets', outputPath: '', generatedAt: '2026-10-21T00:00:00Z',
+  });
+  assert.match(preview.markdown, /synthetic-terminal-id/u);
+  assert.match(preview.markdown, /Run a synthetic terminal check/u);
+  assert.match(preview.markdown, /mode: async/u);
+  const account = buildSdkLossAccount(events, preview.markdown);
+  assert.equal(account.failed, false);
+  assert.deepEqual(account.totals['tool-input'], { present: 1, partial: 0, absent: 0 });
+});
+
 test('SDK exports report early and turn-end fence repairs from the shared renderer', () => {
   const repair = (events: SdkEvent[]) => renderSdkExport(events, source(), {
     title: 'Repairs', assetsDirectory: 'assets', outputPath: '', generatedAt: '2026-10-20T00:00:00Z',

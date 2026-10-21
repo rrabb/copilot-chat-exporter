@@ -256,6 +256,7 @@ non-zero exit code, and `--verify` prints the full schema census.
 
 ### Historical verification limitations
 
+- Earlier verification of saved SDK files regenerated the export instead of reading the supplied file. A passing result did not prove the saved file or its companions were intact. Re-verify with the corrected file check.
 - Layer D before October 20, 2026 did not cover images. Those results describe text coverage, not image preservation. Current image verification checks recorded bytes against linked companions independently by SHA-256.
 
 ### Exporting an Agent Host or Copilot CLI chat

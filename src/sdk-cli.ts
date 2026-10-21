@@ -12,7 +12,7 @@ import { printLossAccount } from './verify/loss-report.ts';
 import { buildSdkVerifyJson } from './verify/json-report.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { errorLabel } from './text.ts';
-import { verifySdkImages } from './verify/images.ts';
+import { readLinkedArchiveCompanions, verifySdkImages } from './verify/images.ts';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { existingUserDataSnapshot, readExportCopy, saveExportCopy, snapshotUserData, verifySourceCopy } from './session/source-snapshot.ts';
@@ -82,7 +82,12 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, frozen: UserDa
     const ledger = readUsageForSource(source);
     if (options.verify) {
       const preview = renderSdkExport(events, source, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger, sourceCopy });
-      return await verifyReport(preview, options.strict, options.json === true);
+      if (options.outputArgument) {
+        const outputPath = path.resolve(options.outputArgument);
+        preview.markdown = await fs.readFile(outputPath, 'utf8');
+        preview.companions = await readLinkedArchiveCompanions(preview.markdown, outputPath);
+      }
+      return await verifyReport(preview, options.strict, options.json === true, Boolean(options.outputArgument));
     }
     const host = await createHostContext({ hashRoot: '', workspaceRoot: null, outDir: options.outDir });
     setWorkspaceRoot(host.workspaceRoot);
@@ -133,7 +138,7 @@ function companionText (result: SdkExport): string {
   return result.companions.filter((item) => item.mediaType.startsWith('text/')).map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n');
 }
 
-async function verifyReport (preview: SdkExport, strict: boolean, json: boolean): Promise<number> {
+async function verifyReport (preview: SdkExport, strict: boolean, json: boolean, savedArchive: boolean): Promise<number> {
   const account = buildSdkLossAccount(preview.events, preview.markdown, companionText(preview));
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
@@ -149,9 +154,9 @@ async function verifyReport (preview: SdkExport, strict: boolean, json: boolean)
     ? console.log(`- UNHANDLED event types: ${drift.map(([kind, count]) => `${kind}=${count}`).join(', ')}`)
     : console.log('- Unhandled event types: none');
   console.log(`- Left out on purpose: ${[...preview.leftOut].map(([name, count]) => `${name} ${count}`).join('; ') || 'nothing'}`);
-  printLossAccount(account, 'the Markdown this build would write');
+  printLossAccount(account, savedArchive ? 'the given file and its linked companions' : 'the Markdown this build would write');
   console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved, ${images.referenceOnly} reference-only.`);
-  console.log(formatParserCheck(parser, 'in-memory build').join('\n'));
+  console.log(formatParserCheck(parser, savedArchive ? 'the given file' : 'in-memory build').join('\n'));
   const { early, turnEnd, html } = preview.fenceRepairs;
   console.log(`Code fences closed by the exporter: ${early.length} before the end of a turn, ${turnEnd} at the end of a turn; HTML escapes: ${html.length}. Only early closes fail --strict.`);
   return images.failed || parser.failed || (strict && (account.failed || drift.length > 0 || early.length > 0)) ? 2 : 0;

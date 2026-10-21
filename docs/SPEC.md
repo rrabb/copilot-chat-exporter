@@ -782,7 +782,11 @@ pieces, the text of a `confirmation` response item that `IGNORED_RESPONSE_KINDS`
 
 **Active-chat inputs.** Local and SDK single-chat paths use the shared snapshot helper. It reads a fixed source length, so appends cannot extend the copy indefinitely. An incomplete final record without a terminating newline is omitted with a notice. Invalid preceding records and complete-but-invalid final records still fail. Both captured bytes and replay bytes have hashes when a trailing record is omitted. A source change during capture is reported in the header with local copy time and UTC offset. SDK metadata/usage databases use SQLite backup. A machine-local receipt associates the output path and selector with the private captured inputs; those raw inputs never become export companions. Verification of a saved archive reuses that receipt and refuses a missing or altered source snapshot rather than reading current session data.
 
-**Historical verification limitations.** Layer D before October 20, 2026 did not cover images. Those historical results must not be read as image-preservation evidence. Current image coverage requires the independent recorded-byte hash check.
+SDK shell calls render their command separately and keep every remaining argument in the input block, including shell IDs, descriptions and execution mode. Pending calls don't rely on a later tool result repeating those fields.
+
+SDK verification with an output path scores the saved Markdown and its linked sibling companions against the captured events. It doesn't substitute a new rendering or regenerate missing companions. Verification without an output path checks the in-memory rendering.
+
+**Historical verification limitations.** Earlier saved-file SDK verification regenerated the export instead of checking the supplied file. Its success did not prove that the saved Markdown or companions were intact. Layer D before October 20, 2026 did not cover images. Those historical results must not be read as image-preservation evidence. Current image coverage requires the independent recorded-byte hash check.
 
 Local single-chat captures include supplementary resources, transcript, model catalog, memory and workspace metadata. Replay verifies their recorded hashes before reading them. Provenance names their original paths while content comes from the copies. Corpus exports use the same inputs from the retained inventory snapshot.
 

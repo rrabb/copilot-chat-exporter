@@ -105,6 +105,9 @@ function applyArguments (node: ToolNode, args: unknown, name: string): void {
   const command = typeof args.command === 'string' && ['powershell', 'bash', 'shell', 'run_in_terminal'].includes(name) ? args.command : '';
   if (command) {
     node.command = command;
+    const remaining = Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'command'));
+    node.inputText = argumentsText(remaining).trim();
+    node.inputLanguage = 'text';
     return;
   }
   if (name === 'task' && typeof args.prompt === 'string') {

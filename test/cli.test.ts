@@ -126,6 +126,17 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   assert.notEqual(broken.status, 0);
   const repeated = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(repeated.status, 0, 'SDK verification keeps the saved snapshot after further live writes');
+  const savedMarkdown = await fs.readFile(activeOutput, 'utf8');
+  await fs.writeFile(activeOutput, savedMarkdown.replace('The compiler error points at the parser.', 'Removed recorded reasoning.'));
+  const edited = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
+  assert.equal(edited.status, 2, 'SDK verification checks the saved Markdown, not a new rendering');
+  assert.ok(JSON.parse(edited.stdout).failureReasons.includes('layer-d'));
+  await fs.writeFile(activeOutput, savedMarkdown);
+  const activeAssets = (await fs.readdir(home)).find((name) => name.startsWith('active-sdk_assets_'))!;
+  const promptPath = path.join(home, activeAssets, (await fs.readdir(path.join(home, activeAssets)))[0]!);
+  await fs.unlink(promptPath);
+  const missingCompanion = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
+  assert.equal(missingCompanion.status, 2, 'missing SDK text companions are loss, not replaced with generated companions');
 });
 
 test('an unknown agent event type is schema drift that --verify --strict reports', async (context) => {
