@@ -43,6 +43,36 @@ test('inline-only archive creates no assets or staging residue', async (context)
   assert.deepEqual(await fs.readdir(root), ['archive.md']);
 });
 
+test('verification failure publishes warning and companions without replacing earlier success or failure files', async (context) => {
+  const { root, outputPath } = await fixture(context);
+  await fs.writeFile(outputPath, 'Earlier success');
+  const oldFailed = path.join(root, 'archive.verify-failed.md');
+  await fs.writeFile(oldFailed, 'Earlier failure');
+  let kept = false;
+  const result = await writeArchive({
+    outputPath, generatedAt, overwrite: true, plan,
+    verification: {
+      capture: path.join(root, 'private-copy'), sessionId: 'synthetic', sourceHash: 'a'.repeat(64),
+      keep: async () => { kept = true; },
+      check: async () => ({
+        failureReasons: ['layer-d'], categories: { prompt: { present: 0, partial: 1, absent: 2 } },
+        details: { failureReasons: ['layer-d'] },
+      }),
+    },
+  });
+  assert.equal(kept, true);
+  assert.equal(await fs.readFile(outputPath, 'utf8'), 'Earlier success');
+  assert.equal(await fs.readFile(oldFailed, 'utf8'), 'Earlier failure');
+  assert.equal(path.basename(result.outputPath), 'archive.verify-failed-1.md');
+  const markdown = await fs.readFile(result.outputPath, 'utf8');
+  assert.match(markdown, /^>.*Verification failed/u);
+  assert.match(markdown, /prompt: 1 partial, 2 absent/u);
+  assert.match(markdown, new RegExp(path.basename(result.assetsPath!)));
+  assert.deepEqual(await fs.readFile(result.companionPaths[0]!), result.archive.companions[0]!.bytes);
+  assert.equal(result.markdownBytes, Buffer.byteLength(markdown));
+  assert.match(await fs.readFile(result.failureLog!, 'utf8'), /"sourceHash"/u);
+});
+
 test('existing destinations refuse by default; overwrite keeps prior companion folder', async (context) => {
   const { outputPath } = await fixture(context);
   const first = await writeArchive({ outputPath, generatedAt, plan });

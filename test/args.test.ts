@@ -73,6 +73,13 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     htmlOutput: null,
     current: false,
     overwrite: false,
+    keepSource: false,
+    cache: false,
+    clean: false,
+    dryRun: false,
+    yes: false,
+    includeCorpus: false,
+    olderThanDays: null,
     verify: false,
     strict: false,
     json: false,
@@ -83,6 +90,23 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     outDir: null,
     userDataRoot: null,
     positionals: [],
+  });
+
+  test('cache commands validate age, dry-run and action conflicts', () => {
+    assert.equal(ok(['--cache']).cache, true);
+    const clean = ok(['--clean', '--older-than', '2.5', '--dry-run']);
+    assert.equal(clean.clean, true);
+    assert.equal(clean.olderThanDays, 2.5);
+    assert.equal(clean.dryRun, true);
+    assert.equal(ok(['--clean', '--yes', '--include-corpus']).yes, true);
+    assert.equal(ok(['--clean', '--include-corpus']).includeCorpus, true);
+    assert.equal(parseArgs(['--yes']).ok, false);
+    assert.equal(parseArgs(['--include-corpus']).ok, false);
+    assert.equal(ok(['synthetic', '--keep-source']).keepSource, true);
+    for (const argv of [['--older-than', '2'], ['--dry-run'], ['--clean', '--older-than', '-1'],
+      ['--clean', '--older-than', 'NaN'], ['--clean', 'synthetic'], ['--cache', '--list'], ['--cache', '--strict'],
+      ['--keep-source'], ['--verify', 'synthetic', '--keep-source']])
+      assert.equal(parseArgs(argv).ok, false, argv.join(' '));
   });
 });
 

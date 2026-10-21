@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { snapshotFile, snapshotUserData, sourceCopyNotice } from '../src/session/source-snapshot.ts';
-import { loadSession } from '../src/index.ts';
+import { loadSession, renderSession } from '../src/index.ts';
 import { runSdkCommand } from '../src/sdk-cli.ts';
 
-test('SDK dispatch removes its temporary snapshot when the selector is not an SDK chat', async (context) => {
+test('SDK dispatch does not allocate a snapshot when the selector is not an SDK chat', async (context) => {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-sdk-dispatch-'));
   const previousHome = process.env.COPILOT_HOME;
   process.env.COPILOT_HOME = path.join(folder, 'copilot');
@@ -20,6 +21,7 @@ test('SDK dispatch removes its temporary snapshot when the selector is not an SD
     await fs.rm(folder, { recursive: true, force: true });
   });
   const created: string[] = [];
+  await fs.mkdir(path.join(folder, 'Code', 'User'), { recursive: true });
   const mkdtemp = fs.mkdtemp;
   context.mock.method(fs, 'mkdtemp', async (prefix: string) => {
     const result = await mkdtemp(prefix);
@@ -29,7 +31,7 @@ test('SDK dispatch removes its temporary snapshot when the selector is not an SD
   const result = await runSdkCommand({ root: path.join(folder, 'Code'), selector: 'synthetic-missing-chat',
     outputArgument: undefined, outDir: null, overwrite: false, verify: true, strict: true });
   assert.equal(result, null);
-  assert.equal(created.length, 1);
+  assert.equal(created.length, 0);
   for (const directory of created) {
     context.after(() => fs.rm(directory, { recursive: true, force: true }));
     await assert.rejects(fs.stat(directory), { code: 'ENOENT' });
@@ -45,6 +47,9 @@ test('Local snapshot replay keeps supplementary memory from the original export'
   await fs.mkdir(path.dirname(memory), { recursive: true });
   await fs.writeFile(source, JSON.stringify({ kind: 0, v: { version: 3, requests: [] } }));
   await fs.writeFile(memory, 'Memory recorded before the export.');
+  const unrelatedMemory = path.join(path.dirname(path.dirname(memory)), 'unrelated-session', 'private.md');
+  await fs.mkdir(path.dirname(unrelatedMemory), { recursive: true });
+  await fs.writeFile(unrelatedMemory, 'Unsubmitted memory from a different session.');
   const database = new DatabaseSync(path.join(folder, 'workspace', 'state.vscdb'));
   try {
     database.exec('CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)');
@@ -55,11 +60,29 @@ test('Local snapshot replay keeps supplementary memory from the original export'
   }
   const original = await loadSession({ source });
   assert.equal(original.session.title, 'Frozen indexed title');
+  await assert.rejects(fs.stat(path.join(original.copiedSource.contextRoot!, 'state.vscdb')), { code: 'ENOENT' });
+  const selectedIndex = JSON.parse(await fs.readFile(path.join(original.copiedSource.contextRoot!, 'selected-index.json'), 'utf8'));
+  assert.equal(selectedIndex.entry.title, 'Frozen indexed title');
+  assert.match(renderSession(original), /Memory recorded before the export\./u);
+  assert.doesNotMatch(renderSession(original), /Unsubmitted memory from a different session/u);
+  const renderOptions = { outputPath: 'export.md', generatedAt: '2026-10-20T12:00:00Z', gitStatus: '' };
+  const defaultMarkdown = renderSession(original, renderOptions);
+  original.copiedSource.kept = true;
+  const keptMarkdown = renderSession(original, renderOptions);
+  assert.equal(keptMarkdown.replace('> A private source copy was kept in the configured exporter cache for later file verification.\n\n', ''),
+    defaultMarkdown, 'the kept-source notice is the only Markdown difference for the same rendering context');
+  original.copiedSource.kept = false;
+  await assert.rejects(fs.stat(path.join(original.copiedSource.contextRoot!, 'GitHub.copilot-chat',
+    'memory-tool', 'memories', 'unrelated-session', 'private.md')), { code: 'ENOENT' });
   await fs.writeFile(memory, 'Different live memory after the export.');
   const replay = await loadSession({ source, snapshotCopy: original.copiedSource });
   assert.equal(replay.memory.repo[0]?.content, 'Memory recorded before the export.');
   assert.equal(replay.memory.repo[0]?.path, memory);
   assert.equal(replay.session.title, 'Frozen indexed title');
+  await replay.dispose();
+  assert.ok(await fs.stat(original.copiedSource.destination), 'disposing borrowed inputs does not delete the original capture');
+  await original.dispose();
+  await assert.rejects(fs.stat(original.copiedSource.destination), { code: 'ENOENT' });
 });
 
 test('source copies keep fixed bytes and hashes after the original grows', async (context) => {
@@ -87,7 +110,9 @@ test('only an incomplete final JSONL record is omitted from a source snapshot', 
   const frozen = await snapshotFile(source, copy);
   assert.equal(frozen.skippedTrailingRecord, true);
   assert.equal(await fs.readFile(copy, 'utf8'), '{"complete":true}\n');
-  assert.equal(await fs.readFile(`${copy}.recorded`, 'utf8'), '{"complete":true}\n{"incomplete":');
+  await assert.rejects(fs.stat(`${copy}.recorded`), { code: 'ENOENT' });
+  assert.equal(frozen.capturedSize, Buffer.byteLength('{"complete":true}\n{"incomplete":'));
+  assert.equal(frozen.capturedSha256, createHash('sha256').update('{"complete":true}\n{"incomplete":').digest('hex'));
   const prefixes = ['{"value":"\\u0', '{"value":1.', '{"value":1e+', '{"value":-',
     Buffer.concat([Buffer.from('{"value":"'), Buffer.from([0xf0, 0x9f])])];
   for (const [index, tail] of prefixes.entries()) {

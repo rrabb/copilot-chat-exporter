@@ -184,7 +184,7 @@ export async function inventorySessions (userDataRoot: string, options: Provider
         diagnostics: [...index.diagnostics, ...workspaceDiagnostics],
       };
       const journalPath = journals.get(key);
-      if (journalPath !== undefined) {
+      if (journalPath !== undefined && !options.identityOnly) {
         try {
           const before = await fs.stat(journalPath);
           const rawBytes = await fs.readFile(journalPath);

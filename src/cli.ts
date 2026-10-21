@@ -1,5 +1,8 @@
 import { promises as fs } from 'node:fs';
-import { readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
+import { keepFailedExportCopy, readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
+import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listSourceCache, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
+import { exportFailureFromReport, failureDetails, failureWarning, writeFailureLog } from './verify/export-failure.ts';
+import type { ExportFailure } from './verify/export-failure.ts';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
@@ -27,7 +30,7 @@ import {
 import { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
 import { buildLossAccount } from './verify/loss-account.ts';
 import { buildLocalVerifyJson } from './verify/json-report.ts';
-import { readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
+import { readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { runSdkCommand } from './sdk-cli.ts';
@@ -58,23 +61,10 @@ import { clip, errorLabel, thousands } from './text.ts';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(__dirname, '..');
 
-/** Text of the companion folders an export wrote next to `output` (`<name>_assets_<stamp>`); content saved there counts as exported. */
-async function siblingCompanionText (output: string): Promise<string> {
-  const directory = path.dirname(output);
-  const prefix = `${path.basename(output, path.extname(output))}_assets_`;
-  const parts: string[] = [];
-  try {
-    const folders = (await fs.readdir(directory, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix)).map((entry) => entry.name).sort();
-    // The newest folder only: an older export's companions must not hide a gap in this one.
-    const newest = folders.at(-1);
-    if (newest)
-      for (const file of await fs.readdir(path.join(directory, newest)))
-        /\.(?:txt|json|diff|md)$/iu.test(file) && parts.push(await fs.readFile(path.join(directory, newest, file), 'utf8'));
-  } catch {
-    // No readable companion folder: the check then scores the Markdown alone.
-  }
-  return parts.join('\n');
+async function siblingCompanionText (output: string, markdown: string): Promise<string> {
+  const companions = await readLinkedArchiveCompanions(markdown, output);
+  return companions.filter((item) => item.mediaType.startsWith('text/'))
+    .map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n');
 }
 
 function printVerificationReport (report: ReturnType<typeof buildVerificationReport>) {
@@ -206,7 +196,52 @@ const {
   workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
   userDataRoot: userDataRootArg,
   overwrite: overwriteMode,
+  keepSource, cache: cacheMode, clean: cleanMode, dryRun, olderThanDays, yes, includeCorpus,
 } = parsed.options;
+
+if (cacheMode) {
+  try {
+    let result = cleanMode ? await cleanSourceCache({ dryRun: true, olderThanDays: olderThanDays ?? undefined, includeCorpus }) : null;
+    const entries = result?.entries ?? await listSourceCache();
+    console.log(`Private source cache: ${sourceCacheRoot()}`);
+    console.log('Created (UTC) | Age (days) | Kind | Bytes | Files | Status | Capture');
+    for (const entry of entries) {
+      console.log(`${entry.createdAt} | ${Math.max(0, (Date.now() - Date.parse(entry.createdAt)) / 86_400_000).toFixed(2)} | ${entry.kind} | ${entry.bytes} | ${entry.files} | ${entry.active ? 'in use' : entry.kept ? 'kept' : 'temporary'} | ${entry.directory}`);
+      result && console.log(`  ${result.selected.some((target) => target.directory === entry.directory) ? 'Eligible' : 'Skipped'}`);
+      for (const output of entry.outputs)
+        console.log(`  Export: ${output}`);
+    }
+    console.log(`Total: ${entries.length} captures, ${entries.reduce((sum, entry) => sum + entry.bytes, 0)} bytes.`);
+    for (const legacy of await legacySourceCacheSizes())
+      console.log(`Legacy cache (report only): ${legacy.directory} | ${legacy.bytes} bytes | ${legacy.files} files`);
+    if (result && !dryRun && result.selected.length) {
+      let approved = yes;
+      if (!approved && process.stdin.isTTY && process.stdout.isTTY) {
+        const prompt = createInterface({ input: process.stdin, output: process.stdout });
+        try {
+          approved = /^(?:y|yes)$/iu.test((await prompt.question('Delete the eligible captures and their receipts? [y/N] ')).trim());
+        } finally {
+          prompt.close();
+        }
+      }
+      if (approved)
+        result = await cleanSourceCache({ yes: true, includeCorpus, olderThanDays: olderThanDays ?? undefined, targets: result.selected });
+      else
+        console.log('Nothing deleted. Noninteractive deletion requires --yes; interactive confirmation defaults to No.');
+    }
+    if (!result || result.dryRun) {
+      const size = await sourceCacheSize();
+      console.log(`Cache directory: ${size.bytes} bytes including receipts and registrations; external corpus snapshots: ${size.externalSnapshotBytes} bytes.`);
+    }
+    if (result)
+      console.log(`${result.dryRun ? 'Would remove' : 'Removed'} ${result.selected.length} captures and their receipts; ${result.dryRun
+        ? result.selected.reduce((sum, entry) => sum + entry.bytes, 0) : result.freedBytes} bytes ${result.dryRun ? 'eligible' : 'freed'}.`);
+    process.exit(0);
+  } catch (error) {
+    console.error(errorLabel(error));
+    process.exit(1);
+  }
+}
 
 if (installSkillTarget) {
   try {
@@ -247,8 +282,11 @@ if (!listMode && !goldenMode && ((!currentMode && !firstIsSource) || (currentMod
   process.exit(1);
 }
 let selectedRoot: string | undefined;
+let fileVerificationReceipt: Awaited<ReturnType<typeof readExportCopy>> | null = null;
 try {
-  if (listMode || currentMode || userDataRootArg !== null || (firstIsSource && !firstArgument?.endsWith('.jsonl'))) {
+  if (verifyMode && outputArgument)
+    fileVerificationReceipt = await readExportCopy(path.resolve(outputArgument), sourceArgument ?? '--current');
+  if (!fileVerificationReceipt && (listMode || currentMode || userDataRootArg !== null || (firstIsSource && !firstArgument?.endsWith('.jsonl')))) {
     selectedRoot = await resolveUserDataRoot({
       userDataRoot: userDataRootArg ?? undefined,
       choose: process.stdin.isTTY && process.stdout.isTTY ? chooseRoot : undefined,
@@ -294,18 +332,22 @@ try {
 }
 // The golden fixture's "workspace" is the package itself, so its committed render stays
 // byte-identical no matter where the package lives or which directory it is run from.
-if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefined && !sourceArgument.endsWith('.jsonl') && selectedRoot !== undefined) {
+if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefined && !sourceArgument.endsWith('.jsonl')
+  && (selectedRoot !== undefined || fileVerificationReceipt?.sdk)) {
   // Agent Host and Copilot CLI chats are not Local journals; the inventory decides which path applies.
   const sdkExit = await runSdkCommand({
-    root: selectedRoot, selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
+    root: selectedRoot ?? '', selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
     overwrite: overwriteMode, verify: verifyMode, strict: strictMode, json: jsonMode,
+    keepSource,
   });
   sdkExit !== null && process.exit(sdkExit);
 }
 let loaded: Awaited<ReturnType<typeof loadSession>>;
+let releaseSavedCopy: (() => Promise<void>) | undefined;
 try {
-  const savedCopy = verifyMode && outputArgument
-    ? await readExportCopy(path.resolve(outputArgument), sourceArgument ?? '--current') : null;
+  const savedCopy = fileVerificationReceipt;
+  if (savedCopy?.captureDirectory)
+    releaseSavedCopy = await leaseCapture(savedCopy.captureDirectory);
   loaded = await loadSession({
     source: sourceArgument,
     current: currentMode,
@@ -314,6 +356,7 @@ try {
     outDir: outDirArg,
     snapshotCopy: savedCopy?.copy,
   });
+  loaded.copiedSource.kept = !verifyMode && !goldenMode && !snapshotAction && keepSource;
 } catch (error) {
   console.error(errorLabel(error));
   process.exit(1);
@@ -350,26 +393,35 @@ if (verifyMode) {
   !jsonMode && printFenceRepairs(fenceRepairs);
   const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown ?? built}\n${renderedMarkdown === null
     ? overflow.companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')
-    : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!))}`);
+    : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!), renderedMarkdown)}`);
   !jsonMode && printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
   const parserCheck = buildParserCheck(renderedMarkdown ?? built, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
   const imageAccount = verifyLocalImages(session.rawRequests ?? [], raw, renderedMarkdown ?? built,
     renderedMarkdown === null ? overflow.companions : await readLinkedImageCompanions(renderedMarkdown, path.resolve(getWorkspaceRoot(), outputArgument!)));
   !jsonMode && console.log(`Images: ${imageAccount.unique} unique, ${imageAccount.found} found, ${imageAccount.missing} missing; ${imageAccount.unresolved} unresolved, ${imageAccount.referenceOnly} reference-only, ${imageAccount.excludedNotSubmitted} excluded-not-submitted.`);
   !jsonMode && console.log(formatParserCheck(parserCheck, renderedMarkdown === null ? 'in-memory build' : 'the given file').join('\n'));
-  const failed = imageAccount.failed || report.mismatches.length > 0 || report.rawRequestCount !== report.parsedTurnCount || crossCheck.failed || Boolean(renderReport?.failed) || parserCheck.failed
-    || (strictMode && (session.census.unhandled.length > 0 || session.census.unrecognizedToolData.length > 0 || lossAccount.failed || fenceRepairs.early.length > 0));
-  if (jsonMode) {
-    const json = buildLocalVerifyJson({
-      strict: strictMode, report, census: session.census, crossCheck, render: renderReport, renderSkipReason,
-      fenceRepairs, loss: lossAccount, lossTarget: renderedMarkdown === null ? 'in-memory' : 'file', parser: parserCheck,
-      images: imageAccount,
-    });
+  const json = buildLocalVerifyJson({
+    strict: strictMode, report, census: session.census, crossCheck, render: renderReport, renderSkipReason,
+    fenceRepairs, loss: lossAccount, lossTarget: renderedMarkdown === null ? 'in-memory' : 'file', parser: parserCheck,
+    images: imageAccount,
+  });
+  if (jsonMode)
     process.stdout.write(`${JSON.stringify(json)}\n`);
-    process.exitCode = json.exitCode;
-  } else {
-    process.exitCode = failed ? 2 : 0;
+  process.exitCode = json.exitCode;
+  const verificationFailure = exportFailureFromReport(json);
+  if (verificationFailure && loaded.copiedSource.captureDirectory) {
+    await finishCapture(loaded.copiedSource.captureDirectory, true);
+    const diagnostics = path.join(sourceCacheRoot(), 'failures');
+    await fs.mkdir(diagnostics, { recursive: true });
+    const log = await writeFailureLog(path.join(diagnostics, 'verification.md'), location.sessionId,
+      verificationFailure, loaded.copiedSource.captureDirectory, new Date().toISOString(), loaded.copiedSource.sha256);
+    console.error(failureWarning(verificationFailure, loaded.copiedSource.captureDirectory));
+    console.error(failureDetails(verificationFailure));
+    console.error(`Failure log: ${log}`);
   }
+  await releaseSavedCopy?.();
+  if (!json.exitCode && !outputArgument && loaded.copiedSource.captureDirectory)
+    await discardCapture(loaded.copiedSource.captureDirectory);
   process.exit();
 }
 
@@ -407,16 +459,43 @@ if (snapshotAction) {
   process.exit(0);
 }
 
-const outputPath = resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
+let outputPath = resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
 let rendered = '';
 const exportFenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
 
 let outputSize: number;
 let companionCount = 0;
 let assetsPath: string | null = null;
+let exportFailure: ExportFailure | null = null;
 try {
   const written = await writeArchive({
     outputPath, generatedAt: new Date().toISOString(), overwrite: goldenMode || overwriteMode,
+    ...(!goldenMode ? { verification: {
+      capture: loaded.copiedSource.captureDirectory!, sessionId: location.sessionId, sourceHash: loaded.copiedSource.sha256,
+      keep: async () => {
+        await keepCaptureDuringFailure(loaded.copiedSource.captureDirectory!);
+        console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
+      },
+      check: async (stagePath: string): Promise<ExportFailure | null> => {
+        const savedMarkdown = await fs.readFile(stagePath, 'utf8');
+        const savedText = `${savedMarkdown}\n${await siblingCompanionText(outputPath, savedMarkdown)}`;
+        const account = buildLossAccount(session.rawRequests ?? [], savedText);
+        const crossCheck = buildJournalCrossCheck(session, raw);
+        const report = buildVerificationReport(session, session.rawRequests ?? []);
+        const images = verifyLocalImages(session.rawRequests ?? [], raw, savedMarkdown,
+          await readLinkedImageCompanions(savedMarkdown, outputPath));
+        const parser = buildParserCheck(savedMarkdown, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
+        printLossAccount(account, 'the staged file and its linked companions');
+        console.log(formatParserCheck(parser, 'the staged file').join('\n'));
+        console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved.`);
+        const result = buildLocalVerifyJson({
+          strict: strictMode, report, census: session.census, crossCheck,
+          render: buildRenderReport(session, savedMarkdown), renderSkipReason: null,
+          fenceRepairs: exportFenceRepairs, loss: account, lossTarget: 'file', parser, images,
+        });
+        return exportFailureFromReport(result);
+      },
+    } } : {}),
     plan: (assetsDirectory) => {
       const overflow = { assetsDirectory, companions: [] as CompanionArtifact[] };
       exportFenceRepairs.early = [];
@@ -438,8 +517,16 @@ try {
   outputSize = written.markdownBytes;
   companionCount = written.companionPaths.length;
   assetsPath = written.assetsPath;
-  if (!goldenMode)
-    await saveExportCopy(outputPath, { selector: sourceArgument ?? '--current', source: location.sessionPath, copy: loaded.copiedSource });
+  outputPath = written.outputPath;
+  exportFailure = written.verificationFailure;
+  if (exportFailure) {
+    console.error(failureWarning(exportFailure, loaded.copiedSource.captureDirectory!));
+    console.error(failureDetails(exportFailure));
+    console.error(`Failure log: ${written.failureLog}`);
+    console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
+    process.exitCode = 2;
+  }
+  written.olderFailedArchive && console.log(`An older .verify-failed.md archive exists: ${written.olderFailedArchive}. It was not deleted.`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
@@ -474,6 +561,22 @@ if (selfFailed.length) {
   process.exitCode = 2;
 } else {
   console.log(`Layer C self-check: all ${selfCheck.checks.length} render checks pass.`);
+}
+
+if (!goldenMode) {
+  if (exportFailure) {
+    await keepFailedExportCopy(outputPath, {
+      selector: sourceArgument ?? '--current', source: location.sessionPath,
+      copy: loaded.copiedSource, captureDirectory: loaded.copiedSource.captureDirectory,
+    }, JSON.stringify(exportFailure));
+  } else {
+    await saveExportCopy(outputPath, keepSource
+      ? { selector: sourceArgument ?? '--current', status: 'kept', source: location.sessionPath,
+        copy: loaded.copiedSource, captureDirectory: loaded.copiedSource.captureDirectory }
+      : { selector: sourceArgument ?? '--current', status: 'not-kept' });
+    if (!keepSource && loaded.copiedSource.captureDirectory)
+      await discardCapture(loaded.copiedSource.captureDirectory);
+  }
 }
 
 if (goldenMode) {

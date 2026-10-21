@@ -6,7 +6,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 // @ts-expect-error The corpus runner is a plain .mjs script without declarations.
-import { countBase64LikeStrings, defaultCorpusPath, runCorpus, scanBase64, selectCorpusSources, sourceChanged, totalize } from '../scripts/verify-corpus.mjs';
+import { countBase64LikeStrings, defaultCorpusPath, runCorpus, scanBase64, selectCorpusSources, sourceChanged, sourcePathId, totalize } from '../scripts/verify-corpus.mjs';
 
 const LOCAL = '11111111-1111-4111-8111-111111111111';
 const AGENT = 'cccccccc-1111-4111-8111-111111111111';
@@ -17,6 +17,11 @@ test('the default corpus filename comes from generatedAt and distinguishes runs 
   assert.notEqual(defaultCorpusPath('2026-10-20T23:59:59.000Z', 240), defaultCorpusPath('2026-10-20T23:59:59.001Z', 240));
 });
 
+test('corpus source identifiers use the original path, independently of labels and capture location', () => {
+  assert.equal(sourcePathId(path.resolve('a', '..', 'events.jsonl')), sourcePathId(path.resolve('events.jsonl')));
+  assert.notEqual(sourcePathId(path.resolve('events.jsonl')), sourcePathId(path.resolve('other', 'events.jsonl')));
+  assert.match(sourcePathId(path.resolve('events.jsonl')), /^[a-f0-9]{12}$/u);
+});
 test('base64 trigger counts string values at 64 KiB, not keys or shorter runs', () => {
   const value = 'Ab09+/'.repeat(10923);
   assert.equal(countBase64LikeStrings({ a: value, b: `data:image/png;base64,${value}`, c: ['A'.repeat(65535)] }), 2);
@@ -99,7 +104,8 @@ test('the corpus runner verifies every Local journal and SDK chat and writes one
   assert.deepEqual(sdk.failureReasons, ['unhandled-kind']);
   assert.deepEqual(report.totals.failureReasons, { 'unhandled-kind': 1 });
   assert.deepEqual(report.totals.byExitCode, { 0: 1, 2: 1 });
-  assert.equal(report.version, 6);
+  assert.equal(report.version, 7);
+  assert.equal(local.sourceId, sourcePathId(journal));
   assert.equal(report.mode, 'snapshot');
   assert.ok(report.snapshotFiles.some((file: { method: string }) => file.method === 'sqlite-backup'));
   assert.match(local.snapshot.sha256, /^[a-f0-9]{64}$/u);

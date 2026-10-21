@@ -1,9 +1,11 @@
-import { createSourceCacheDirectory, sourceCacheRoot } from './source-cache.ts';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
+import { createSourceCacheDirectory, sourceCacheRoot, discardCapture, finishCapture, registerCapture } from './source-cache.ts';
+import type { SdkCapture } from './sdk-capture.ts';
+import { readChatIndex } from './inventory.ts';
 
 export interface SourceStamp { size: number; mtimeMs: number }
 export interface SourceCopy {
@@ -14,7 +16,7 @@ export interface SourceCopy {
   after: SourceStamp;
   size: number;
   sha256: string;
-  method: 'bytes' | 'sqlite-backup';
+  method: 'bytes' | 'sqlite-backup' | 'sqlite-rows';
   changedDuringCopy: boolean;
   skippedTrailingRecord: boolean;
   capturedSize?: number;
@@ -22,6 +24,10 @@ export interface SourceCopy {
   contextRoot?: string;
   contextCopies?: SourceCopy[];
   indexedTitle?: string;
+  indexedMetadata?: { destination: string; sha256: string };
+  notices?: string[];
+  kept?: boolean;
+  captureDirectory?: string;
 }
 
 export async function sourceStamp (file: string): Promise<SourceStamp> {
@@ -117,9 +123,8 @@ export async function snapshotFile (source: string, destination: string, rejectI
           continue;
         }
         captured = { capturedSize: bytes.length, capturedSha256: createHash('sha256').update(bytes).digest('hex') };
-        await fs.rename(destination, `${destination}.recorded`);
         bytes = Buffer.from(lines.slice(0, -1).join('\n') + (index ? '\n' : ''));
-        await fs.writeFile(destination, bytes, { flag: 'wx' });
+        await fs.writeFile(destination, bytes);
         skippedTrailingRecord = true;
       }
     }
@@ -158,14 +163,32 @@ async function snapshotTree (source: string, destination: string, files: SourceC
 }
 
 /** Keep the journal and the supplementary inputs that enrich a Local export. */
-export async function snapshotLocalInputs (source: string): Promise<SourceCopy> {
+export async function snapshotLocalInputs (source: string, indexedTitle?: string): Promise<SourceCopy> {
   source = path.resolve(source);
-  const contextRoot = path.join(await createSourceCacheDirectory('cce-local-source-'), 'workspace');
+  const directory = await createSourceCacheDirectory('cce-local-source-');
+  try {
+    return await captureLocalInputs(source, indexedTitle, path.join(directory, 'workspace'));
+  } catch (error) {
+    await discardCapture(directory);
+    throw error;
+  }
+}
+
+async function captureLocalInputs (source: string, indexedTitle: string | undefined, contextRoot: string): Promise<SourceCopy> {
   const copy = await snapshotFile(source, path.join(contextRoot, 'chatSessions', path.basename(source)));
   const originalRoot = path.dirname(path.dirname(source));
   const sessionId = path.basename(source, '.jsonl');
   const contextCopies: SourceCopy[] = [];
-  for (const relative of ['workspace.json', 'state.vscdb',
+  const selectedIndex = readChatIndex(originalRoot).entries.get(sessionId) ?? (indexedTitle ? { title: indexedTitle } : undefined);
+  let indexedMetadata;
+  if (selectedIndex) {
+    const file = path.join(contextRoot, 'selected-index.json');
+    await fs.mkdir(contextRoot, { recursive: true });
+    const text = `${JSON.stringify({ sessionId, entry: selectedIndex })}\n`;
+    await fs.writeFile(file, text);
+    indexedMetadata = { destination: file, sha256: createHash('sha256').update(text).digest('hex') };
+  }
+  for (const relative of ['workspace.json',
     path.join('GitHub.copilot-chat', 'transcripts', `${sessionId}.jsonl`),
     path.join('GitHub.copilot-chat', 'debug-logs', sessionId, 'models.json')]) {
     const file = path.join(originalRoot, relative);
@@ -180,7 +203,8 @@ export async function snapshotLocalInputs (source: string): Promise<SourceCopy> 
     await snapshotTree(path.join(originalRoot, relative), path.join(contextRoot, relative), contextCopies,
       (file) => !file.includes(path.sep) && file.endsWith('.md'));
   }
-  return { ...copy, contextRoot, contextCopies };
+  return { ...copy, contextRoot, contextCopies, indexedMetadata, captureDirectory: path.dirname(contextRoot),
+    ...(typeof selectedIndex?.title === 'string' ? { indexedTitle: selectedIndex.title } : {}) };
 }
 
 /** Only paths read by inventory/export are copied. Symlinks and unrelated extension stores aren't followed. */
@@ -192,6 +216,7 @@ export async function snapshotUserData (root: string, home = process.env.COPILOT
   if (directory) {
     await fs.mkdir(path.dirname(folder), { recursive: true });
     await fs.mkdir(folder);
+    await registerCapture(folder, 'corpus');
   }
   const userDataRoot = path.join(folder, 'Code');
   const copilotHome = path.join(folder, 'copilot');
@@ -266,6 +291,11 @@ export async function verifySourceCopy (copy: SourceCopy): Promise<Buffer> {
 }
 
 export async function readSourceCopy (copy: SourceCopy): Promise<string> {
+  if (copy.indexedMetadata) {
+    const bytes = await fs.readFile(copy.indexedMetadata.destination);
+    if (createHash('sha256').update(bytes).digest('hex') !== copy.indexedMetadata.sha256)
+      throw new Error('The saved selected index metadata changed. Re-export before verifying this file.');
+  }
   for (const related of copy.contextCopies ?? [])
     await verifySourceCopy(related);
   return new TextDecoder('utf-8', { fatal: true }).decode(await verifySourceCopy(copy));
@@ -279,6 +309,8 @@ export function sourceCopyNotice (copy: SourceCopy | undefined): string[] {
   const local = new Date(date.getTime() - offset * 60_000).toISOString().slice(0, -1);
   const zone = `${offset > 0 ? '-' : '+'}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0')}:${String(Math.abs(offset) % 60).padStart(2, '0')}`;
   return [
+    ...(copy.notices ?? []).map((notice) => `> Snapshot notice: ${notice}`),
+    ...(copy.kept ? ['> A private source copy was kept in the configured exporter cache for later file verification.'] : []),
     ...(copy.changedDuringCopy ? [`> Source changed during copy at ${local}${zone}. This archive uses the captured copy.`] : []),
     ...(copy.skippedTrailingRecord ? ['> Snapshot notice: skipped one incomplete trailing record. All preceding records were parsed normally.'] : []),
   ];
@@ -286,7 +318,12 @@ export function sourceCopyNotice (copy: SourceCopy | undefined): string[] {
 
 interface ExportCopyReceipt {
   selector: string;
-  outputSha256: string;
+  outputSha256: string | null;
+  verificationFailure?: string;
+  output?: string;
+  status?: 'kept' | 'not-kept';
+  captureDirectory?: string;
+  sdk?: SdkCapture;
   root?: string;
   source?: string;
   copy?: SourceCopy;
@@ -299,8 +336,24 @@ const receiptFile = (output: string) => path.join(sourceCacheRoot(), 'receipts',
 export async function saveExportCopy (output: string, receipt: Omit<ExportCopyReceipt, 'outputSha256'>) {
   const file = receiptFile(output);
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const outputSha256 = createHash('sha256').update(await fs.readFile(output)).digest('hex');
-  await fs.writeFile(file, `${JSON.stringify({ ...receipt, outputSha256 }, null, 2)}\n`);
+  if (await exists(file)) {
+    const previous: ExportCopyReceipt = JSON.parse(await fs.readFile(file, 'utf8'));
+    if (previous.captureDirectory && previous.captureDirectory !== receipt.captureDirectory)
+      await discardCapture(previous.captureDirectory);
+  }
+  const outputSha256 = receipt.verificationFailure ? null : createHash('sha256').update(await fs.readFile(output)).digest('hex');
+  await fs.writeFile(file, `${JSON.stringify({ ...receipt, output: path.resolve(output), outputSha256 }, null, 2)}\n`);
+  if (receipt.captureDirectory)
+    await finishCapture(receipt.captureDirectory, true, file);
+}
+
+export async function keepFailedExportCopy (output: string, receipt: Omit<ExportCopyReceipt, 'outputSha256' | 'status'>,
+  failure: string): Promise<void> {
+  if (!receipt.captureDirectory)
+    throw new Error('A failed export requires its captured source directory.');
+  // Keep the evidence even if writing its receipt also fails.
+  await finishCapture(receipt.captureDirectory, true);
+  await saveExportCopy(output, { ...receipt, status: 'kept', verificationFailure: failure });
 }
 
 export async function readExportCopy (output: string, selector: string): Promise<ExportCopyReceipt> {
@@ -310,5 +363,9 @@ export async function readExportCopy (output: string, selector: string): Promise
   const receipt: ExportCopyReceipt = JSON.parse(await fs.readFile(file, 'utf8'));
   if (receipt.selector !== selector)
     throw new Error('The saved export snapshot belongs to a different source selector.');
+  if (receipt.status === 'not-kept')
+    throw new Error('The source copy was not kept. Re-export with --keep-source before verifying this saved file; live sources will not be substituted.');
+  if (receipt.captureDirectory && !await exists(receipt.captureDirectory))
+    throw new Error('The kept source copy is unavailable. Re-export with --keep-source before verifying this saved file.');
   return receipt;
 }

@@ -8,6 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existingUserDataSnapshot, snapshotUserData } from '../src/session/source-snapshot.ts';
+import { discardCapture, finishCapture } from '../src/session/source-cache.ts';
+import { createHash } from 'node:crypto';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_CLI = path.join(ROOT, 'src', 'cli.ts');
@@ -16,8 +18,14 @@ const DEFAULT_CLI = path.join(ROOT, 'src', 'cli.ts');
 // during the run from totals (listed in totals.changedDuringRun instead).
 // Version 5 adds independent image hashes and measured Local export sizes.
 // Version 6 adds source snapshots and keeps results when live originals change.
-export const CORPUS_REPORT_VERSION = 6;
+// Version 7 adds stable IDs derived from the original source path beside run-local labels.
+export const CORPUS_REPORT_VERSION = 7;
 export const BASE64_TRIGGER_BYTES = 64 * 1024;
+
+export function sourcePathId (source) {
+  const canonical = path.resolve(source).replace(/\\/gu, '/');
+  return createHash('sha256').update(process.platform === 'win32' ? canonical.toLowerCase() : canonical).digest('hex').slice(0, 12);
+}
 
 /** Counts string values with a base64-alphabet run of at least 64 KiB; this is a heuristic, not decoding. */
 export function countBase64LikeStrings (value) {
@@ -183,8 +191,9 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
   const frozen = live ? null : existing ?? await snapshotUserData(userDataRoot, env.COPILOT_HOME, snapshotDirectory);
   const sources = await collectSources(frozen?.userDataRoot ?? userDataRoot, frozen?.copilotHome ?? env.COPILOT_HOME);
   const copies = new Map(frozen?.files.map((file) => [file.destination, file]) ?? []);
-  const executionEnv = frozen ? { ...env, COPILOT_HOME: frozen.copilotHome } : env;
   const scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-corpus-'));
+  const executionEnv = { ...env, ...(frozen ? { COPILOT_HOME: frozen.copilotHome } : {}),
+    CCE_CACHE_DIR: path.join(scratch, 'cache') };
   const jobs = [
     ...sources.local.map((journal, index) => ({ kind: 'local', selector: journal, sourcePath: journal, label: `L${String(index + 1).padStart(3, '0')}` })),
     ...sources.sdk.map(({ selector, provider, path: sourcePath }, index) => ({ kind: `sdk:${provider}`, selector, sourcePath, label: `S${String(index + 1).padStart(3, '0')}` })),
@@ -203,7 +212,7 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
       if (job.kind === 'local') {
         const markdown = path.join(scratch, job.label, 'export.md');
         await fs.mkdir(path.dirname(markdown), { recursive: true });
-        const exported = await run([cli, job.selector, markdown], executionEnv);
+        const exported = await run([cli, job.selector, markdown, '--keep-source'], executionEnv);
         result = exported.exitCode === 0
           ? await run([cli, '--verify', '--strict', '--json', job.selector, markdown], executionEnv)
           : { ...exported, stage: 'export' };
@@ -225,6 +234,7 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
       const after = await statSource(copy?.source ?? job.sourcePath);
       results[index] = {
         ...summarize(job.kind, job.kind === 'local' && copy ? copy.source : job.selector, job.label, result, result.stage ? null : parseReport(result.stdout), Date.now() - t0),
+        sourceId: sourcePathId(copy?.source ?? job.sourcePath),
         source: { before, after },
         snapshot: copy ?? null,
         base64Like,
@@ -245,7 +255,9 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
   } finally {
     await fs.rm(scratch, { recursive: true, force: true });
     if (frozen && !snapshotDirectory && !existing)
-      await fs.rm(frozen.directory, { recursive: true, force: true });
+      await discardCapture(frozen.directory);
+    if (frozen && snapshotDirectory && !existing)
+      await finishCapture(frozen.directory, true);
   }
   const report = {
     version: CORPUS_REPORT_VERSION,
@@ -280,10 +292,11 @@ export function totalize (results) {
   const totals = {
     sources: compared.length,
     changedDuringRun: results.filter((item) => item.changedDuringRun).map((item) => item.label),
+    changedSources: results.filter((item) => item.changedDuringRun).map(({ label, sourceId }) => ({ label, sourceId })),
     byKind: {}, byExitCode: {}, failureReasons: {}, checked: 0, categories: {},
     base64Like: { count: 0, thresholdBytes: BASE64_TRIGGER_BYTES, invalidLines: 0 },
     representationCounts: {},
-    parser: { failed: 0, skipped: 0, totalMs: 0, maxMs: 0, maxMsLabel: null },
+    parser: { failed: 0, skipped: 0, totalMs: 0, maxMs: 0, maxMsLabel: null, maxMsSourceId: null },
     images: {},
     localExportSizes: { markdownBytes: 0, companionBytes: 0, totalBytes: 0, largest: null },
   };
@@ -301,7 +314,7 @@ export function totalize (results) {
       for (const key of ['markdownBytes', 'companionBytes', 'totalBytes'])
         totals.localExportSizes[key] += item.exportSizes[key];
       if (!totals.localExportSizes.largest || item.exportSizes.totalBytes > totals.localExportSizes.largest.totalBytes)
-        totals.localExportSizes.largest = { label: item.label, ...item.exportSizes };
+        totals.localExportSizes.largest = { label: item.label, sourceId: item.sourceId ?? null, ...item.exportSizes };
     }
     for (const [name, count] of Object.entries(item.representationCounts ?? {}))
       totals.representationCounts[name] = (totals.representationCounts[name] ?? 0) + count;
@@ -318,6 +331,7 @@ export function totalize (results) {
     if ((item.parserMs ?? 0) > totals.parser.maxMs) {
       totals.parser.maxMs = item.parserMs;
       totals.parser.maxMsLabel = item.label;
+      totals.parser.maxMsSourceId = item.sourceId ?? null;
     }
     addCategories(totals.categories, item.categories);
   }
@@ -350,7 +364,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const options = parseArgs(process.argv.slice(2));
     const report = await runCorpus({
       ...options,
-      onProgress: (item, done, total) => console.error(`${done}/${total} ${item.label} ${item.kind} exit ${item.exitCode}${item.failureReasons.length ? ` ${item.failureReasons.join(',')}` : ''}`),
+      onProgress: (item, done, total) => console.error(`${done}/${total} ${item.label} [${item.sourceId}] ${item.kind} exit ${item.exitCode}${item.failureReasons.length ? ` ${item.failureReasons.join(',')}` : ''}`),
     });
     console.log(JSON.stringify({ out: report.outputPath, totals: report.totals }));
     process.exit(report.totals.sources === (report.totals.byExitCode[0] ?? 0) ? 0 : 2);

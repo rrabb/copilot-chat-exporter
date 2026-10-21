@@ -16,6 +16,13 @@ export interface CliOptions {
   htmlOutput: string | null;
   current: boolean;
   overwrite: boolean;
+  keepSource: boolean;
+  cache: boolean;
+  clean: boolean;
+  dryRun: boolean;
+  yes: boolean;
+  includeCorpus: boolean;
+  olderThanDays: number | null;
   verify: boolean;
   strict: boolean;
   /** With --verify: print one machine-readable JSON object instead of the text report. */
@@ -37,6 +44,7 @@ export type ParsedArgs =
 const BOOLEAN_FLAGS = new Set([
   '--list', '--current', '--overwrite', '--verify', '--audit', '--strict', '--json',
   '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed', '--compressed',
+  '--keep-source', '--cache', '--clean', '--dry-run', '--yes', '--include-corpus',
 ]);
 
 // Value is the usage line shown when the flag is wrong, so the message lives next to the flag.
@@ -49,6 +57,7 @@ const VALUE_FLAGS: Record<string, string> = {
   '--golden': '--golden check|update',
   '--snapshot': '--snapshot check|update [sessionId]',
   '--install-skill': '--install-skill <targetRoot>',
+  '--older-than': '--older-than <nonnegative days>',
 };
 
 const ACTION_FLAGS = ['--golden', '--snapshot'] as const;
@@ -92,9 +101,23 @@ export function parseArgs (argv: string[]): ParsedArgs {
   const modes = [
     booleans.has('--list'), values.has('--golden'), values.has('--snapshot'), values.has('--install-skill'),
     booleans.has('--verify') || booleans.has('--audit'),
+    booleans.has('--cache') || booleans.has('--clean'),
   ].filter(Boolean).length;
+  const olderThan = values.get('--older-than');
+  if (olderThan !== undefined && (!/^\d+(?:\.\d+)?$/u.test(olderThan) || !Number.isFinite(Number(olderThan))))
+    return { ok: false, error: 'Usage: --older-than <nonnegative days>' };
+  if ((booleans.has('--dry-run') || booleans.has('--yes') || booleans.has('--include-corpus') || olderThan !== undefined) && !booleans.has('--clean'))
+    return { ok: false, error: '--dry-run, --yes, --include-corpus and --older-than require --clean.' };
+  if ((booleans.has('--cache') || booleans.has('--clean')) && (positionals.length || booleans.has('--current') || booleans.has('--keep-source')))
+    return { ok: false, error: 'Cache commands do not accept a session, output or --keep-source.' };
   const listRequested = booleans.has('--list')
     || (modes === 0 && positionals.length === 0 && !booleans.has('--current'));
+  if (booleans.has('--keep-source') && (listRequested || modes > 0))
+    return { ok: false, error: '--keep-source is available only when exporting a chat.' };
+  if ((booleans.has('--cache') || booleans.has('--clean'))
+    && ([...booleans].some((flag) => !['--cache', '--clean', '--dry-run', '--yes', '--include-corpus'].includes(flag))
+      || [...values.keys()].some((flag) => flag !== '--older-than')))
+    return { ok: false, error: 'Cache commands accept only --cache, --clean, --older-than, --dry-run, --yes and --include-corpus.' };
   if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
     || booleans.has('--no-html') || booleans.has('--detailed') || booleans.has('--compressed') || values.has('--compression') || values.has('--html-output')) && !listRequested)
     return { ok: false, error: 'Listing options are available only when listing sessions.' };
@@ -134,6 +157,13 @@ export function parseArgs (argv: string[]): ParsedArgs {
       htmlOutput: values.get('--html-output') ?? null,
       current: booleans.has('--current'),
       overwrite: booleans.has('--overwrite'),
+      keepSource: booleans.has('--keep-source'),
+      cache: booleans.has('--cache') || booleans.has('--clean'),
+      clean: booleans.has('--clean'),
+      dryRun: booleans.has('--dry-run'),
+      yes: booleans.has('--yes'),
+      includeCorpus: booleans.has('--include-corpus'),
+      olderThanDays: olderThan === undefined ? null : Number(olderThan),
       verify: booleans.has('--verify') || booleans.has('--audit'),
       strict: booleans.has('--strict'),
       json: booleans.has('--json'),

@@ -6,8 +6,9 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { readSourceCopy, snapshotLocalInputs, sourceCopyForPath } from './session/source-snapshot.ts';
+import { readSourceCopy, snapshotLocalInputs } from './session/source-snapshot.ts';
 import type { SourceCopy } from './session/source-snapshot.ts';
+import { discardCapture } from './session/source-cache.ts';
 import { createHostContext, setWorkspaceRoot } from './host.ts';
 import { buildDocument } from './markdown.ts';
 import type { FenceRepairs, TextOverflow } from './markdown.ts';
@@ -78,7 +79,7 @@ export async function loadSession (options: {
   const host = await createHostContext({ hashRoot: location.hashRoot, workspaceRoot, outDir });
   setWorkspaceRoot(host.workspaceRoot);
 
-  const copiedSource = options.snapshotCopy ?? await sourceCopyForPath(location.sessionPath) ?? await snapshotLocalInputs(location.sessionPath);
+  const copiedSource = options.snapshotCopy ?? await snapshotLocalInputs(location.sessionPath, location.indexedTitle);
   copiedSource.indexedTitle = location.indexedTitle;
   const { contextRoot } = copiedSource;
   if (!contextRoot)
@@ -103,7 +104,14 @@ export async function loadSession (options: {
   for (const item of Object.values(memory).flat())
     item.path = originalPath(item.path);
 
-  return { location, host, raw, session, resources, versions, memory, copiedSource };
+  let disposed = false;
+  const dispose = async () => {
+    if (!disposed && !options.snapshotCopy && copiedSource.captureDirectory) {
+      await discardCapture(copiedSource.captureDirectory);
+      disposed = true;
+    }
+  };
+  return { location, host, raw, session, resources, versions, memory, copiedSource, dispose };
 }
 
 /** Everything a renderer needs, derived from its own producer so it cannot drift from it. */

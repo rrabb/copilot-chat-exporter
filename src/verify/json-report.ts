@@ -93,12 +93,13 @@ export function buildLocalVerifyJson (input: {
   render?.failed && reasons.push('layer-c');
   input.parser.failed && reasons.push('parser-check');
   input.images?.failed && reasons.push('image-loss');
+  input.renderSkipReason === 'unreadable-output' && reasons.push('unreadable-output');
   if (strict) {
     census.unhandled.length && reasons.push('unhandled-kind');
     census.unrecognizedToolData.length && reasons.push('unrecognized-tool-data');
-    loss.failed && reasons.push('layer-d');
-    fenceRepairs.early.length && reasons.push('early-fence-close');
   }
+  loss.failed && reasons.push('layer-d');
+  strict && fenceRepairs.early.length && reasons.push('early-fence-close');
   return {
     version: VERIFY_JSON_VERSION,
     path: 'local',
@@ -144,11 +145,9 @@ export function buildSdkVerifyJson (input: {
   const reasons: string[] = [];
   input.parser.failed && reasons.push('parser-check');
   input.images?.failed && reasons.push('image-loss');
-  if (strict) {
-    census.unhandled.length && reasons.push('unhandled-kind');
-    loss.failed && reasons.push('layer-d');
-    input.fenceRepairs.early.length && reasons.push('early-fence-close');
-  }
+  strict && census.unhandled.length && reasons.push('unhandled-kind');
+  loss.failed && reasons.push('layer-d');
+  strict && input.fenceRepairs.early.length && reasons.push('early-fence-close');
   return {
     version: VERIFY_JSON_VERSION,
     path: 'sdk',

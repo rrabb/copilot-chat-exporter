@@ -115,7 +115,11 @@ async function resolveBacking (root: string, identity: AgentHostIdentity, entrie
   };
 }
 
-export interface ProviderResolverOptions { copilotHome?: string }
+export interface ProviderResolverOptions {
+  copilotHome?: string;
+  /** Internal selector discovery only. Event identity must be validated on the captured log before export. */
+  identityOnly?: boolean;
+}
 export interface ResolvedProviderSource {
   source: SdkEventSource;
   children: SdkEventSource[];
@@ -148,6 +152,14 @@ export function createProviderSourceResolver (options: ProviderResolverOptions =
     mtimeMs: number;
   }>>();
   async function log (id: string) {
+    if (options.identityOnly)
+      return {
+        sha256: '', producer: null, scopes: [] as VerifiedChildScope[],
+        activity: new Map<string, number | null>(), created: new Map<string, number | null>(),
+        promptCounts: new Map<string, number | null>(), confirmedEmpty: new Map<string, boolean>(),
+        childParents: new Map<string, string | null>(), childProblems: [] as ChildScopeProblem[],
+        size: 0, mtimeMs: 0,
+      };
     let result = logs.get(id);
     if (!result) {
       result = (async () => {
@@ -226,6 +238,8 @@ export function createProviderSourceResolver (options: ProviderResolverOptions =
   }
 
   async function resolve (key: string, provenance: SourceProvenance): Promise<ResolvedProviderSource> {
+    if (options.identityOnly && key.includes('#subagent/'))
+      throw new Error('Child selectors require event-scope verification, not metadata-only discovery.');
     let backing: Backing;
     let chat: string;
     let provider: 'agent-host' | 'copilot-cli';

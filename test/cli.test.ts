@@ -3,9 +3,10 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { finishCapture, registerCapture } from '../src/session/source-cache.ts';
 
 const CLI = process.env.CCE_TEST_CLI ?? fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 const UUID = '11111111-1111-4111-8111-111111111111';
@@ -62,7 +63,7 @@ for (const codec of ['gzip', 'brotli']) {
 }
 
 test('an Agent Host chat is exported by prefix, with companions, left-out counts and an independent content check', async (context) => {
-  const { home, root, workspace, invoke } = await fixture(context);
+  const { home, root, workspace, env, invoke } = await fixture(context);
   const chat = 'aaaaaaaa-1111-4111-8111-111111111111';
   const database = new DatabaseSync(path.join(workspace, 'state.vscdb'));
   try {
@@ -102,6 +103,7 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   assert.match(result.stdout, /Left out \(counted, not exported\): permission prompts 1/u);
   assert.match(result.stdout, /Every checked piece of recorded content appears in the export\./u);
   const markdown = await fs.readFile(output, 'utf8');
+  assert.equal((await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-')).length, 0);
   assert.match(markdown, /The compiler error points at the parser\./u);
   assert.match(markdown, /\*\*Intent:\*\* Open the parser/u);
   assert.match(markdown, /Copilot SDK event log/u);
@@ -114,7 +116,7 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   assert.match(verify.stdout, /Unhandled event types: none/u);
   await fs.appendFile(file, '\n{"id":"active","type":"assistant.message","data":{"content":');
   const activeOutput = path.join(home, 'active-sdk.md');
-  const active = invoke('aaaaaaaa', activeOutput, '--strict', '--user-data-root', root);
+  const active = invoke('aaaaaaaa', activeOutput, '--strict', '--keep-source', '--user-data-root', root);
   assert.equal(active.status, 0, active.stdout + active.stderr);
   assert.match(await fs.readFile(activeOutput, 'utf8'), /skipped one incomplete trailing record/u);
   await fs.appendFile(file, '"New SDK content after the export"}}\n');
@@ -134,9 +136,15 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   await fs.writeFile(activeOutput, savedMarkdown);
   const activeAssets = (await fs.readdir(home)).find((name) => name.startsWith('active-sdk_assets_'))!;
   const promptPath = path.join(home, activeAssets, (await fs.readdir(path.join(home, activeAssets)))[0]!);
+  const promptBytes = await fs.readFile(promptPath);
   await fs.unlink(promptPath);
   const missingCompanion = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(missingCompanion.status, 2, 'missing SDK text companions are loss, not replaced with generated companions');
+  await fs.writeFile(promptPath, promptBytes);
+  await fs.rm(root, { recursive: true });
+  await fs.rm(env.COPILOT_HOME, { recursive: true });
+  const withoutNative = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
+  assert.equal(withoutNative.status, 0, 'kept SDK file verification never requires native index/event/usage stores');
 });
 
 test('an unknown agent event type is schema drift that --verify --strict reports', async (context) => {
@@ -213,7 +221,7 @@ test('a running Local chat exports complete records and verifies the original co
   const { home, sessionPath, invoke } = await fixture(context);
   await fs.appendFile(sessionPath, '\n{"kind":1,"k":["requests",0,"response"],"v":');
   const output = path.join(home, 'active-local.md');
-  const exported = invoke(sessionPath, output, '--strict');
+  const exported = invoke(sessionPath, output, '--strict', '--keep-source');
   assert.equal(exported.status, 0, exported.stdout + exported.stderr);
   assert.match(await fs.readFile(output, 'utf8'), /skipped one incomplete trailing record/u);
   await fs.appendFile(sessionPath, '[{"value":"New live content that is not in the copy"}]}\n');
@@ -232,6 +240,163 @@ test('--json is refused without --verify', async (context) => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /--json is available only with --verify/u);
 });
+
+test('default export verifies before discarding its source and later file verification explains --keep-source', async (context) => {
+  const { home, sessionPath, raw, env, invoke } = await fixture(context);
+  const output = path.join(home, 'default.md');
+  const exported = invoke(sessionPath, output);
+  assert.equal(exported.status, 0, exported.stderr + exported.stdout);
+  assert.match(exported.stdout, /Every checked piece of recorded content/u);
+  assert.doesNotMatch(await fs.readFile(output, 'utf8'), /private source copy was kept/u);
+  assert.equal((await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-')).length, 0);
+  const checked = invoke('--verify', sessionPath, output);
+  assert.equal(checked.status, 1);
+  assert.match(checked.stderr, /source copy was not kept.*--keep-source/u);
+  const kept = invoke(sessionPath, output, '--overwrite', '--keep-source');
+  assert.equal(kept.status, 0, kept.stderr + kept.stdout);
+  assert.match(await fs.readFile(output, 'utf8'), /private source copy was kept/u);
+  const directories = (await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-'));
+  assert.equal(directories.length, 1);
+  const listing = invoke('--cache');
+  assert.equal(listing.status, 0, listing.stderr);
+  assert.match(listing.stdout, /Total: 1 captures/u);
+  const preview = invoke('--clean', '--dry-run');
+  assert.equal(preview.status, 0, preview.stderr);
+  assert.match(preview.stdout, /Would remove 1 captures/u);
+  assert.equal(invoke('--verify', '--strict', sessionPath, output).status, 0);
+  const listed = invoke('--clean');
+  assert.equal(listed.status, 0, listed.stderr);
+  assert.match(listed.stdout, /--yes/u);
+  assert.equal((await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-')).length, 1);
+  const cleaned = invoke('--clean', '--yes');
+  assert.equal(cleaned.status, 0, cleaned.stderr);
+  assert.equal((await fs.readdir(path.join(env.CCE_CACHE_DIR, 'receipts'))).length, 0);
+  assert.equal(await fs.readFile(sessionPath, 'utf8'), raw);
+});
+
+test('cleanup lists first, excludes corpus by default and requires approval before deletion', async (context) => {
+  const { home, env, invoke } = await fixture(context);
+  const corpus = path.join(home, 'retained-corpus');
+  await fs.mkdir(corpus);
+  await fs.writeFile(path.join(corpus, 'source-snapshot.json'), '{}');
+  const previous = process.env.CCE_CACHE_DIR;
+  process.env.CCE_CACHE_DIR = env.CCE_CACHE_DIR;
+  try {
+    await registerCapture(corpus, 'corpus');
+    await finishCapture(corpus, true);
+  } finally {
+    process.env.CCE_CACHE_DIR = previous;
+  }
+  const skipped = invoke('--clean', '--yes');
+  assert.equal(skipped.status, 0, skipped.stderr);
+  assert.match(skipped.stdout, /Skipped/u);
+  assert.ok(await fs.stat(corpus));
+  const preview = invoke('--clean', '--include-corpus');
+  assert.equal(preview.status, 0, preview.stderr);
+  assert.match(preview.stdout, /Age \(days\)/u);
+  assert.match(preview.stdout, /Nothing deleted.*--yes/u);
+  assert.ok(await fs.stat(corpus));
+  const dry = invoke('--clean', '--include-corpus', '--yes', '--dry-run');
+  assert.equal(dry.status, 0, dry.stderr);
+  assert.ok(await fs.stat(corpus));
+  const preload = path.join(home, 'terminal.mjs');
+  await fs.writeFile(preload, "Object.defineProperty(process.stdin,'isTTY',{value:true});Object.defineProperty(process.stdout,'isTTY',{value:true});");
+  for (const answer of ['\n', 'n\n', 'yes\n']) {
+    const result = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, CLI, '--clean', '--include-corpus'], {
+      cwd: home, env, input: answer, encoding: 'utf8', timeout: 30_000,
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.ok(result.stdout.indexOf(corpus) < result.stdout.indexOf('Delete the eligible'));
+    if (answer !== 'yes\n')
+      assert.ok(await fs.stat(corpus));
+    else
+      await assert.rejects(fs.stat(corpus), { code: 'ENOENT' });
+  }
+});
+
+test('cache reporting includes legacy temp captures without deleting them', async (context) => {
+  const { home, env, invoke } = await fixture(context);
+  const legacy = path.join(home, 'copilot-chat-exporter-cache');
+  await fs.mkdir(legacy);
+  await fs.writeFile(path.join(legacy, 'old-receipt.json'), '{}');
+  const preload = path.join(home, 'legacy-temp.mjs');
+  await fs.writeFile(preload, `import os from 'node:os';os.tmpdir=()=>${JSON.stringify(home)};`);
+  env.NODE_OPTIONS = `--import=${pathToFileURL(preload).href}`;
+  const report = invoke('--cache');
+  assert.equal(report.status, 0, report.stderr);
+  assert.ok(report.stdout.includes(`Legacy cache (report only): ${legacy}`));
+  assert.ok(await fs.stat(legacy));
+});
+
+for (const sdk of [false, true]) {
+  for (const failure of ['missing-content', 'read-error']) {
+    for (const keepSource of [false, true]) {
+    test(`failed ${sdk ? 'SDK' : 'Local'} ${keepSource ? 'kept' : 'default'} export keeps its capture after ${failure}`, async (context) => {
+      const { home, root, sessionPath, env, invoke } = await fixture(context);
+      let selector = sessionPath;
+      if (sdk) {
+        selector = 'copilotcli:/failure-fixture';
+        const database = new DatabaseSync(path.join(root, 'User', 'workspaceStorage', 'hash', 'state.vscdb'));
+        try {
+          database.prepare('UPDATE ItemTable SET value = ? WHERE key = ?').run(JSON.stringify({
+            version: 1, entries: { [selector]: { title: 'Failure fixture' } },
+          }), 'chat.ChatSessionStore.index');
+        } finally {
+          database.close();
+        }
+        const events = path.join(env.COPILOT_HOME, 'session-state', 'failure-fixture', 'events.jsonl');
+        await fs.mkdir(path.dirname(events), { recursive: true });
+        await fs.writeFile(events, [
+          { type: 'session.start', data: { sessionId: 'failure-fixture', version: 1 } },
+          { type: 'system.message', data: { role: 'system', content: 'Companion system instructions' } },
+          { type: 'user.message', data: { content: 'Question' } },
+          { type: 'assistant.message', data: { content: 'Answer' } },
+        ].map((event) => JSON.stringify(event)).join('\n'));
+      }
+      const output = path.join(home, 'failed.md');
+      const preload = path.join(home, 'verification-failure.mjs');
+      await fs.writeFile(preload, `
+import { promises as fs } from 'node:fs';
+const original = fs.readFile;
+fs.readFile = async function (file, ...args) {
+  if (String(file).startsWith(${JSON.stringify(path.join(home, '.chat-export-'))}) && args[0] === 'utf8') {
+    ${failure === 'read-error' ? "throw new Error('Synthetic saved-file read failure');" : ''}
+    const bytes = await original.call(this, file, ...args);
+    return typeof bytes === 'string' ? bytes.replaceAll('Question', 'Removed!') : bytes;
+  }
+  return original.call(this, file, ...args);
+};
+`);
+      const previousNodeOptions = env.NODE_OPTIONS;
+      env.NODE_OPTIONS = `${previousNodeOptions} --import=${pathToFileURL(preload).href}`;
+      await fs.writeFile(output, 'Existing successful archive');
+      const result = invoke(selector, output, '--overwrite', ...(keepSource ? ['--keep-source'] : []), '--user-data-root', root);
+      assert.notEqual(result.status, 0, result.stdout + result.stderr);
+      const captures = (await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-'));
+      assert.equal(captures.length, 1, result.stdout + result.stderr);
+      const capture = path.join(env.CCE_CACHE_DIR, captures[0]!);
+      assert.ok(result.stderr.includes(capture), 'failure diagnostic includes the kept capture path');
+      assert.match(result.stderr, /verification failed.*source copy.*kept/iu);
+      assert.equal(await fs.readFile(output, 'utf8'), 'Existing successful archive');
+      const failed = path.join(home, 'failed.verify-failed.md');
+      const failedMarkdown = await fs.readFile(failed, 'utf8');
+      assert.match(failedMarkdown, /^>.*Verification failed/iu);
+      assert.ok(failedMarkdown.includes(capture));
+      const logs = (await fs.readdir(home)).filter((name) => /^failed-.+-\d{6}_\d{6}(?:-\d+)?\.log$/u.test(name));
+      assert.equal(logs.length, 1);
+      assert.match(await fs.readFile(path.join(home, logs[0]!), 'utf8'), /failureReasons|verification-error/u);
+      assert.equal(JSON.parse(await fs.readFile(path.join(capture, '.cce-capture.json'), 'utf8')).kept, true);
+      env.NODE_OPTIONS = previousNodeOptions;
+      const verify = invoke('--verify', '--strict', selector, failed, '--user-data-root', root);
+      assert.equal(verify.status, 0, verify.stdout + verify.stderr);
+      const success = invoke(selector, output, '--overwrite', '--user-data-root', root);
+      assert.equal(success.status, 0, success.stdout + success.stderr);
+      assert.match(success.stdout, /older.*verify-failed/iu);
+      assert.equal(await fs.readFile(failed, 'utf8'), failedMarkdown);
+    });
+    }
+  }
+}
 
 async function fixture (context: test.TestContext, multipleRoots = false) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-cli-'));
@@ -263,9 +428,12 @@ async function fixture (context: test.TestContext, multipleRoots = false) {
   multipleRoots && await fs.mkdir(path.join(parent, 'Code - Insiders'), { recursive: true });
   const env = {
     ...process.env, HOME: home, USERPROFILE: home, APPDATA: parent, XDG_CONFIG_HOME: parent,
+    NODE_OPTIONS: process.env.NODE_OPTIONS ?? '',
     COPILOT_HOME: path.join(home, 'copilot'),
+    CCE_CACHE_DIR: await fs.mkdtemp(path.join(process.env.CCE_CACHE_DIR!, 'cli-')),
     VSCODE_TARGET_SESSION_LOG: path.join(workspace, 'GitHub.copilot-chat', 'debug-logs', UUID),
   };
+  context.after(() => fs.rm(env.CCE_CACHE_DIR, { recursive: true, force: true }));
   function invoke (...args: string[]) {
     return spawnSync(process.execPath, [CLI, ...args], { cwd: home, env, encoding: 'utf8', timeout: 30_000 });
   }

@@ -157,7 +157,7 @@ export async function readLinkedImageCompanions (markdown: string, outputPath: s
 /** Reads only links into this archive's sibling asset folder, never native session locations. */
 export async function readLinkedArchiveCompanions (markdown: string, outputPath: string, imagesOnly = false): Promise<CompanionArtifact[]> {
   const directory = path.dirname(path.resolve(outputPath));
-  const prefix = `${path.basename(outputPath, path.extname(outputPath))}_assets_`;
+  const prefix = `${path.basename(outputPath, path.extname(outputPath)).replace(/\.verify-failed(?:-\d+)?$/u, '')}_assets_`;
   const result: CompanionArtifact[] = [];
   for (const target of archiveTargets(markdown, imagesOnly)) {
     const parts = target.split('/');

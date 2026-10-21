@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { PlannedArchive } from './export-policy.ts';
+import { failedArchivePath, failureWarning, verificationException, writeFailureLog } from './verify/export-failure.ts';
+import type { ExportFailure } from './verify/export-failure.ts';
 
 export interface ArchiveWriteOptions {
   outputPath: string;
@@ -9,6 +11,13 @@ export interface ArchiveWriteOptions {
   overwrite?: boolean;
   /** Pure planner; collision retries may call it with a different sibling folder name. */
   plan: (assetsDirectory: string) => PlannedArchive;
+  verification?: {
+    check: (stagePath: string) => Promise<ExportFailure | null>;
+    keep: () => Promise<void>;
+    capture: string;
+    sessionId: string;
+    sourceHash: string;
+  };
 }
 
 export interface WrittenArchive {
@@ -17,6 +26,9 @@ export interface WrittenArchive {
   companionPaths: string[];
   markdownBytes: number;
   archive: PlannedArchive;
+  verificationFailure: ExportFailure | null;
+  failureLog: string | null;
+  olderFailedArchive: string | null;
 }
 
 function code (error: unknown) {
@@ -63,7 +75,7 @@ async function writeExclusive (file: string, bytes: Uint8Array, created: () => v
 
 /** Saves companions before publishing Markdown; failure never deletes a previous archive. */
 export async function writeArchive (options: ArchiveWriteOptions): Promise<WrittenArchive> {
-  const outputPath = path.resolve(options.outputPath);
+  let outputPath = path.resolve(options.outputPath);
   const directory = path.dirname(outputPath);
   const base = assetBase(outputPath, options.generatedAt);
   if (!options.overwrite) {
@@ -113,7 +125,43 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
       throw new Error('Markdown staging file was not created.');
     if (!(await fs.readFile(stage)).equals(markdown))
       throw new Error('Markdown verification failed before publication.');
-    if (options.overwrite) {
+    let failure: ExportFailure | null = null;
+    let failureLog: string | null = null;
+    if (options.verification) {
+      try {
+        failure = await options.verification.check(stage);
+      } catch (error) {
+        failure = verificationException(error);
+      }
+      if (failure) {
+        await options.verification.keep();
+        const warning = failureWarning(failure, options.verification.capture);
+        await fs.writeFile(stage, `${warning}${archive.markdown}`, { mode: 0o600 });
+        failureLog = await writeFailureLog(outputPath, options.verification.sessionId, failure,
+          options.verification.capture, options.generatedAt, options.verification.sourceHash);
+      }
+    }
+    let olderFailedArchive: string | null = null;
+    if (!failure) {
+      const failedName = path.basename(failedArchivePath(outputPath));
+      const stem = failedName.slice(0, -3);
+      const older = (await fs.readdir(directory)).find((name) => name === failedName
+        || (name.startsWith(`${stem}-`) && /^\d+\.md$/u.test(name.slice(stem.length + 1))));
+      olderFailedArchive = older ? path.join(directory, older) : null;
+    }
+    if (failure) {
+      for (let suffix = 0; ; suffix++) {
+        const candidate = failedArchivePath(options.outputPath, suffix);
+        try {
+          await fs.link(stage, candidate);
+          outputPath = path.resolve(candidate);
+          break;
+        } catch (error) {
+          if (code(error) !== 'EEXIST')
+            throw error;
+        }
+      }
+    } else if (options.overwrite) {
       // Do not unlink the old file: failed replacement must leave it intact.
       await fs.rename(stage, outputPath);
       stage = null;
@@ -128,7 +176,7 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
     }
     return {
       outputPath, assetsPath, companionPaths: [...ownedFiles],
-      markdownBytes: markdown.byteLength, archive,
+      markdownBytes: (await fs.stat(outputPath)).size, archive, verificationFailure: failure, failureLog, olderFailedArchive,
     };
   } catch (error) {
     const cleanupErrors: unknown[] = [];

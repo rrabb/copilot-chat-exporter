@@ -73,9 +73,9 @@ test('local verify JSON carries counts and reasons but no recorded text or tool 
   assert.deepEqual(JSON.parse(text), json);
 });
 
-test('local verify JSON applies strict-only reasons only under --strict', () => {
+test('local verify JSON fails content loss without strict while schema drift remains strict-only', () => {
   const json = local(false, { loss: loss(true), census: census([['newKind', 2]]), early: 1 });
-  assert.deepEqual(json.failureReasons, ['layer-b-mismatch', 'layer-a-tool-ids']);
+  assert.deepEqual(json.failureReasons, ['layer-b-mismatch', 'layer-a-tool-ids', 'layer-d']);
 });
 
 test('sdk verify JSON fails strict on drift or loss and leaks no samples', () => {
@@ -86,6 +86,9 @@ test('sdk verify JSON fails strict on drift or loss and leaks no samples', () =>
   const failing = buildSdkVerifyJson({ strict: true, census: census([['x', 1]]), leftOut: new Map(), loss: loss(true), parser: parser(true), fenceRepairs });
   assert.deepEqual(failing.failureReasons, ['parser-check', 'unhandled-kind', 'layer-d']);
   assert.ok(!JSON.stringify(failing).includes(SECRET));
+  const nonstrict = buildSdkVerifyJson({ strict: false, census: census(), leftOut: new Map(), loss: loss(true), parser: parser(), fenceRepairs });
+  assert.equal(nonstrict.exitCode, 2);
+  assert.deepEqual(nonstrict.failureReasons, ['layer-d']);
 });
 
 test('a failed parser check is a failure reason with or without --strict', () => {
