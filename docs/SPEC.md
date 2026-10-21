@@ -778,17 +778,20 @@ times): 50 absent (request errors 30, `confirmation` text 13, "Healed error" too
 43 partial (tool inputs whose command echo is shown differently). The committed golden session shows two known absent
 pieces, the text of a `confirmation` response item that `IGNORED_RESPONSE_KINDS` still drops by policy.
 
+**Corpus inputs.** `scripts/verify-corpus.mjs` snapshots the supported inventory stores and session sources before discovering jobs. It uses SQLite backup for databases, not filesystem database copies. Report version 6 includes per-copy sizes and SHA-256 hashes. Changes to live originals are reported without excluding frozen results. `--live` retains the previous exclusion behavior. `--snapshot-dir` keeps inputs for repeatable comparisons. Copies are consistent per file, not one atomic snapshot across stores.
+
+**Active-chat inputs.** Local and SDK single-chat paths use the shared snapshot helper. It reads a fixed source length, so appends cannot extend the copy indefinitely. An incomplete final record without a terminating newline is omitted with a notice. Invalid preceding records and complete-but-invalid final records still fail. Both captured bytes and replay bytes have hashes when a trailing record is omitted. A source change during capture is reported in the header with local copy time and UTC offset. SDK metadata/usage databases use SQLite backup. A machine-local receipt associates the output path and selector with the private captured inputs; those raw inputs never become export companions. Verification of a saved archive reuses that receipt and refuses a missing or altered source snapshot rather than reading current session data.
+
+**Historical verification limitations.** Layer D before October 20, 2026 did not cover images. Those historical results must not be read as image-preservation evidence. Current image coverage requires the independent recorded-byte hash check.
+
+Local single-chat captures include supplementary resources, transcript, model catalog, memory and workspace metadata. Replay verifies their recorded hashes before reading them. Provenance names their original paths while content comes from the copies. Corpus exports use the same inputs from the retained inventory snapshot.
+
 **CLI mapping.** `--verify <sessionId>` runs Layers A/B (source-side truth) and Layer D against the Markdown this
 build would write. `--verify <sessionId> <outputFile>` additionally runs Layer C against that file and runs Layer D against
 it too, and a normal export runs Layer C in-process on the content it just rendered. The output file is optional; the
 layers are complementary.
 
-**Driftless vs stale Layer C.** Layer C must check the rendered file that corresponds to the *current*
-journal snapshot. The export's in-process self-check is driftless (same parse produced both the file
-and the tool-node count). Running `--verify <id> <file>` against a file written by an *earlier* export
-reports a badge/anchor deficit equal to the tool calls recorded since - expected for a live,
-self-referential session, not a render bug. Prefer the export self-check, or export and verify in one
-invocation, when auditing the session that is building the exporter.
+**Export-bound Layer C.** The export's in-process self-check uses the parse that produced the file. Later `--verify <id> <file>` uses the captured inputs associated with that output and selector, not the current journal. New live tool calls therefore don't create a stale badge/anchor deficit. If that capture is unavailable, file verification fails and asks for a new export rather than substituting live data.
 
 ### 9.2 Fast automated gate
 

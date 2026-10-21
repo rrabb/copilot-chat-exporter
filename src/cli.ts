@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import { readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
@@ -303,12 +304,15 @@ if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefin
 }
 let loaded: Awaited<ReturnType<typeof loadSession>>;
 try {
+  const savedCopy = verifyMode && outputArgument
+    ? await readExportCopy(path.resolve(outputArgument), sourceArgument ?? '--current') : null;
   loaded = await loadSession({
     source: sourceArgument,
     current: currentMode,
     userDataRoot: selectedRoot,
     workspaceRoot: workspaceRootArg ?? (goldenMode ? PKG : null),
     outDir: outDirArg,
+    snapshotCopy: savedCopy?.copy,
   });
 } catch (error) {
   console.error(errorLabel(error));
@@ -434,6 +438,8 @@ try {
   outputSize = written.markdownBytes;
   companionCount = written.companionPaths.length;
   assetsPath = written.assetsPath;
+  if (!goldenMode)
+    await saveExportCopy(outputPath, { selector: sourceArgument ?? '--current', source: location.sessionPath, copy: loaded.copiedSource });
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);

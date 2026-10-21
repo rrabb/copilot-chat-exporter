@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -98,7 +99,10 @@ test('the corpus runner verifies every Local journal and SDK chat and writes one
   assert.deepEqual(sdk.failureReasons, ['unhandled-kind']);
   assert.deepEqual(report.totals.failureReasons, { 'unhandled-kind': 1 });
   assert.deepEqual(report.totals.byExitCode, { 0: 1, 2: 1 });
-  assert.equal(report.version, 5);
+  assert.equal(report.version, 6);
+  assert.equal(report.mode, 'snapshot');
+  assert.ok(report.snapshotFiles.some((file: { method: string }) => file.method === 'sqlite-backup'));
+  assert.match(local.snapshot.sha256, /^[a-f0-9]{64}$/u);
   assert.deepEqual(local.base64Like, { count: 0, thresholdBytes: 65536, invalidLines: 0 });
   assert.deepEqual(report.totals.changedDuringRun, []);
   assert.equal(local.changedDuringRun, false);
@@ -119,6 +123,7 @@ test('SDK chats sharing one events log become one job selected by an exact chat 
     sessionId,
     backing: { status: 'verified', source: { kind: 'sdk-events', provider: 'agent-host', sessionId: AGENT, path: path.resolve('/x/events.jsonl'), chatIdentity, scope: { kind: 'main' } } },
   });
+
   const selected = selectCorpusSources([
     sdk(`agent-host-copilotcli:/${AGENT}#b`, 'chat-b'),
     sdk(`agent-host-copilotcli:/${AGENT}`, 'chat-a'),
@@ -128,6 +133,24 @@ test('SDK chats sharing one events log become one job selected by an exact chat 
   ]);
   assert.deepEqual(selected.local, [path.resolve('/x/a.jsonl')]);
   assert.deepEqual(selected.sdk, [{ selector: `agent-host-copilotcli:/${AGENT}`, provider: 'agent-host', sharedKeys: 3, path: path.resolve('/x/events.jsonl') }]);
+});
+
+test('frozen corpus totals include live sources that grow, while --live keeps the old mode', async (context) => {
+  const { home, root, journal, env } = await corpusFixture(context);
+  let changed = false;
+  const report = await runCorpus({ userDataRoot: root, out: path.join(home, 'frozen.json'), env, concurrency: 1,
+    onProgress: () => {
+      if (!changed) {
+        changed = true;
+        appendFileSync(journal, '\n');
+      }
+    } });
+  assert.equal(report.totals.sources, 2);
+  assert.equal(report.sources.find((item: { kind: string }) => item.kind === 'local').changedDuringRun, true);
+  assert.deepEqual(report.totals.changedDuringRun, ['L001']);
+  const live = await runCorpus({ userDataRoot: root, out: path.join(home, 'live.json'), env, live: true });
+  assert.equal(live.mode, 'live');
+  assert.equal(live.sources.every((item: { snapshot: unknown }) => item.snapshot === null), true);
 });
 
 test('sources whose size or mtime changed during the run are listed and excluded from totals', () => {
@@ -141,6 +164,8 @@ test('sources whose size or mtime changed during the run are listed and excluded
   assert.deepEqual(totals.byExitCode, { 0: 1 });
   assert.deepEqual(totals.failureReasons, {});
   assert.equal(totals.checked, 10);
+  const frozen = totalize([item('L001', false, 0), { ...item('L002', true, 0), snapshot: { sha256: 'recorded' } }]);
+  assert.equal(frozen.sources, 2, 'changed live originals do not exclude frozen copies');
   assert.equal(sourceChanged({ size: 1, mtimeMs: 1 }, { size: 1, mtimeMs: 1 }), false);
   assert.equal(sourceChanged({ size: 1, mtimeMs: 1 }, { size: 2, mtimeMs: 1 }), true);
   assert.equal(sourceChanged({ size: 1, mtimeMs: 1 }, { size: 1, mtimeMs: 2 }), true);

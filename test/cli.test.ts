@@ -112,6 +112,20 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   const verify = invoke('--verify', '--strict', 'aaaaaaaa', '--user-data-root', root);
   assert.equal(verify.status, 0, verify.stdout + verify.stderr);
   assert.match(verify.stdout, /Unhandled event types: none/u);
+  await fs.appendFile(file, '\n{"id":"active","type":"assistant.message","data":{"content":');
+  const activeOutput = path.join(home, 'active-sdk.md');
+  const active = invoke('aaaaaaaa', activeOutput, '--strict', '--user-data-root', root);
+  assert.equal(active.status, 0, active.stdout + active.stderr);
+  assert.match(await fs.readFile(activeOutput, 'utf8'), /skipped one incomplete trailing record/u);
+  await fs.appendFile(file, '"New SDK content after the export"}}\n');
+  const frozen = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
+  assert.equal(frozen.status, 0, frozen.stdout + frozen.stderr);
+  assert.deepEqual(JSON.parse(frozen.stdout).failureReasons, []);
+  await fs.appendFile(file, '{"invalid":\n{"still":"invalid preceding record"}\n');
+  const broken = invoke('aaaaaaaa', path.join(home, 'bad-sdk.md'), '--user-data-root', root);
+  assert.notEqual(broken.status, 0);
+  const repeated = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
+  assert.equal(repeated.status, 0, 'SDK verification keeps the saved snapshot after further live writes');
 });
 
 test('an unknown agent event type is schema drift that --verify --strict reports', async (context) => {
@@ -179,8 +193,26 @@ test('--verify --json writes one JSON document with counts and the same exit cod
   assert.equal(report.layerD.target, 'in-memory');
   assert.ok(report.layerD.checked > 0);
   assert.doesNotMatch(result.stdout, /Question|Answer/u, 'recorded text stays out of the JSON');
-  const unreadable = JSON.parse(invoke('--verify', '--json', UUID, 'missing.md').stdout);
-  assert.equal(unreadable.layerC.skipped, 'unreadable-output');
+  const unreadable = invoke('--verify', '--json', UUID, 'missing.md');
+  assert.equal(unreadable.status, 1);
+  assert.match(unreadable.stderr, /saved export snapshot is unavailable/u);
+});
+
+test('a running Local chat exports complete records and verifies the original copy after live growth', async (context) => {
+  const { home, sessionPath, invoke } = await fixture(context);
+  await fs.appendFile(sessionPath, '\n{"kind":1,"k":["requests",0,"response"],"v":');
+  const output = path.join(home, 'active-local.md');
+  const exported = invoke(sessionPath, output, '--strict');
+  assert.equal(exported.status, 0, exported.stdout + exported.stderr);
+  assert.match(await fs.readFile(output, 'utf8'), /skipped one incomplete trailing record/u);
+  await fs.appendFile(sessionPath, '[{"value":"New live content that is not in the copy"}]}\n');
+  const checked = invoke('--verify', '--strict', '--json', sessionPath, output);
+  assert.equal(checked.status, 0, checked.stderr + checked.stdout);
+  assert.equal(JSON.parse(checked.stdout).layerD.failed, false);
+  await fs.writeFile(sessionPath, '{"broken":\n{"valid":true}\n');
+  assert.equal(invoke(sessionPath, path.join(home, 'broken.md')).status, 1);
+  const again = invoke('--verify', '--strict', '--json', sessionPath, output);
+  assert.equal(again.status, 0, 'verification must not reread even a now-invalid original source');
 });
 
 test('--json is refused without --verify', async (context) => {

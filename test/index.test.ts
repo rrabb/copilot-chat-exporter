@@ -11,6 +11,9 @@ const ROOT = path.join(path.sep, 'proj');
 setWorkspaceRoot(ROOT);
 
 const loadedFixture = (over: Partial<ParsedSession> = {}): LoadedSession => ({
+  copiedSource: { source: path.join(ROOT, 'chatSessions', 'abcdef01.jsonl'), destination: path.join(ROOT, 'copy.jsonl'),
+    copiedAt: '2026-08-24T07:04:00.000Z', before: { size: 0, mtimeMs: 0 }, after: { size: 0, mtimeMs: 0 },
+    size: 0, sha256: 'synthetic', method: 'bytes', changedDuringCopy: false, skippedTrailingRecord: false },
   location: {
     sessionId: 'abcdef01-0000-4000-8000-000000000000',
     sessionPath: path.join(ROOT, 'chatSessions', 'abcdef01.jsonl'),

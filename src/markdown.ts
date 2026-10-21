@@ -18,6 +18,8 @@ import { planToolText } from './export-policy.ts';
 import type { CompanionArtifact, CompanionKind } from './export-policy.ts';
 import { collectRecordedImages, saveImageCompanion } from './images.ts';
 import type { RecordedImage } from './images.ts';
+import { sourceCopyNotice } from './session/source-snapshot.ts';
+import type { SourceCopy } from './session/source-snapshot.ts';
 import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
@@ -1021,6 +1023,7 @@ function reasoningRecordedText (scalar: TurnScalars) {
 // is what lets the recorded checks compare two runs at all.
 /** Everything the page needs that is not in the parsed model. */
 export interface DocumentContext {
+  sourceCopy?: SourceCopy;
   location: SessionLocation;
   resources: { resources: Resource[]; byCall: Map<string, Resource[]>; resourceRoot: string };
   versions: { copilotVersion: string; vscodeVersion: string };
@@ -1216,6 +1219,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     '',
     `# Copilot Chat Export: ${redact(title)}`,
     '',
+    ...sourceCopyNotice(context.sourceCopy).flatMap((notice) => [notice, '']),
     sdk
       ? '> Conversation archive sourced from the Copilot SDK event log (Agent Host / Copilot CLI): prompts, readable reasoning, assistant messages, tool calls with inputs, outputs and errors, code blocks and timing.'
       : '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',

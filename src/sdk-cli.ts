@@ -13,6 +13,10 @@ import { buildSdkVerifyJson } from './verify/json-report.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { errorLabel } from './text.ts';
 import { verifySdkImages } from './verify/images.ts';
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
+import { existingUserDataSnapshot, readExportCopy, saveExportCopy, snapshotUserData, verifySourceCopy } from './session/source-snapshot.ts';
+import type { UserDataSnapshot } from './session/source-snapshot.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -27,7 +31,35 @@ export interface SdkCommandOptions {
 
 /** Returns an exit code, or null when the selector is not an Agent Host or Copilot CLI chat. */
 export async function runSdkCommand (options: SdkCommandOptions): Promise<number | null> {
-  const inventory = await inventorySessions(options.root);
+  try {
+    return await runSdkCommandFromCopy(options);
+  } catch (error) {
+    console.error(errorLabel(error));
+    return 1;
+  }
+}
+
+async function runSdkCommandFromCopy (options: SdkCommandOptions): Promise<number | null> {
+  const receipt = options.verify && options.outputArgument
+    ? await readExportCopy(path.resolve(options.outputArgument), options.selector) : null;
+  if (receipt && !receipt.root)
+    return null;
+  const selectedRoot = receipt?.root ?? options.root;
+  const existing = await existingUserDataSnapshot(selectedRoot);
+  if (receipt && !existing)
+    throw new Error('The saved SDK source snapshot is unavailable. Re-export before verifying this file.');
+  const frozen = existing ?? await snapshotUserData(selectedRoot);
+  let keepSnapshot = existing !== null;
+  try {
+    return await runSdkSnapshotCommand(options, frozen, () => { keepSnapshot = true; });
+  } finally {
+    if (!keepSnapshot)
+      await fs.rm(frozen.directory, { recursive: true, force: true });
+  }
+}
+
+async function runSdkSnapshotCommand (options: SdkCommandOptions, frozen: UserDataSnapshot, keepSnapshot: () => void): Promise<number | null> {
+  const inventory = await inventorySessions(frozen.userDataRoot, { copilotHome: frozen.copilotHome });
   const selection = selectSdkSession(inventory.occurrences, options.selector);
   if (selection === null)
     return null;
@@ -38,12 +70,18 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
     return 1;
   }
   const { occurrence, source } = selection;
+  const sourceCopy = frozen.files.find((file) => file.destination === source.path);
+  if (sourceCopy)
+    await verifySourceCopy(sourceCopy);
+  const usageCopy = frozen.files.find((file) => file.destination === path.join(frozen.copilotHome, 'session-store.db'));
+  if (usageCopy)
+    await verifySourceCopy(usageCopy);
   const title = occurrence.title || '(untitled)';
   try {
     const events = await readSdkScope(source);
     const ledger = readUsageForSource(source);
     if (options.verify) {
-      const preview = renderSdkExport(events, source, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger });
+      const preview = renderSdkExport(events, source, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger, sourceCopy });
       return await verifyReport(preview, options.strict, options.json === true);
     }
     const host = await createHostContext({ hashRoot: '', workspaceRoot: null, outDir: options.outDir });
@@ -61,10 +99,12 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
     const written = await writeArchive({
       outputPath, generatedAt, overwrite: options.overwrite,
       plan: (assetsDirectory) => {
-        last = renderSdkExport(events, source, { title, assetsDirectory, outputPath, generatedAt, ledger });
+        last = renderSdkExport(events, source, { title, assetsDirectory, outputPath, generatedAt, ledger, sourceCopy });
         return { markdown: last.markdown, companions: last.companions, diagnostics: [], policy: { ...DEFAULT_EXPORT_POLICY } };
       },
     });
+    await saveExportCopy(outputPath, { selector: options.selector, root: frozen.userDataRoot, copy: sourceCopy });
+    keepSnapshot();
     const result = last as SdkExport | null;
     if (!result)
       throw new Error('The export plan was not produced.');

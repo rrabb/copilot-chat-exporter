@@ -5,6 +5,9 @@
 // here prints or exits - that stays in `cli.ts` - so every step below is callable from a test.
 
 import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { readSourceCopy, snapshotLocalInputs, sourceCopyForPath } from './session/source-snapshot.ts';
+import type { SourceCopy } from './session/source-snapshot.ts';
 import { createHostContext, setWorkspaceRoot } from './host.ts';
 import { buildDocument } from './markdown.ts';
 import type { FenceRepairs, TextOverflow } from './markdown.ts';
@@ -65,26 +68,42 @@ export async function loadSession (options: {
   outDir?: string | null;
   userDataRoot?: string;
   current?: boolean;
+  snapshotCopy?: SourceCopy;
 } = {}) {
   const { source, workspaceRoot = null, outDir = null } = options;
-  const location = await resolveSession(source, { userDataRoot: options.userDataRoot, current: options.current });
+  const location = options.snapshotCopy
+    ? { sessionId: path.basename(options.snapshotCopy.source, '.jsonl'), sessionPath: options.snapshotCopy.source,
+      hashRoot: path.dirname(path.dirname(options.snapshotCopy.source)), indexedTitle: options.snapshotCopy.indexedTitle }
+    : await resolveSession(source, { userDataRoot: options.userDataRoot, current: options.current });
   const host = await createHostContext({ hashRoot: location.hashRoot, workspaceRoot, outDir });
   setWorkspaceRoot(host.workspaceRoot);
 
-  const raw = await fs.readFile(location.sessionPath, 'utf8');
+  const copiedSource = options.snapshotCopy ?? await sourceCopyForPath(location.sessionPath) ?? await snapshotLocalInputs(location.sessionPath);
+  copiedSource.indexedTitle = location.indexedTitle;
+  const { contextRoot } = copiedSource;
+  if (!contextRoot)
+    throw new Error('The saved Local snapshot lacks supplementary inputs. Re-export before verifying this file.');
+  const raw = await readSourceCopy(copiedSource);
   validateLocalJournalRecords(raw, location.sessionId);
   const session = parseChatSession(location.sessionPath, raw);
-  attachTranscriptPatches(session, await loadTranscriptPatches(location.hashRoot, location.sessionId));
+  attachTranscriptPatches(session, await loadTranscriptPatches(contextRoot, location.sessionId));
   // Manual GUI renames can update only the workspace index. Preserve the journal customTitle
   // for provenance while letting the indexed title control current display output.
   location.indexedTitle && (session.title = location.indexedTitle);
 
-  const resources = await loadResources(location.hashRoot, location.sessionId);
-  const versions = await readVersions(location.hashRoot, location.sessionId);
-  await loadModelNames(location.hashRoot, location.sessionId);
-  const memory = await loadMemoryFiles(location.hashRoot, location.sessionId);
+  const resources = await loadResources(contextRoot, location.sessionId);
+  const versions = await readVersions(contextRoot, location.sessionId);
+  await loadModelNames(contextRoot, location.sessionId);
+  const memory = await loadMemoryFiles(contextRoot, location.sessionId);
+  // Read captured content, but keep its original locations in export provenance.
+  const originalPath = (file: string) => path.join(location.hashRoot, path.relative(contextRoot, file));
+  resources.resourceRoot = originalPath(resources.resourceRoot);
+  for (const resource of resources.resources)
+    resource.filePath = originalPath(resource.filePath);
+  for (const item of Object.values(memory).flat())
+    item.path = originalPath(item.path);
 
-  return { location, host, raw, session, resources, versions, memory };
+  return { location, host, raw, session, resources, versions, memory, copiedSource };
 }
 
 /** Everything a renderer needs, derived from its own producer so it cannot drift from it. */
@@ -153,5 +172,5 @@ export function renderSession (loaded: LoadedSession, options: {
   fenceRepairs?: FenceRepairs;
 } = {}) {
   const { outputPath = '', gitStatus = '', generatedAt = new Date().toISOString(), overflow, fenceRepairs } = options;
-  return buildDocument(loaded.session, { ...loaded, outputPath, gitStatus, generatedAt, ...(overflow ? { overflow } : {}), ...(fenceRepairs ? { fenceRepairs } : {}) });
+  return buildDocument(loaded.session, { ...loaded, sourceCopy: loaded.copiedSource, outputPath, gitStatus, generatedAt, ...(overflow ? { overflow } : {}), ...(fenceRepairs ? { fenceRepairs } : {}) });
 }

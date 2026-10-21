@@ -7,6 +7,7 @@ import { createReadStream } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { existingUserDataSnapshot, snapshotUserData } from '../src/session/source-snapshot.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_CLI = path.join(ROOT, 'src', 'cli.ts');
@@ -14,7 +15,8 @@ const DEFAULT_CLI = path.join(ROOT, 'src', 'cli.ts');
 // Version 3 added per-source size/mtime before and after, and excludes sources that changed
 // during the run from totals (listed in totals.changedDuringRun instead).
 // Version 5 adds independent image hashes and measured Local export sizes.
-export const CORPUS_REPORT_VERSION = 5;
+// Version 6 adds source snapshots and keeps results when live originals change.
+export const CORPUS_REPORT_VERSION = 6;
 export const BASE64_TRIGGER_BYTES = 64 * 1024;
 
 /** Counts string values with a base64-alphabet run of at least 64 KiB; this is a heuristic, not decoding. */
@@ -158,6 +160,8 @@ function summarize (kind, selector, label, result, report, durationMs) {
     error: report ? null : (result.stderr.trim().split(/\r?\n/u)[0] ?? '').slice(0, 300),
     checked: report?.layerD?.checked ?? 0,
     categories: report?.layerD?.totals ?? {},
+    layerDOrder: report?.layerD?.order ?? null,
+    layerDMultiplicity: report?.layerD?.multiplicity ?? null,
     layerB: report?.layerB ? { rawRequests: report.layerB.rawRequests, parsedTurns: report.layerB.parsedTurns } : null,
     layerA: report?.layerA ? { rawToolIds: report.layerA.rawToolIds, parsedToolIds: report.layerA.parsedToolIds } : null,
     layerCFailed: report?.layerC?.failed ?? null,
@@ -173,9 +177,13 @@ function summarize (kind, selector, label, result, report, durationMs) {
   };
 }
 
-export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = process.env, concurrency = 4, onProgress = () => {} }) {
+export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = process.env, concurrency = 4, live = false, snapshotDirectory, onProgress = () => {} }) {
   const started = Date.now();
-  const sources = await collectSources(userDataRoot, env.COPILOT_HOME);
+  const existing = live ? null : await existingUserDataSnapshot(userDataRoot);
+  const frozen = live ? null : existing ?? await snapshotUserData(userDataRoot, env.COPILOT_HOME, snapshotDirectory);
+  const sources = await collectSources(frozen?.userDataRoot ?? userDataRoot, frozen?.copilotHome ?? env.COPILOT_HOME);
+  const copies = new Map(frozen?.files.map((file) => [file.destination, file]) ?? []);
+  const executionEnv = frozen ? { ...env, COPILOT_HOME: frozen.copilotHome } : env;
   const scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-corpus-'));
   const jobs = [
     ...sources.local.map((journal, index) => ({ kind: 'local', selector: journal, sourcePath: journal, label: `L${String(index + 1).padStart(3, '0')}` })),
@@ -188,15 +196,16 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
       const index = next++;
       const job = jobs[index];
       const t0 = Date.now();
-      const before = await statSource(job.sourcePath);
+      const copy = copies.get(job.sourcePath);
+      const before = copy?.before ?? await statSource(job.sourcePath);
       const base64Like = await scanBase64(job.sourcePath);
       let result;
       if (job.kind === 'local') {
         const markdown = path.join(scratch, job.label, 'export.md');
         await fs.mkdir(path.dirname(markdown), { recursive: true });
-        const exported = await run([cli, job.selector, markdown], env);
+        const exported = await run([cli, job.selector, markdown], executionEnv);
         result = exported.exitCode === 0
-          ? await run([cli, '--verify', '--strict', '--json', job.selector, markdown], env)
+          ? await run([cli, '--verify', '--strict', '--json', job.selector, markdown], executionEnv)
           : { ...exported, stage: 'export' };
         if (exported.exitCode === 0) {
           const markdownBytes = (await fs.stat(markdown)).size;
@@ -211,12 +220,13 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
         }
         await fs.rm(path.dirname(markdown), { recursive: true, force: true });
       } else {
-        result = await run([cli, '--verify', '--strict', '--json', job.selector, '--user-data-root', sources.userDataRoot], env);
+        result = await run([cli, '--verify', '--strict', '--json', job.selector, '--user-data-root', sources.userDataRoot], executionEnv);
       }
-      const after = await statSource(job.sourcePath);
+      const after = await statSource(copy?.source ?? job.sourcePath);
       results[index] = {
-        ...summarize(job.kind, job.selector, job.label, result, result.stage ? null : parseReport(result.stdout), Date.now() - t0),
+        ...summarize(job.kind, job.kind === 'local' && copy ? copy.source : job.selector, job.label, result, result.stage ? null : parseReport(result.stdout), Date.now() - t0),
         source: { before, after },
+        snapshot: copy ?? null,
         base64Like,
         exportSizes: result.exportSizes ?? null,
         changedDuringRun: sourceChanged(before, after),
@@ -226,14 +236,24 @@ export async function runCorpus ({ userDataRoot, out, cli = DEFAULT_CLI, env = p
   }
   try {
     await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, jobs.length)) }, worker));
+    for (const result of results) {
+      if (result.snapshot) {
+        result.source.after = await statSource(result.snapshot.source);
+        result.changedDuringRun = sourceChanged(result.source.before, result.source.after);
+      }
+    }
   } finally {
     await fs.rm(scratch, { recursive: true, force: true });
+    if (frozen && !snapshotDirectory && !existing)
+      await fs.rm(frozen.directory, { recursive: true, force: true });
   }
   const report = {
     version: CORPUS_REPORT_VERSION,
     generatedAt: new Date().toISOString(),
     cli: path.resolve(cli),
-    userDataRoot: sources.userDataRoot,
+    userDataRoot: path.resolve(userDataRoot),
+    mode: live ? 'live' : 'snapshot',
+    snapshotFiles: frozen?.files ?? [],
     command: '--verify --strict --json',
     durationMs: Date.now() - started,
     totals: totalize(results),
@@ -254,9 +274,9 @@ export function defaultCorpusPath (generatedAt, offsetMinutes = new Date(generat
   return path.join(ROOT, 'reports', 'corpus', `corpus-${local.replace(/[:.]/gu, '-')}${offset}.json`);
 }
 
-/** Totals over sources that did not change during the run; changed ones are listed, not counted. */
+/** Frozen copies stay counted. In live mode, changed sources are listed but excluded. */
 export function totalize (results) {
-  const compared = results.filter((item) => !item.changedDuringRun);
+  const compared = results.filter((item) => item.snapshot || !item.changedDuringRun);
   const totals = {
     sources: compared.length,
     changedDuringRun: results.filter((item) => item.changedDuringRun).map((item) => item.label),
@@ -309,17 +329,19 @@ export function totalize (results) {
 }
 
 function parseArgs (argv) {
-  const options = { userDataRoot: undefined, out: undefined, concurrency: 4 };
+  const options = { userDataRoot: undefined, out: undefined, concurrency: 4, live: false };
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index];
     const value = argv[index + 1];
     if (flag === '--user-data-root') options.userDataRoot = value, index++;
     else if (flag === '--out') options.out = value, index++;
     else if (flag === '--concurrency') options.concurrency = Number(value), index++;
+    else if (flag === '--live') options.live = true;
+    else if (flag === '--snapshot-dir') options.snapshotDirectory = value, index++;
     else throw new Error(`Unknown argument: ${flag}`);
   }
   if (!options.userDataRoot)
-    throw new Error('Usage: node scripts/verify-corpus.mjs --user-data-root <root> [--out <report.json>] [--concurrency 4]');
+    throw new Error('Usage: node scripts/verify-corpus.mjs --user-data-root <root> [--out <report.json>] [--concurrency 4] [--live] [--snapshot-dir <folder>]');
   return options;
 }
 

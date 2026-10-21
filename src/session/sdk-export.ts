@@ -8,6 +8,7 @@ import type { SdkEventSource, SessionOccurrence } from './sources.ts';
 import { buildSdkSession } from './sdk-session.ts';
 import { attachRunningTotals, attachUsage, copilotHomeOf, readUsageLedger, usageFromEvents } from './sdk-usage.ts';
 import type { UsageCall } from './sdk-usage.ts';
+import type { SourceCopy } from './source-snapshot.ts';
 
 export interface SdkExport {
   fenceRepairs: FenceRepairs;
@@ -20,6 +21,7 @@ export interface SdkExport {
 }
 
 export interface SdkExportOptions {
+  sourceCopy?: SourceCopy;
   title: string;
   assetsDirectory: string;
   outputPath: string;
@@ -55,6 +57,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     gitStatus: '',
     generatedAt: options.generatedAt,
     source: 'sdk-events',
+    sourceCopy: options.sourceCopy,
     overflow,
     fenceRepairs,
   });
