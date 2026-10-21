@@ -252,7 +252,7 @@ passing silently - for example `Schema drift: 1 unhandled node kind(s)` or `Laye
 2 of 9 render checks FAILED`, with each failed check named. `--strict` turns any of those into a
 non-zero exit code, and `--verify` prints the full schema census.
 
-`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Under `--strict`, partial or absent text fails. Source-safe message order and repeated occurrences are checked only for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent streams grouped by agent scope. Other text is presence-only. See [SPEC section 9](docs/SPEC.md) for its limits.
+`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Partial or absent text fails even without `--strict`. Source-safe message order and repeated occurrences are checked only for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent streams grouped by agent scope. Other text is presence-only. See [SPEC section 9](docs/SPEC.md) for its limits.
 
 ### Historical verification limitations
 
@@ -280,7 +280,7 @@ These are this package's own `package.json` scripts. Run them from the package d
 | `npm run golden` / `golden:update` | `--golden check` / `update` | the small in-repo recorded check |
 | `npm run snapshot -- update\|check <id>` | `node src/cli.ts --snapshot` | record or compare one of your own sessions |
 | `npm run baseline` / `baseline:update` | `node test/baseline.ts` | the machine-local ~30 MB recorded check |
-| `npm run test` | `node --test "test/*.test.ts"` | unit tests |
+| `npm run test` | `node scripts/test.mjs` | unit tests in an isolated cache, with a real-cache write guard |
 | `npm run typecheck` / `typecheck:test` | `tsc` over src / tests | type check, no emit |
 | `npm run verify` | typecheck + typecheck:test + test + golden | everything a fresh clone can run |
 | `npm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
@@ -288,17 +288,55 @@ These are this package's own `package.json` scripts. Run them from the package d
 
 For commits in this repository, enable [the commit-message hook](.githooks/commit-msg) with `git config core.hooksPath .githooks`. It removes Copilot co-author trailers, keeps other authors and body text, and requires Node.js on `PATH`. The hook is tested through a real commit in a temporary repository.
 
-The corpus runner snapshots its inputs before inventory or verification. Journals, SDK events and relevant metadata are copied into an isolated temporary tree. SQLite inputs, including workspace/global state, Agent Host metadata and SDK usage, use SQLite's backup API so WAL data is included. Each copy records its byte size and SHA-256. Original sources that change through run end are listed but their frozen results remain in totals. `--live` keeps the old behavior, which excludes changing sources. Use `--snapshot-dir <new-folder>` to keep the frozen inputs for later comparisons. These are per-file snapshots, not an atomic snapshot across all sessions or databases.
+The corpus runner snapshots its inputs before inventory or verification. Journals, SDK events and relevant metadata are copied into an isolated temporary tree. SQLite inputs, including workspace/global state, Agent Host metadata and SDK usage, use SQLite's backup API so WAL data is included. Each copy records its byte size and SHA-256. Report version 7 pairs run-local labels such as `S023` with a stable `sourceId`: the first 12 SHA-256 characters of the original absolute source path, normalized for separators and Windows case. Labels can change between runs. The identifier stays the same when the source grows or its capture moves, but changes if the original path moves. Original sources that change through run end are listed but their frozen results remain in totals. `--live` keeps the old behavior, which excludes changing sources. Use `--snapshot-dir <new-folder>` to keep the frozen inputs for later comparisons. These are per-file snapshots, not an atomic snapshot across all sessions or databases.
 
-Single-chat exports also capture the source before parsing. One incomplete final JSONL record is skipped with an archive notice; malformed earlier records still fail. The header reports a source that changed during capture, with the local copy time and UTC offset. SDK usage comes from a SQLite backup. Native payloads remain in a private machine-local temporary cache, never in Markdown companions. A later `--verify <source> <export.md>` uses that saved source copy. Use the same source selector for export and file verification. If the cache has been removed, re-export first; verification won't silently read the live source. Treat these cached native files as private, just like the originals.
+Single-chat exports capture the selected source before parsing. One incomplete final JSONL record is skipped with an archive notice; malformed earlier records still fail. The header reports a source that changed during capture, with the local copy time and UTC offset. Only the trimmed event log is kept. Its manifest records the untrimmed byte size and SHA-256 when trimming was needed, without a second `.recorded` file. These are per-file captures, not an atomic snapshot across the event log and usage transaction.
 
-Local captures also keep the session's supplementary resources, transcript, model catalog and memory inputs. Later verification reads those copies, not updated live files. Export provenance keeps their original locations.
+SDK selection reads live indexes and identity mappings without waiting for event logs to stop growing. The private capture contains that chat's event log, selected identity/index metadata and a small SQLite usage database. Usage extraction selects that backing session's rows, including child agents, in a read-only transaction. Unrelated sessions, tables and full state/catalog databases aren't copied. Event identity is checked on the fixed copy before export. A missing usage database keeps the existing event-usage fallback.
 
-SDK captures created for preview verification or a selector that isn't an SDK chat are removed after the command. Successful exports keep their captures for later file verification. An explicitly retained corpus snapshot is never removed by single-chat commands.
+Local captures keep the journal, selected index metadata instead of the whole workspace database, supplementary resources, transcript and model catalog. They also keep the session/repo/user Markdown memories rendered in the archive, not unrelated memory subdirectories. Export provenance keeps original locations while replay reads captured bytes.
 
-**Current source-cache location and lifetime:** Node's OS temporary directory (`os.tmpdir()`, normally `%LOCALAPPDATA%\Temp` on Windows) holds Local captures in `cce-local-source-*`, SDK/inventory captures in `cce-sources-*`, and output-path-keyed receipts in `cce-export-snapshots`. Successful export captures have no application expiry, size cap or cleanup command. They remain until manual or OS cleanup removes them. Library and golden calls can also leave Local captures. SDK captures include the supported inventory tree, not just the selected chat. Explicit corpus snapshots stay at the requested destination. Removing a required capture or receipt prevents later file verification; it doesn't change the Markdown or native session stores.
+### Private source cache
 
-Strict Layer D verification now fails on partial as well as absent text. There are no approved partial-cause exceptions. A future exception needs a named cause and evidence for that individual piece, not an exemption for a whole category.
+Set `CCE_CACHE_DIR` to override the shared root for captures, receipts and snapshot registrations. Never point it into native session storage. Cached native payloads are private and never become Markdown companions.
+
+| Platform | Default root |
+|---|---|
+| Windows | `%LOCALAPPDATA%\copilot-chat-exporter\cache` |
+| macOS | `~/Library/Caches/copilot-chat-exporter/cache` |
+| Linux | `$XDG_CACHE_HOME/copilot-chat-exporter/cache`, or `~/.cache/copilot-chat-exporter/cache` |
+
+These defaults avoid the temporary directory. Manual removal or OS cache policies can still remove kept copies. `--cache` also reports old temporary cache and receipt folders without migrating or deleting them.
+
+| Action | Source copy |
+|---|---|
+| Normal export | Checks persisted staged Markdown and linked companions before publication, then deletes the capture after success |
+| Export with `--keep-source` | Keeps the capture and adds a header notice |
+| Export verification fails or throws | Keeps a warning-marked `.verify-failed.md`, companions, diagnostic log, capture and receipt; exits nonzero |
+| `--verify <source>` | Checks a temporary capture; removes it on success and keeps it with a diagnostic log on failure |
+| `--verify <source> <export.md>` | Requires the kept capture associated with that output path and exact selector; never substitutes live data |
+| Re-export to the same output | Removes the old capture and its receipt before installing the new receipt |
+
+Without `--keep-source`, a small receipt records that the source wasn't kept. Later file verification explains this and suggests re-exporting with `--keep-source`. A missing kept capture is a separate error. Kept captures have no automatic age expiry or size cap. Manual/OS removal can still make them unavailable.
+
+```sh
+node src/cli.ts <source> export.md --keep-source
+node src/cli.ts --cache
+node src/cli.ts --clean --older-than 7 --dry-run
+node src/cli.ts --clean --older-than 7
+node src/cli.ts --clean --older-than 7 --yes
+node src/cli.ts --clean --include-corpus --yes
+```
+
+`--cache` reports sizes, creation times, affected exports and in-use status. `--clean` lists targets before doing anything. Deletion requires `--yes` or an interactive answer of `yes`/`y`; the prompt defaults to No. Without a terminal, the command lists and deletes nothing unless `--yes` is supplied. `--dry-run` always lists without deleting, even with `--yes`. Retained corpus snapshots are skipped unless `--include-corpus` is passed. `--older-than N` uses creation age in days. Cleanup rechecks the listed ownership identity and active readers before deleting a capture and its linked receipts. Symlinks/junctions, unknown directories and in-use captures are protected. Legacy snapshots without a registration aren't cleanup targets. Single-chat commands never remove a borrowed corpus snapshot.
+
+Failed export verification exits nonzero with or without `--strict` or `--keep-source`. It publishes `<name>.verify-failed.md` instead of the normal name, without replacing an earlier successful archive, even with `--overwrite`. The warning at the top lists failure reasons, category counts and the kept capture path. Companions remain beside it with working relative links. Existing failures aren't replaced: collisions use `.verify-failed-1.md`, then increasing suffixes. A later successful export writes the normal name and reports older failed archives without deleting them. An incomplete trailing active-chat record alone isn't a failure.
+
+Each failed export writes a private `failed-<sessionid>-YYMMDD_HHMMSS.log` beside the failed Markdown. It contains check results, counts, errors, runtime/command details, source hash and capture location. The console reports the same relevant failure details and log path. Standalone `--verify` leaves supplied Markdown unchanged and writes failure logs under the configured cache's `failures` directory. Logs use the normal best-effort credential redaction, but contain private filesystem locations; review them before sharing.
+
+Tests, golden checks and baselines run under isolated cache roots and remove them afterward. The runner fails if the real default cache or legacy receipt/capture stores change. For selected tests, use `node scripts/test.mjs test/source-snapshot.test.ts test/cli.test.ts`, not bare `node --test`.
+
+Layer D verification fails on partial as well as absent text, even without `--strict`. Schema drift and early fence repairs remain additional strict checks. There are no approved partial-cause exceptions. A future exception needs a named cause and evidence for that individual piece, not an exemption for a whole category.
 
 Flags without a dedicated script go through `export`:
 
@@ -326,9 +364,15 @@ The output directory is the first of: `--out-dir`, `chatExport.outDir` in the wo
 import { loadSession, renderSession, sessionToJson } from 'copilot-chat-exporter';
 
 const loaded = await loadSession({ source: sessionId });
-const markdown = renderSession(loaded, { outputPath, gitStatus, generatedAt });
-const data = sessionToJson(loaded);
+try {
+  const markdown = renderSession(loaded, { outputPath, gitStatus, generatedAt });
+  const data = sessionToJson(loaded);
+} finally {
+  await loaded.dispose();
+}
 ```
+
+Library callers release their temporary capture with `loaded.dispose()` after rendering/checking. Process exit also cleans unfinished temporary captures. Borrowed `snapshotCopy` inputs aren't deleted by `dispose()`.
 
 `loadSession()` and `resolveSession()` no longer select an implicit current/newest session. Pass `source`, or explicitly pass `{ current: true, userDataRoot }`. UUID-based library calls and `listSessions({ userDataRoot })` resolve one root without prompting; ambiguity is an error. An exact Local journal path can be read independently of discovered installations.
 

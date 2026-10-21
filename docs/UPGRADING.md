@@ -17,7 +17,7 @@ what-to-do-about-it.
 
 ### Provider identity and scope regressions
 
-Run `node --test test/provider-sources.test.ts test/inventory.test.ts test/cli.test.ts` when changing SDK/provider resolution. Verify central-versus-legacy precedence against the installed build and pinned public source. Do not use missing metadata, a title, a similar UUID or a tool summary to infer a peer/child backing. Preserve unresolved occurrences and warnings; default-only provider-ID fallback requires an existing session database and matching SDK header. `🟠 ❓` identifies ambiguous child scopes without invalidating an independently verified main.
+Run `node scripts/test.mjs test/provider-sources.test.ts test/inventory.test.ts test/cli.test.ts` when changing SDK/provider resolution. The runner isolates captures/receipts and rejects real-cache writes. Verify central-versus-legacy precedence against the installed build and pinned public source. Do not use missing metadata, a title, a similar UUID or a tool summary to infer a peer/child backing. Preserve unresolved occurrences and warnings; default-only provider-ID fallback requires an existing session database and matching SDK header. `🟠 ❓` identifies ambiguous child scopes without invalidating an independently verified main.
 
 Re-read the source for export and compare its identity/integrity to the selection evidence. Reject concurrent changes or retry with a fresh resolver; do not reuse cached scope evidence across changed logs. Preserve unrecognized event fields for the fidelity adapter and report unsupported semantics. Current SDK identity verification is not a claim of implemented Markdown export or complete private-schema coverage.
 
