@@ -1,3 +1,4 @@
+import { createSourceCacheDirectory, sourceCacheRoot } from './source-cache.ts';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
@@ -159,7 +160,7 @@ async function snapshotTree (source: string, destination: string, files: SourceC
 /** Keep the journal and the supplementary inputs that enrich a Local export. */
 export async function snapshotLocalInputs (source: string): Promise<SourceCopy> {
   source = path.resolve(source);
-  const contextRoot = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'cce-local-source-')), 'workspace');
+  const contextRoot = path.join(await createSourceCacheDirectory('cce-local-source-'), 'workspace');
   const copy = await snapshotFile(source, path.join(contextRoot, 'chatSessions', path.basename(source)));
   const originalRoot = path.dirname(path.dirname(source));
   const sessionId = path.basename(source, '.jsonl');
@@ -187,7 +188,7 @@ export async function snapshotUserData (root: string, home = process.env.COPILOT
   directory?: string) {
   root = path.resolve(root);
   home = path.resolve(home);
-  const folder = directory ? path.resolve(directory) : await fs.mkdtemp(path.join(os.tmpdir(), 'cce-sources-'));
+  const folder = directory ? path.resolve(directory) : await createSourceCacheDirectory('cce-sources-');
   if (directory) {
     await fs.mkdir(path.dirname(folder), { recursive: true });
     await fs.mkdir(folder);
@@ -291,7 +292,7 @@ interface ExportCopyReceipt {
   copy?: SourceCopy;
 }
 
-const receiptFile = (output: string) => path.join(os.tmpdir(), 'cce-export-snapshots',
+const receiptFile = (output: string) => path.join(sourceCacheRoot(), 'receipts',
   `${createHash('sha256').update(path.resolve(output)).digest('hex')}.json`);
 
 /** Private machine-local receipt. Native payloads never become Markdown companions. */
