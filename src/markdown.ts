@@ -450,10 +450,10 @@ function renderSubagent (node: ToolNode, byCall: Map<string, Resource[]>) {
   ];
 }
 
-function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
+function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, continuation = false) {
   if (node.subagent)
     return renderSubagent(node, byCall);
-  const resources = node.toolCallId ? (byCall.get(node.toolCallId) ?? []) : [];
+  const resources = node.toolCallId && !continuation ? (byCall.get(node.toolCallId) ?? []) : [];
   const rawInput = node.toolSpecificData?.kind === 'input' ? node.toolSpecificData.rawInput : null;
   const inputText = node.command && isCommandEcho(node.inputText, node.command) ? '' : node.inputText;
   // A completed call needs no marker; only the exceptions earn one.
@@ -464,13 +464,15 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
   const head = `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: ${summaryHtml}`;
   const hasDetails = node.toolSpecificData && node.toolSpecificData.kind !== 'terminal' && node.toolSpecificData.kind !== 'todoList';
   const resultDetails = unrenderedResultDetails(node);
-  const hasBody = node.images?.length || node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
+  const hasBody = continuation || node.images?.length || node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
   // Nothing to expand: render a plain line rather than an empty collapsible.
   if (!hasBody)
     return [`- ${mutedSummary(node.noRecordedContent
       ? `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: No message, input or output was recorded.`
       : head)}`];
   const body = [];
+  if (continuation && !node.output)
+    body.push(`**Terminal status:** ${node.isComplete ? 'completed' : 'in progress'}${node.exitCode != null ? `; exit ${node.exitCode}` : ''}${node.duration != null ? `; ${humanDuration(node.duration)}` : ''}.`, '');
   node.intent && body.push(`**Intent:** ${esc(node.intent)}`, '');
   if (node.command) {
     const fence = fenceFor(node.command, 'powershell');
@@ -526,7 +528,7 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>) {
     body.push(...toolTextBlock('📦 Tool result details', redact(JSON.stringify(resultDetails, null, 2)), 'json', { kind: 'tool-result', label: 'tool-result-details', extension: 'json', toolCallId: node.toolCallId }));
   if (resources.length)
     body.push(`**Persisted output:** ${resources.map((resource) => `${resource.relative} (${thousands(resource.bytes)} bytes)`).join('; ')}.`, '');
-  else if (!node.output && !node.resultText && !node.detailText)
+  else if (!continuation && !node.output && !node.resultText && !node.detailText)
     body.push('**Output:** not persisted as a separate resource (returned inline).', '');
   for (const resource of resources)
     body.push(`<details><summary>${mutedSummary(`📦 Output body - ${esc(resource.relative)}`)}</summary>`, '', ...indentBlock([`- Resource path: \`${workspacePath(resource.filePath)}\``, '', ...resourceBody(resource)], NESTED_INDENT), '', '</details>', '');
@@ -698,7 +700,33 @@ function containsRecordedValue (earlier: unknown, later: unknown): boolean {
   return Object.entries(later).every(([key, value]) => containsRecordedValue(Reflect.get(earlier, key), value));
 }
 
-function continuationOf (node: ToolNode, turn: number, previous: Map<string, PreviousTool[]>): number | null {
+function recordedDifference (earlier: unknown, later: unknown): unknown {
+  if (containsRecordedValue(earlier, later))
+    return undefined;
+  if (later === null || typeof later !== 'object' || Array.isArray(later))
+    return later;
+  return Object.fromEntries(Object.entries(later).flatMap(([key, value]) => {
+    const added = recordedDifference(earlier && typeof earlier === 'object' ? Reflect.get(earlier, key) : undefined, value);
+    return added === undefined ? [] : [[key, added]];
+  }));
+}
+
+function terminalDelta (earlier: ToolNode, later: ToolNode): ToolNode {
+  const delta = { ...later };
+  for (const key of ['invocation', 'pastTense', 'title', 'command', 'promptText', 'inputText', 'inputLanguage',
+    'output', 'resultText', 'resultError', 'detailText', 'intent', 'fileUri'] as const) {
+    const before = earlier[key] ?? '';
+    const after = later[key] ?? '';
+    delta[key] = before === after ? '' : key === 'output' && after.startsWith(before) ? after.slice(before.length) : after;
+  }
+  delta.resultDetails = recordedDifference(earlier.resultDetails, later.resultDetails) ?? null;
+  delta.exitCode = earlier.exitCode === later.exitCode ? null : later.exitCode;
+  delta.duration = earlier.duration === later.duration ? null : later.duration;
+  delta.images = later.images?.filter((image) => !earlier.images?.some((previous) => containsRecordedValue(previous, image)));
+  return delta;
+}
+
+function continuationOf (node: ToolNode, turn: number, previous: Map<string, PreviousTool[]>): { turn: number; delta?: ToolNode } | null {
   if (!node.toolCallId)
     return null;
   const history = previous.get(node.toolCallId) ?? [];
@@ -709,9 +737,12 @@ function continuationOf (node: ToolNode, turn: number, previous: Map<string, Pre
   ];
   const original = history.find((entry) => entry.turn < turn
     && fields.every((key) => containsRecordedValue(entry.node[key], node[key])));
+  const terminal = node.toolId === 'run_in_terminal' && !node.subagent
+    ? [...history].reverse().find((entry) => entry.turn < turn && entry.node.toolId === node.toolId && !entry.node.subagent)
+    : undefined;
   history.push({ turn, node });
   previous.set(node.toolCallId, history);
-  return original?.turn ?? null;
+  return original ? { turn: original.turn } : terminal ? { turn: terminal.turn, delta: terminalDelta(terminal.node, node) } : null;
 }
 
 export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '', options: { heading?: boolean; previousTools?: Map<string, PreviousTool[]> } = {}) {
@@ -803,7 +834,10 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       stripLeadFence = false;
       const from = options.previousTools ? continuationOf(node, turn.number, options.previousTools) : null;
       lines.push(...(from === null ? renderToolNode(node, byCall) : [
-        `- ${mutedSummary(`${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: continued from turn ${from}.`)}`,
+        from.delta
+          ? `> ${esc(toolFriendly(node.toolId))}: continued from turn ${from.turn}.`
+          : `- ${mutedSummary(`${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: continued from turn ${from.turn}.`)}`,
+        ...(from.delta ? ['', ...renderToolNode(from.delta, byCall, true)] : []),
       ]), '');
     } else if (node.type === 'note') {
       if (node.images?.length && fenceOpen()) {

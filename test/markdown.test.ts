@@ -6,8 +6,10 @@ import { buildDocument, copySource, markdownBody, renderTurnBody, toolFriendly, 
 import type { FenceRepairs } from '../src/markdown.ts';
 import { fenceFor, openFenceTicks } from '../src/text.ts';
 import type { CompanionArtifact } from '../src/export-policy.ts';
-import type { EditOperation, Turn, TurnNode } from '../src/types.ts';
+import type { EditOperation, ToolNode, Turn, TurnNode } from '../src/types.ts';
 import { testSession, testTool, testTurn } from './helpers.ts';
+import { buildRenderReport } from '../src/verify/layers.ts';
+import { buildLossAccount } from '../src/verify/loss-account.ts';
 
 const ROOT = path.join(path.sep, 'proj');
 setWorkspaceRoot(ROOT);
@@ -55,6 +57,64 @@ test('cross-turn copies with no new content become identity-keyed continuation n
   assert.match(output, /new output/);
   assert.equal(output.match(/unique input/g)?.length, 3, 'a different ID and a same-ID update both keep their content');
   assert.equal(turns[1].body[0], same, 'rendering does not change parsed records');
+});
+
+test('terminal carryovers render appended output after an identity-keyed continuation without changing records', () => {
+  const previousTools = new Map<string, Array<{ turn: number; node: ToolNode }>>();
+  const original = testTool({ toolId: 'run_in_terminal', toolCallId: 'terminal-one', command: 'synthetic-command',
+    output: 'recorded first line\n', isComplete: false });
+  const updated = testTool({ ...original, output: 'recorded first line\nnew second line\n', isComplete: true, exitCode: 0, duration: 1000 });
+  const before = JSON.stringify([original, updated]);
+  renderTurnBody(testTurn({ number: 1, body: [original] }), new Map(), '', { previousTools });
+  const later = renderTurnBody(testTurn({ number: 2, body: [updated] }), new Map(), '', { previousTools }).join('\n');
+  assert.match(later, /continued from turn 1/u);
+  assert.match(later, /new second line/u);
+  assert.doesNotMatch(later, /recorded first line|synthetic-command/u);
+  assert.equal(JSON.stringify([original, updated]), before);
+  const third = testTool({ ...updated, output: `${updated.output}third addition` });
+  const last = renderTurnBody(testTurn({ number: 3, body: [third] }), new Map(), '', { previousTools }).join('\n');
+  assert.match(last, /continued from turn 2/u);
+  assert.match(last, /third addition/u);
+  assert.doesNotMatch(last, /new second line|recorded first line/u);
+  const session = testSession({ turns: [original, updated].map((node, index) =>
+    testTurn({ number: index + 1, body: [node], toolNodes: [node] })) });
+  const document = buildDocument(session, documentContext());
+  assert.equal(buildRenderReport(session, document).failed, false, 'continuation note is not a second tool-call badge');
+  const raw = [original, updated].map((node) => ({
+    message: { text: 'do the thing' }, response: [{ kind: 'toolInvocationSerialized', toolId: node.toolId,
+      toolCallId: node.toolCallId, toolSpecificData: { terminalCommandOutput: { text: node.output } } }],
+  }));
+  assert.equal(buildLossAccount(raw, document).failed, false);
+});
+
+test('terminal continuations keep non-prefix replacements and new commands, metadata and status', () => {
+  const previousTools = new Map<string, Array<{ turn: number; node: ToolNode }>>();
+  const original = testTool({ toolId: 'run_in_terminal', toolCallId: 'terminal-one',
+    command: 'old-command', output: 'old output', resultDetails: { stable: 1 }, isComplete: false });
+  renderTurnBody(testTurn({ number: 1, body: [original] }), new Map(), '', { previousTools });
+  const updated = testTool({ ...original, command: 'replacement-command', output: 'replacement output',
+    resultDetails: { stable: 1, newField: 'recorded metadata' } });
+  const later = renderTurnBody(testTurn({ number: 2, body: [updated] }), new Map(), '', { previousTools }).join('\n');
+  assert.match(later, /continued from turn 1/u);
+  assert.match(later, /replacement-command/u);
+  assert.match(later, /replacement output/u);
+  assert.match(later, /recorded metadata/u);
+  assert.doesNotMatch(later, /"stable"/u);
+  const completed = testTool({ ...updated, isComplete: true, exitCode: 7, duration: 1000 });
+  const status = renderTurnBody(testTurn({ number: 3, body: [completed] }), new Map(), '', { previousTools }).join('\n');
+  assert.match(status, /continued from turn 2/u);
+  assert.match(status, /exit 7/u);
+  assert.doesNotMatch(status, /replacement output|replacement-command/u);
+});
+
+test('terminal output is never deduplicated across different IDs or within the same turn', () => {
+  const previousTools = new Map<string, Array<{ turn: number; node: ToolNode }>>();
+  const node = testTool({ toolId: 'run_in_terminal', toolCallId: 'first', output: 'identical recorded output' });
+  renderTurnBody(testTurn({ number: 1, body: [node] }), new Map(), '', { previousTools });
+  const different = testTool({ ...node, toolCallId: 'second' });
+  const later = renderTurnBody(testTurn({ number: 2, body: [different, different] }), new Map(), '', { previousTools }).join('\n');
+  assert.doesNotMatch(later, /continued from/u);
+  assert.equal(later.match(/identical recorded output/gu)?.length, 2);
 });
 
 test('a turn body renders in recorded order, never bucketed by type', () => {

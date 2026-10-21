@@ -156,7 +156,7 @@ interface Piece {
   checkMultiplicity?: boolean;
 }
 
-function pieces (request: unknown): Piece[] {
+function pieces (request: unknown, terminalOutput?: (id: string, value: string) => string): Piece[] {
   if (!isRecord(request))
     return [];
   // Prompts and final prose are emitted in request/response order. Thinking snapshots, tool
@@ -199,8 +199,11 @@ function pieces (request: unknown): Piece[] {
       typeof data?.prompt === 'string' && result.push({ category: 'subagent-prompt', text: data.prompt });
       for (const part of Array.isArray(details?.output) ? details.output : [])
         isRecord(part) && part.isText && typeof part.value === 'string' && result.push({ category: 'tool-output', text: part.value });
-      typeof data?.terminalCommandOutput?.text === 'string'
-        && result.push({ category: 'terminal-output', text: stripAnsi(data.terminalCommandOutput.text) });
+      if (typeof data?.terminalCommandOutput?.text === 'string') {
+        const output = stripAnsi(data.terminalCommandOutput.text);
+        result.push({ category: 'terminal-output', text: terminalOutput && leaf.toolId === 'run_in_terminal' && typeof leaf.toolCallId === 'string'
+          ? terminalOutput(leaf.toolCallId, output.trim()) : output });
+      }
       data?.kind === 'subagent' && typeof data.result === 'string' && result.push({ category: 'subagent-result', text: data.result });
       const failure = leaf.resultError;
       typeof failure === 'string' && result.push({ category: 'tool-error', text: failure });
@@ -322,7 +325,20 @@ function overlapsMatchedRange (ranges: readonly { start: number; end: number }[]
 }
 
 export function buildLossAccount (rawRequests: readonly unknown[], markdown: string): LossAccount {
-  return scoreLossPieces(rawRequests.flatMap((request, index) => pieces(request).map((piece) => ({ ...piece, request: index + 1 }))), markdown);
+  const priorOutputs = new Map<string, string>();
+  return scoreLossPieces(rawRequests.flatMap((request, index) => {
+    const updates = new Map<string, string>();
+    const recorded = pieces(request, (id, value) => {
+      const previous = priorOutputs.get(id);
+      updates.set(id, value);
+      // Inspect raw IDs and output independently of the renderer. Never join different calls
+      // or same-request snapshots just because their text happens to match.
+      return previous && value !== previous && value.startsWith(previous) ? value.slice(previous.length) : value;
+    });
+    for (const [id, value] of updates)
+      priorOutputs.set(id, value);
+    return recorded.map((piece) => ({ ...piece, request: index + 1 }));
+  }), markdown);
 }
 
 /** A recorded piece of content to look for, optionally eligible for source-safe sequence checks. */

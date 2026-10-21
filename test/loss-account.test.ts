@@ -10,6 +10,22 @@ const request = (response: unknown[], extra: Record<string, unknown> = {}) => ({
 const summary = (account: ReturnType<typeof buildLossAccount>) => Object.fromEntries(
   Object.entries(account.totals).map(([category, row]) => [category, `${row.present}/${row.partial}/${row.absent}`]));
 
+test('terminal cumulative output is checked as identity-keyed increments across requests, including mid-line appends', () => {
+  const first = 'The original recorded output before continuation';
+  const added = ' and the newly recorded suffix after continuation';
+  const tool = (value: string, id = 'same-terminal') => ({ kind: 'toolInvocationSerialized', toolId: 'run_in_terminal', toolCallId: id,
+    toolSpecificData: { kind: 'terminal', terminalCommandOutput: { text: value } } });
+  const requests = [request([tool(first)]), request([tool(first + added)])];
+  const complete = `Please explain the build failure\n${first}\nPlease explain the build failure\ncontinued from turn 1\n${added}`;
+  assert.equal(buildLossAccount(requests, complete).failed, false);
+  const missing = buildLossAccount(requests, `Please explain the build failure\n${first}\nPlease explain the build failure`);
+  assert.equal(missing.failed, true);
+  assert.equal(missing.totals['terminal-output'].absent, 1);
+  assert.equal(buildLossAccount([requests[0], request([tool(first + added, 'different-terminal')])], complete).failed, true);
+  const sameTurn = [request([tool(first), tool(first + added)])];
+  assert.equal(buildLossAccount(sameTurn, complete).failed, true, 'same-request snapshots are not cross-turn deltas');
+});
+
 test('recorded text that appears in the Markdown, however it is wrapped, is present', () => {
   const markdown = [
     '> Please explain the build failure',

@@ -44,7 +44,9 @@ Fence repair: a fence still open at the end of a turn is closed there and counte
 
 Verification applies the same fence-repair rules to SDK and Local exports: early closes fail strict verification, while turn-end closes and HTML escapes are recorded without failing strict. The independent `markdown-it` check is loaded only for verification and tests. An unavailable parser fails `--verify --strict`.
 
-The exporter keeps tool calls that VS Code hides (`presentation: 'hidden'`). A later copy of the same tool-call ID that adds no rendered content becomes a one-line "continued from turn N" note. Copies with new content remain in full. Different IDs are never deduplicated by text, and parsed records are unchanged.
+The exporter keeps tool calls that VS Code hides (`presentation: 'hidden'`). A later copy of the same tool-call ID that adds no rendered content becomes a one-line "continued from turn N" note. Terminal updates with new content get that note plus a delta: unchanged text and metadata are not repeated, appended terminal output emits its suffix, and non-prefix replacement output stays in full. New commands, errors, images, metadata and status remain visible. The comparison uses the latest earlier turn with the same ID, never another call with similar text. Persisted resources already linked for that ID are not repeated. Other tool updates remain in full. Parsed records are unchanged.
+
+Layer D independently reads raw terminal IDs and output across requests. It checks newly appended output separately, including mid-line suffixes. It never combines different IDs or same-request snapshots into a cross-turn delta. Repeated-content and ordering checks for other categories remain unchanged.
 
 For Local tool records, an explicit missing-data representation is allowed only after checking the complete record against the reviewed metadata fields. It renders the tool name once and "No message, input or output was recorded." The census reports these under `representationCounts.tool-no-content`, separately from Layer D content pieces. Unfamiliar fields fall back to JSON and fail strict rather than claiming no content.
 

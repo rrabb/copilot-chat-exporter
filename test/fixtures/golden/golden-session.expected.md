@@ -802,23 +802,19 @@ The second invocation completed.
 
 #### 💬 Assistant Response
 
-<details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">run_in_terminal</code>: <code style="color:#928363;background:transparent;font-size:0.8rem;">Write-Output second</code></span></sub></summary>
+> run_in_terminal: continued from turn 8.
+
+<details><summary><sub><span style="color:#7d8590;font-weight:400">🛠️ <code style="color:#d0b682;background:transparent">run_in_terminal</code>: Ran the repeated invocation again</span></sub></summary>
 <div aria-hidden="true" style="height:0.35rem"></div>
 
 <div style="margin-left:2em">
 
-**Command:**
-
-```powershell
-Write-Output second
-```
-
-<details><summary><sub><span style="color:#7d8590;font-weight:400">📟 Terminal output (exit 0 · 0.0s · 1 lines)</span></sub></summary>
+<details><summary><sub><span style="color:#7d8590;font-weight:400">📟 Terminal output (0.0s · 1 lines)</span></sub></summary>
 
 <div style="margin-left:1em">
 
 ```text
-second again
+ again
 ```
 
 </div>
