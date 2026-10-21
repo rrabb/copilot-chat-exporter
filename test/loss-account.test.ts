@@ -10,6 +10,27 @@ const request = (response: unknown[], extra: Record<string, unknown> = {}) => ({
 const summary = (account: ReturnType<typeof buildLossAccount>) => Object.fromEntries(
   Object.entries(account.totals).map(([category, row]) => [category, `${row.present}/${row.partial}/${row.absent}`]));
 
+test('exact-search reuse keeps line coverage, overlapping text, order and repeat accounting separate', () => {
+  const pieces = [
+    { request: 1, category: 'tool-output', text: 'alpha line\nbeta line' },
+    { request: 1, category: 'assistant-text', text: 'first recorded message', orderGroup: 'main', checkMultiplicity: true },
+    { request: 2, category: 'assistant-text', text: 'second recorded message', orderGroup: 'main', checkMultiplicity: true },
+    { request: 3, category: 'assistant-text', text: 'first recorded message', orderGroup: 'main', checkMultiplicity: true },
+    { request: 4, category: 'assistant-text', text: 'recorded message', orderGroup: 'child' },
+  ];
+  const markdown = 'alpha line\nmarkup separates these output lines\nbeta line\nfirst recorded message\nsecond recorded message\nfirst recorded message';
+  const account = scoreLossPieces(pieces, markdown);
+  assert.deepEqual(account.totals, { 'tool-output': { present: 1, partial: 0, absent: 0 },
+    'assistant-text': { present: 4, partial: 0, absent: 0 } });
+  assert.deepEqual(account.order, { checked: 4, outOfOrder: 0 });
+  assert.deepEqual(account.multiplicity, { checked: 1, missing: 0 });
+  const missingRepeat = scoreLossPieces(pieces, markdown.slice(0, markdown.lastIndexOf('\n')));
+  assert.equal(missingRepeat.multiplicity.missing, 1);
+  const reordered = scoreLossPieces(pieces, markdown.replace('first recorded message\nsecond recorded message',
+    'second recorded message\nfirst recorded message'));
+  assert.equal(reordered.order.outOfOrder, 1);
+});
+
 test('terminal cumulative output is checked as identity-keyed increments across requests, including mid-line appends', () => {
   const first = 'The original recorded output before continuation';
   const added = ' and the newly recorded suffix after continuation';

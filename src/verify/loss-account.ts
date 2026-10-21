@@ -48,7 +48,7 @@ export interface LossAccount {
   unaccounted: LossItem[];
   order: LossOrder;
   multiplicity: LossMultiplicity;
-  /** True when text is absent, out of order, or a repeated piece is missing. Partial pieces are not failures here. */
+  /** True for unaccounted text, order errors or missing repeated pieces. No partial-cause exceptions are currently approved. */
   failed: boolean;
 }
 
@@ -276,12 +276,12 @@ export function normalizeForLoss (value: string): string {
     .trim();
 }
 
-function statusOf (haystack: string, needle: string): LossStatus {
-  if (haystack.includes(needle))
+function statusOf (contains: (needle: string) => boolean, needle: string): LossStatus {
+  if (contains(needle))
     return 'present';
   const head = needle.slice(0, EDGE_CHARS);
   const tail = needle.slice(-EDGE_CHARS);
-  if (needle.length > EDGE_CHARS && (haystack.includes(head) || (needle.length >= LONG_TEXT && haystack.includes(tail))))
+  if (needle.length > EDGE_CHARS && (contains(head) || (needle.length >= LONG_TEXT && contains(tail))))
     return 'partial';
   return 'absent';
 }
@@ -291,18 +291,18 @@ function meaningful (line: string): boolean {
 }
 
 /** Per-line coverage: a command echo trimmed or a middle clipped shows as missing lines, not as all-or-nothing. */
-function lineStatus (haystack: string, lineSet: ReadonlySet<string>, raw: string): { status: LossStatus; found: number; total: number; text: string } {
+function lineStatus (contains: (needle: string) => boolean, lineSet: ReadonlySet<string>, raw: string): { status: LossStatus; found: number; total: number; text: string } {
   const lines = raw.split(/\r?\n/u).map((line) => normalizeForLoss(redactText(line).text)).filter(meaningful);
   // Most recorded lines appear as whole lines of the Markdown; only the rest need a scan of the whole text.
-  const found = lines.filter((line) => lineSet.has(line) || haystack.includes(line)).length;
+  const found = lines.filter((line) => lineSet.has(line) || contains(line)).length;
   const status = found === lines.length ? 'present' : found === 0 ? 'absent' : 'partial';
   return { status, found, total: lines.length, text: lines.join(' ') };
 }
 
-function countOccurrences (haystack: string, needle: string): number {
+function countOccurrences (haystack: string, needle: string, first: number): number {
   let count = 0;
   let offset = 0;
-  let found = haystack.indexOf(needle, offset);
+  let found = first;
   while (found >= 0) {
     count += 1;
     offset = found + needle.length;
@@ -356,6 +356,16 @@ export interface LossPiece {
 export function scoreLossPieces (all: readonly LossPiece[], markdown: string, lineCategories: ReadonlySet<string> = LINE_CATEGORIES): LossAccount {
   const haystack = normalizeForLoss(markdown);
   const lineSet = new Set(markdown.split(/\r?\n/u).map((line) => normalizeForLoss(line)));
+  const firstMatches = new Map<string, number>();
+  const firstMatch = (needle: string): number => {
+    const cached = firstMatches.get(needle);
+    if (cached !== undefined)
+      return cached;
+    const found = haystack.indexOf(needle);
+    firstMatches.set(needle, found);
+    return found;
+  };
+  const contains = (needle: string) => firstMatch(needle) >= 0;
   const totals: Record<string, LossCategoryTotals> = {};
   const unaccounted: LossItem[] = [];
   const orderedByGroup = new Map<string, string[]>();
@@ -368,7 +378,7 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
     let lines: LossItem['lines'];
     let orderedText: string;
     if (lineCategories.has(piece.category)) {
-      const result = lineStatus(haystack, lineSet, piece.text);
+      const result = lineStatus(contains, lineSet, piece.text);
       if (!result.total)
         continue;
       ({ status } = result);
@@ -380,7 +390,7 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
       const needle = normalizeForLoss(redactText(piece.text).text);
       if (!meaningful(needle))
         continue;
-      status = statusOf(haystack, needle);
+      status = statusOf(contains, needle);
       chars = needle.length;
       sample = needle.slice(0, 60);
       orderedText = needle;
@@ -388,7 +398,7 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
     checked += 1;
     const row = totals[piece.category] ??= { present: 0, partial: 0, absent: 0 };
     row[status] += 1;
-    if (status === 'present' && haystack.includes(orderedText)) {
+    if (status === 'present' && (piece.orderGroup || piece.checkMultiplicity) && contains(orderedText)) {
       if (piece.orderGroup) {
         const group = orderedByGroup.get(piece.orderGroup) ?? [];
         group.push(orderedText);
@@ -409,7 +419,7 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
   for (const [text, expected] of sourceCounts) {
     if (expected < 2)
       continue;
-    const found = countOccurrences(haystack, text);
+    const found = countOccurrences(haystack, text, firstMatch(text));
     repeatedCounts.set(text, found);
     missingRepeats += Math.max(0, expected - found);
   }
@@ -423,14 +433,14 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
       const foundCount = repeatedCounts.get(text);
       if (expected !== undefined && expected > 1 && foundCount !== undefined && foundCount < expected)
         continue;
-      const position = haystack.indexOf(text, cursor);
+      const first = firstMatch(text);
+      const position = first < 0 ? -1 : first >= cursor ? first : haystack.indexOf(text, cursor);
       if (position >= 0) {
         order.checked += 1;
         cursor = position + text.length;
         matchedRanges.push({ start: position, end: cursor });
         continue;
       }
-      const first = haystack.indexOf(text);
       if (first >= 0 && overlapsMatchedRange(matchedRanges, first, first + text.length))
         continue;
       order.checked += 1;
