@@ -1,0 +1,4 @@
+{"type":"session.start","data":{"sessionId":"failure-fixture","version":1,"copilotVersion":"test-copilot","vscodeVersion":"test-vscode"}}
+{"type":"system.message","data":{"role":"system","content":"Companion system instructions"}}
+{"type":"user.message","data":{"content":"Question"}}
+{"type":"assistant.message","data":{"content":"Answer"}}

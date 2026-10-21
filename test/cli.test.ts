@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -380,6 +381,8 @@ for (const sdk of [false, true]) {
           { type: 'assistant.message', data: { content: 'Answer' } },
         ].map((event) => JSON.stringify(event)).join('\n'));
       }
+      const sourceFile = sdk ? path.join(env.COPILOT_HOME, 'session-state', 'failure-fixture', 'events.jsonl') : sessionPath;
+      const sourceHash = createHash('sha256').update(await fs.readFile(sourceFile)).digest('hex');
       const output = path.join(home, 'failed.md');
       const preload = path.join(home, 'verification-failure.mjs');
       await fs.writeFile(preload, `
@@ -407,6 +410,7 @@ fs.readFile = async function (file, ...args) {
       await fs.writeFile(output, 'Existing successful archive');
       const result = invoke(selector, output, '--overwrite', ...(keepSource ? ['--keep-source'] : []), '--user-data-root', root);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
+      assert.equal(createHash('sha256').update(await fs.readFile(sourceFile)).digest('hex'), sourceHash);
       const captures = (await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-'));
       assert.equal(captures.length, 1, result.stdout + result.stderr);
       const capture = path.join(env.CCE_CACHE_DIR, captures[0]!);
@@ -424,6 +428,13 @@ fs.readFile = async function (file, ...args) {
       assert.match(result.stdout, /Export failed verification; written as .*failed\.verify-failed\.md/u);
       const logs = (await fs.readdir(home)).filter((name) => /^failed-.+-\d{6}_\d{6}(?:-\d+)?\.log$/u.test(name));
       assert.equal(logs.length, 1);
+      const assetsFolder = (await fs.readdir(home)).find((name) => name.startsWith('failed_assets_'));
+      if (sdk) {
+        assert.ok(assetsFolder, 'failed companion files are retained');
+        const logTimestamp = logs[0]!.match(/-(\d{6}_\d{6})(?:-\d+)?\.log$/u)?.[1];
+        assert.ok(logTimestamp);
+        assert.ok(assetsFolder!.endsWith(logTimestamp), 'companion and diagnostic log use the same local timestamp');
+      }
       const logText = await fs.readFile(path.join(home, logs[0]!), 'utf8');
       assert.match(logText, /^WARNING: This log may contain session content\./u);
       const logData = JSON.parse(logText.slice(logText.indexOf('\n') + 1));
@@ -447,6 +458,11 @@ fs.readFile = async function (file, ...args) {
       }
       assert.equal(JSON.parse(await fs.readFile(path.join(capture, '.cce-capture.json'), 'utf8')).kept, true);
       env.NODE_OPTIONS = previousNodeOptions;
+      const cleanupPreview = invoke('--clean');
+      assert.equal(cleanupPreview.status, 0, cleanupPreview.stdout + cleanupPreview.stderr);
+      assert.match(cleanupPreview.stdout, /Nothing deleted/u);
+      assert.ok(cleanupPreview.stdout.includes(capture));
+      assert.ok(await fs.stat(capture));
       const verify = invoke('--verify', '--strict', selector, failed, '--user-data-root', root);
       assert.equal(verify.status, 0, verify.stdout + verify.stderr);
       const success = invoke(selector, output, '--overwrite', '--user-data-root', root);

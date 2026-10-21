@@ -285,6 +285,13 @@ These are this package's own `package.json` scripts. Run them from the package d
 | `npm run verify` | typecheck + typecheck:test + test + golden | everything a fresh clone can run |
 | `npm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
 | `npm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
+| `npm run demo:failure` | `node scripts/failure-demo.mjs` | generate synthetic failed-export review artifacts |
+
+`npm run demo:failure` runs five synthetic Local and SDK verification failures using only the
+committed fixtures. It writes the failed Markdown, warning header, console output, failure log,
+non-deleting cleanup preview and a summary under
+`temp-tool-output/failure-demo-<local timestamp>/`. It is for manual review and is not part of
+`npm run verify`.
 
 For commits in this repository, enable [the commit-message hook](.githooks/commit-msg) with `git config core.hooksPath .githooks`. It removes Copilot co-author trailers, keeps other authors and body text, and requires Node.js on `PATH`. The hook is tested through a real commit in a temporary repository.
 

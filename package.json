@@ -44,6 +44,7 @@
     "verify:generated": "node scripts/generate-brotli.mjs --check",
     "verify:local": "npm run verify && npm run baseline",
     "build": "node scripts/build.mjs",
+    "demo:failure": "node scripts/failure-demo.mjs",
     "generate:brotli": "node scripts/generate-brotli.mjs",
     "prepare": "npm run build"
   },
