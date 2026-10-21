@@ -2,6 +2,20 @@
 
 ## Current status
 
+**Follow-up receipt (October 21, 2026, local UTC-04:00):** all three approved image commits are pushed through `6733fb3`. Terminal deltas remain unstaged. The previous log restructure is set aside, not discarded: hash-verified copies of both logs are in `temp-tool-output/log-restructure-set-aside-20261021-0131/` (local-only). The original log layout is restored. A separate type-based restructure prompt will replace that work.
+
+S023 was copied once into an isolated inventory, with a SQLite backup of its usage ledger. Both the committed `6733fb3` build and current build verified the same frozen event bytes: 12,485 text pieces, all present, zero partial/absent, exit 0. Counts match in every category. The 144,571,579-byte event copy has SHA-256 `80eb00df2fb2859efa8adae8b499a19d0623c2d618b9fa35545fdd6732e59666`. Evidence: [frozen comparison summary](temp-tool-output/s023-frozen-20261021-0131/summary.json) and [source hashes](temp-tool-output/s023-frozen-20261021-0131/frozen-file-hashes.json), local-only. The earlier live partial isn't reproduced and remains unconfirmed. Its cause is unknown. No speculative renderer fix was made.
+
+Strict currently fails on absent text, order errors and missing repeated messages, but accepts all partial text matches. There is no accepted-cause classification. Proposal, not implemented: fail unclassified partials and require piece-specific evidence for any approved exception. Historical clipping or a matching command echo is not automatically an accepted cause.
+
+Estimates, before implementation: frozen corpus sources by default with `--live` for the old behavior, 3-5 hours including SDK isolation, integrity tests and corpus validation. Text-scoring changes, 4-6 hours including frozen comparisons with identical per-source/category counts and order/multiplicity results. Start with exact-search caching and reuse of verified match positions. Avoid forward-only searches for categories without an ordering guarantee. Neither change is implemented. The S015 profile must be repeated on a frozen source after the snapshot change. Previous live-input timing is provisional, not the new benchmark.
+
+The commit-message hook is added at `.githooks/commit-msg` and repository-local `core.hooksPath` is `.githooks`. It removes Git-recognized Copilot co-author trailers without removing matching prose or human trailers. A real temporary-repository commit tests the hook. No project commit or staging was performed. Five user-owned customization changes remain excluded. Source comparisons must use frozen copies from now on. Partial/absent results on changing live sources remain unconfirmed until reproduced from frozen bytes.
+
+Validation for this follow-up: `npm run verify` passed 547/547 tests, both typechecks and the golden check. Evidence: [local-only verification log](temp-tool-output/frozen-s023-hook-verify-20261021.log). The committed comparison build's 64 source/manifest files match `6733fb3` exactly. The research requirement and decisions below still match HEAD byte-for-byte. On staging approval, the hook must be recorded with executable mode for non-Windows checkouts.
+
+The following image-pass paragraph is the earlier pre-commit receipt, kept as history and superseded by this follow-up receipt:
+
 **Current image pass (October 21, 2026, local UTC-04:00):** the user approved commits 1-3 after the read-only answers and added a local-offset corpus filename, synthetic golden image and Local image warning. Commit 1 is `942d7b2` (532/532 tests and build). Commit 2 is `29859ca` (540/540 and build). Both were verified as isolated cumulative index snapshots at the normal sibling-folder depth. Commit 3 is being prepared. Local prompt and tool images use exact-byte, SHA-256-deduplicated companions through a helper shared with SDK exports. Layer D has an independent image decoder/hash check. All earlier Layer D results below covered text, not images. Inline images remain deferred. The latest runner verified 109 stable sources, all exit 0, with 114/114 Local and 124/124 SDK hashes found, zero missing/unresolved, and 100,404 text pieces present ([JSON](reports/corpus/corpus-2026-10-21T00-07-11-852-04-00.json), local-only and gitignored). Reports now use local time with offset in filenames and keep UTC `generatedAt`. No native session data or Git history was changed.
 
 ### Previous pushed baseline
@@ -23,7 +37,7 @@ Snapshot: October 20, 2026, after the approved corrections and push. The committ
 
 ## Next action
 
-Next: verify and commit approved group 3, then push all three. After push, restructure the work log, then implement terminal delta rendering, then profile S015 verification without optimizing it. User-owned customization files stay out. No history rewrite. The eight groups below are the previously pushed baseline.
+Next: obtain approval for snapshot-runner and scoring estimates and for staging terminal deltas and the hook. Do not commit the set-aside restructure. After implementing source snapshots, profile S015 on a frozen copy. User-owned customization files stay out. No history rewrite. The eight groups below are the previously pushed baseline.
 
 | Group | Commit / scope | `npm run verify` tests | `npm run build` |
 | --- | --- | --- | --- |
