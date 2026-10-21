@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const file = process.argv[2];
+if (!file)
+  throw new Error('commit-msg requires the commit message path.');
+const message = readFileSync(file, 'utf8');
+const parsed = execFileSync('git', ['interpret-trailers', '--parse'], { input: message, encoding: 'utf8' });
+const coauthor = (line) => /^co-authored-by\s*:\s*(.+)$/iu.exec(line.trim())?.[1];
+const copilot = parsed.split(/\r?\n/u).map(coauthor).filter((value) => value && /\bcopilot(?:\[bot\])?\b/iu.test(value));
+const lines = message.match(/[^\n]*\n|[^\n]+$/gu) ?? [];
+for (const value of copilot) {
+  for (let index = lines.length - 1; index >= 0; index--) {
+    if (coauthor(lines[index]) !== value)
+      continue;
+    lines.splice(index, 1);
+    break;
+  }
+}
+const updated = lines.join('');
+updated !== message && writeFileSync(file, updated);

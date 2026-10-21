@@ -281,6 +281,8 @@ These are this package's own `package.json` scripts. Run them from the package d
 | `npm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
 | `npm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
 
+For commits in this repository, enable [the commit-message hook](.githooks/commit-msg) with `git config core.hooksPath .githooks`. It removes Copilot co-author trailers, keeps other authors and body text, and requires Node.js on `PATH`. The hook is tested through a real commit in a temporary repository.
+
 Flags without a dedicated script go through `export`:
 
 ```
