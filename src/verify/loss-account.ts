@@ -442,6 +442,6 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
     checked: repeatedCounts.size,
     missing: missingRepeats,
   };
-  const failed = unaccounted.some((item) => item.status === 'absent') || order.outOfOrder > 0 || multiplicity.missing > 0;
+  const failed = unaccounted.length > 0 || order.outOfOrder > 0 || multiplicity.missing > 0;
   return { checked, totals, unaccounted, order, multiplicity, failed };
 }

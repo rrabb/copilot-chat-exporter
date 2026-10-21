@@ -252,7 +252,7 @@ passing silently - for example `Schema drift: 1 unhandled node kind(s)` or `Laye
 2 of 9 render checks FAILED`, with each failed check named. `--strict` turns any of those into a
 non-zero exit code, and `--verify` prints the full schema census.
 
-`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Under `--strict`, absent text fails; source-safe message order and repeated occurrences are checked only for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent streams grouped by agent scope. Other text is presence-only. See `docs/SPEC.md` section 9 for its limits.
+`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Under `--strict`, partial or absent text fails. Source-safe message order and repeated occurrences are checked only for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent streams grouped by agent scope. Other text is presence-only. See [SPEC section 9](docs/SPEC.md) for its limits.
 
 ### Historical verification limitations
 
@@ -297,6 +297,8 @@ Local captures also keep the session's supplementary resources, transcript, mode
 SDK captures created for preview verification or a selector that isn't an SDK chat are removed after the command. Successful exports keep their captures for later file verification. An explicitly retained corpus snapshot is never removed by single-chat commands.
 
 **Current source-cache location and lifetime:** Node's OS temporary directory (`os.tmpdir()`, normally `%LOCALAPPDATA%\Temp` on Windows) holds Local captures in `cce-local-source-*`, SDK/inventory captures in `cce-sources-*`, and output-path-keyed receipts in `cce-export-snapshots`. Successful export captures have no application expiry, size cap or cleanup command. They remain until manual or OS cleanup removes them. Library and golden calls can also leave Local captures. SDK captures include the supported inventory tree, not just the selected chat. Explicit corpus snapshots stay at the requested destination. Removing a required capture or receipt prevents later file verification; it doesn't change the Markdown or native session stores.
+
+Strict Layer D verification now fails on partial as well as absent text. There are no approved partial-cause exceptions. A future exception needs a named cause and evidence for that individual piece, not an exemption for a whole category.
 
 Flags without a dedicated script go through `export`:
 

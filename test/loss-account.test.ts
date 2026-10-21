@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { parseChatSession } from '../src/session/journal.ts';
-import { buildLossAccount, normalizeForLoss } from '../src/verify/loss-account.ts';
+import { buildLossAccount, normalizeForLoss, scoreLossPieces } from '../src/verify/loss-account.ts';
 
 const request = (response: unknown[], extra: Record<string, unknown> = {}) => ({
   requestId: 'r', message: { text: 'Please explain the build failure' }, response, ...extra,
@@ -175,11 +175,11 @@ test('a carousel option whose value equals its label is one piece, matching the 
   assert.equal(account.totals['other:questionCarousel']?.absent, 0);
 });
 
-test('clipped long text is partial, not present and not lost', () => {
+test('a partial text match without a proven accepted cause fails strict accounting', () => {
   const long = Array.from({ length: 80 }, (_, index) => `sentence number ${index} of the long answer`).join('. ');
   const account = buildLossAccount([request([{ value: long }])], `Please explain the build failure ${long.slice(0, 300)} ... [middle omitted]`);
   assert.equal(account.totals['assistant-text']!.partial, 1);
-  assert.equal(account.failed, false, 'partial content is reported but is not a failure by itself');
+  assert.equal(account.failed, true, 'historical clipping is not evidence for an approved exception');
 });
 
 test('multi-line output reports how many recorded lines are missing', () => {

@@ -6,6 +6,7 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Strict content verification rejects partial text without an approved cause. No partial-cause exceptions are currently approved; legacy clipping and command-echo differences aren't category-wide exemptions.
 - Active Local and SDK chats export captured sources, omit only an incomplete trailing record with a notice, and report writes during capture. Later file verification reuses the private saved snapshot instead of rereading the running chat. SDK usage uses a SQLite backup; native payloads aren't export companions.
 - Local replay also uses captured resources, transcripts, model data and memory, while keeping original locations in provenance. Truncated final Unicode escapes, number tokens and UTF-8 characters receive the same trailing-record handling.
 - SDK shell inputs keep arguments besides the command, including shell IDs and execution mode. A frozen active-chat check exposed a previously omitted `shellId`; no partial exception hides it.

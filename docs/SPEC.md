@@ -762,9 +762,7 @@ clipped middle shows as "N of M lines". Short fragments that sit next to code (f
 rendered sequence is preserved: Local prompts/prose across final replayed requests, and SDK prompts, reasoning, prose
 and tool intent within each `agentId` scope. Local reasoning snapshots, tool progress/results, notes and companion text
 still receive presence accounting but are not assumed to be separate inline messages for order or multiplicity.
-`--verify` prints the totals and never changes the exit code, except that `--verify --strict` fails when text is absent,
-eligible message text is out of order, or an identical eligible occurrence is missing. Partial pieces remain reported but
-are not failures by themselves.
+`--verify` prints the totals and never changes the exit code, except that `--verify --strict` fails when text is partial or absent, eligible message text is out of order, or an identical eligible occurrence is missing. No partial-cause exception is currently approved or implemented. A future exception must identify the cause and evidence for that exact piece; historical clipping, legacy byte caps and command-echo differences aren't category-wide exemptions.
 
 Layer D does not infer that adjacent text needs a separator: VS Code 1.141.2's version-matched
 [`chatModel.ts`](https://github.com/microsoft/vscode/blob/16507d91be0dc1ce4f94c04d4d0430210b8685d9/src/vs/workbench/contrib/chat/common/model/chatModel.ts)

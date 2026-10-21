@@ -12,7 +12,7 @@ export function printLossAccount (account: LossAccount, source: string): void {
   if (absent.length)
     console.log(`- NOT IN THE EXPORT: ${absent.length} piece(s), e.g. ${absent.slice(0, 3).map((item) => `request ${item.request} ${item.category}`).join('; ')}`);
   if (partial)
-    console.log(`- Only partly in the export (clipped or summarized): ${partial} piece(s)`);
+    console.log(`- Only partly in the export: ${partial} piece(s). No proven accepted cause; strict verification fails.`);
   if (!account.unaccounted.length)
     console.log('- Every checked piece of recorded content appears in the export.');
   console.log(`- Source-ordered message text: ${thousands(account.order.checked)} piece(s) checked, ${thousands(account.order.outOfOrder)} out of order`);
