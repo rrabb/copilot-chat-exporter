@@ -4,7 +4,15 @@ Project mode: prototype
 
 This is the single project instruction file for all agents and harnesses. `.github/copilot-instructions.md` only points here. Personal working preferences (collaboration, asking, evidence, git safety, time format) live in the user-level instructions and still apply.
 
-Start tracked work at the [work-log.md](work-log.md) dashboard (status, priority, next action), then the linked topic under [work-items/](work-items). Follow the [handbook](work-items/README.md) for keeping tracking records. Each fact has one owner, so link to it instead of copying it.
+
+### Project memory and work tracking
+
+Read in this order: the [handbook](work-items/README.md) (statuses, tags, rules), the **Start here** section of the [work-log.md](work-log.md) dashboard, then the topic in `work-items/` for the item you work on. Skip `work-log-archive.md` unless a link sends you there.
+
+- **Inbox:** put each new idea, bug, question or research topic in the dashboard Inbox as one line: `YYMMDD [tag] text (from: you|agent)`. Tags: `[idea]` `[research]` `[build]` `[question]`. Append only, and reread before you add. At session start, propose a disposition for each line.
+- **Capture check:** after any substantive prompt that produced an idea, finding, decision or status change, update the Inbox, the dashboard row or the topic. Skip plain Q&A. End those replies with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, just above the `Evidence:` line.
+- **Rabbit holes:** new work found while working on an item becomes a child WI with exactly one `Part of` parent and its `Do after` items. Add it to the parent's Work tree and refresh the tree's progress line.
+- Don't log routine actions, test totals or transcripts. Reread an entry before you edit it, and keep other chats' changes.
 
 ## Goal
 

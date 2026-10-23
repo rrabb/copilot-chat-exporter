@@ -1,64 +1,98 @@
-# Project work dashboard
+# Work dashboard
 
-**Published project memory.** This dashboard and the three linked handbook/topic records establish the approved C1/C2 structure. Project-memory migration remains incomplete. Product priorities below are provisional suggestions, not approved ordering.
+Updated 261023. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
-## Purpose and reading order
+🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
-Use this page to find current work, its condition, and its next action. Read a linked topic for goals, rationale, and findings. Read the [handbook](work-items/README.md) for terminology and maintenance rules. The [product goal](docs/SPEC.md#project-goal-and-scope) and [current behavior](README.md) remain in product documentation.
+## Start here
 
-Each identity appears once below. Row anchors remain stable when statuses change. Missing topic links mean the row currently carries enough context, not that a file is missing. WI-005 and WI-011 are unallocated. WI-004 includes the previously separate metadata-overflow proposal; the optional listing-model thought has no identity yet.
+**Do now**
 
-## Current focus
+| # | Item | Next action | Who | Size |
+| --- | --- | --- | --- | --- |
+| 1 | [WI-003](#wi-003) Manual acceptance | [question] Confirm the [checklist](work-items/WI-003-remaining-manual-acceptance.md#acceptance-inventory), then run the two required checks | you | S |
+| 2 | [WI-006](#wi-006) Resource clipping | [research] Test the 96 KiB limit with small synthetic cases, then write up options for you to pick | agent | M |
 
-The four approved C1/C2 documents are published. The immediate next step is promotion review, instruction adoption review, and approval of the next migration batch. The [transition entry](#wi-001) records that gate. C3-C5 and standing-instruction adoption are not authorized by this promotion. No product investigation is automatically Next. Product priorities remain subject to user selection.
+**Decisions you owe:** 4. See the `[question]` lines in the [Inbox](#inbox).
 
-The dashboard owns status, proposed priority, waiting/revisit conditions, and next action. Topics do not repeat those fields. Historical table numbers and aliases help find evidence but do not determine present status. The ten completed entries below describe delivered scope; separate acceptance and evidence questions remain independently visible.
+**Inbox:** 6 lines to triage.
 
-## Waiting
+**In flight:** nothing is Active.
 
-| Identity and outcome | Status | Proposed priority | Condition and next action |
-| --- | --- | --- | --- |
-| <a name="wi-001"></a>**WI-001 Project-memory transition** | Waiting | High | User review of this promotion. Review the dashboard, handbook, and two topics, then review instruction adoption and approve the next migration batch. C3-C5 remain unauthorized; the broader transition is incomplete. |
-| <a name="wi-003"></a>**WI-003 Remaining manual acceptance** | Waiting | Medium | User access to required manual checks. Recover outstanding UI/print/browser checks from legacy #13, #5/#6/#8 receipts, and compressed-report viewer limits. Separate required acceptance from untested platform coverage and agree a bounded checklist before execution; don't reopen completed implementation. |
-| <a name="wi-007"></a>**WI-007 Remaining inventory evidence** | Waiting | Medium | Evidence for placeholder/child identity cases. Identify the exact unverified inventory cases from legacy #7, separate unavailable records from parser faults, and define an approved evidence capture. Selection implementation is already delivered. |
-| <a name="wi-009"></a>**WI-009 Anonymized report fixture** | Waiting | Low | Approval needed for proposed synthetic/design fixture work. Agree useful report states, privacy checks, and acceptance before creating it. Alias: `next-design-fixture`. Fixture creation still requires separate approval. |
-| <a name="wi-025"></a>**WI-025 Historical tool-identity closure check** | Waiting | Low | Privacy-safe linkage to the original 1,040/1,039 case. Record whether it matches the request-slot verifier correction in `a23fe4e`; don't infer a new exporter bug from stale counts. Alias: `next-local-toolcall-mismatch`. |
+## Overview
 
-## Backlog
+### Fidelity
 
-| Identity and outcome | Status | Proposed priority | Next action and boundary |
-| --- | --- | --- | --- |
-| <a name="wi-002"></a>**WI-002 Documentation consistency** | Backlog | Medium | Reconcile deferred policy wording and completed receipts in docs after agreeing each policy. Legacy #12; aliases `exporter-docs`, `next-acceptance`. Documentation agreement must not silently approve a product change. |
-| <a name="wi-006"></a>**WI-006 [Persisted-resource clipping](work-items/WI-006-persisted-resource-clipping.md)** | Backlog | Medium | Request a bounded synthetic investigation of thresholds, Unicode excerpts, resource association, and accounting. Document alternatives and seek an owner decision or deferral/acceptance disposition. Priority remains unapproved; remediation is outside this item. |
-| <a name="wi-008"></a>**WI-008 Browser timeout investigation** | Backlog | Low | If the intermittent timeout recurs, isolate parallel-load and readiness effects with a reproducible case. Legacy alias `next-browser-parallel-flake`. No confirmed product fault or browser workaround is recorded. |
-| <a name="wi-010"></a>**WI-010 Graph refresh** | Backlog | Low; Quick win | If graph tooling will be used, refresh it against the chosen source revision and check coverage. Legacy #32, alias `next-graph-reindex`. Optional maintenance, not an export prerequisite. |
+| Item | What it is | Status | Type | Who | Size | Do after | Links |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <a name="wi-004"></a>[WI-004 Fidelity policy](work-items/WI-004-fidelity-policy-research.md) | Decide extra metadata, omission notices and redaction, then plan `--high-fidelity` and `--no-redact`. Resumes when you pick policy work up again. | 💤 Deferred · Medium | [research] | you | M | - | old #15/#16 |
+| <a name="wi-006"></a>[WI-006 Resource clipping](work-items/WI-006-persisted-resource-clipping.md) | Find out what the 96 KiB limit on saved tool resources hides, then fix it or accept it. | 🔜 Next · Medium | [research] | agent | M | - | WI-004 |
+| <a name="wi-014"></a>**WI-014** Inline images | Decide whether to show images inline as well as linking the saved files. Resumes when you review a display proposal. | 💤 Deferred · Low | [idea] | both | M | - | WI-024 |
+| <a name="wi-019"></a>**WI-019** Agent chat export | Exports Agent Host and Copilot CLI chats with usage and credits. | ✅ Done | [build] | - | - | - | old #9/#20 |
+| <a name="wi-020"></a>**WI-020** Local content fidelity | Keeps Local text, inputs and errors; repeated terminal output shows only the new part (`b1bcb61`). | ✅ Done | [build] | - | - | - | old #15/#16 |
+| <a name="wi-021"></a>**WI-021** Source-aware verification | Checks exports against the source, with parser and fuzz tests and faster scoring. | ✅ Done | [build] | - | - | - | old #10, WI-025 |
+| <a name="wi-024"></a>**WI-024** Image companions | Saves recorded images as exact-byte files and checks their hashes. | ✅ Done | [build] | - | - | - | WI-014 |
 
-## Deferred
+### Confidence
 
-| Identity and outcome | Status | Proposed priority | Revisit condition and next action |
-| --- | --- | --- | --- |
-| <a name="wi-004"></a>**WI-004 Fidelity-policy research** | Deferred | Medium | User resumes policy work. Reconcile `--high-fidelity`, `--no-redact`, extra-metadata thresholds, omission notices, and companion redaction before implementation. Includes former WI-005 proposal; aliases `exporter-local-fidelity`, `next-local-fidelity`. |
-| <a name="wi-012"></a>**WI-012 Compact evidence experiment** | Deferred | Low | User requests another report-size experiment. Compare a compact evidence record/renderer with accepted output and access requirements. It is not unfinished original #35 duplication reduction. |
-| <a name="wi-013"></a>**WI-013 Batched compressed insertion** | Deferred | Low | User authorizes a bounded compressed-report experiment. Measure insertion/readiness behavior without changing recorded results or current default delivery. Keep it separate from delivered gzip/Brotli support. |
-| <a name="wi-014"></a>**WI-014 Inline-image presentation** | Deferred | Low | User reviews an image-display proposal. Agree display/readability behavior separately from keeping recorded image bytes. Existing image companion delivery is complete; no resizing or new loss policy is approved. |
+| Item | What it is | Status | Type | Who | Size | Do after | Links |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <a name="wi-003"></a>[WI-003 Manual acceptance](work-items/WI-003-remaining-manual-acceptance.md) | Check by hand that the root chooser and the final listing work as agreed. | 🔜 Next · Medium | [research] | you | S | - | old #5/#6/#13 |
+| <a name="wi-007"></a>**WI-007** Inventory evidence | Collect evidence for the listing cases still unverified (placeholders, child chats). Waits for an approved way to capture it. | ⏳ Waiting · Medium | [research] | both | M | - | old #7, WI-015 |
+| <a name="wi-008"></a>**WI-008** Browser timeout | If the browser test times out again under load, reproduce it before changing anything. | 📋 Backlog · Low | [research] | agent | S | - | |
+| <a name="wi-015"></a>**WI-015** Discovery and selection | Finds chats in the covered stores and picks the root and exact chat safely. | ✅ Done | [build] | - | - | - | old #1/#5-7/#22 |
+| <a name="wi-025"></a>**WI-025** Old tool-call gap | Confirm the old 1,040 vs 1,039 tool-call gap was the request-slot bug fixed in `a23fe4e`. Waits for a privacy-safe way to link that case. | ⏳ Waiting · Low | [research] | agent | S | - | WI-021 |
 
-## Closed-work lookup
+### Report size
 
-Completed work keeps its identity. These entries summarize outcomes rather than every validation run. Manual acceptance is WI-003. Unknown future evidence does not make every delivered parent Active.
+| Item | What it is | Status | Type | Who | Size | Do after | Links |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <a name="wi-009"></a>**WI-009** Sample report | Make an anonymized sample report to rebuild the design guide from. Waits for your approval. | ⏳ Waiting · Low | [build] | both | S | - | |
+| <a name="wi-012"></a>**WI-012** Compact evidence | Try compact evidence records with one renderer. Resumes if report size becomes a problem again. | 💤 Deferred · Low | [research] | agent | L | - | WI-017 |
+| <a name="wi-013"></a>**WI-013** Batched insertion | Try inserting compressed report cards in batches to shorten the long startup task. Resumes when you ask for it. | 💤 Deferred · Low | [research] | agent | M | - | WI-018 |
+| <a name="wi-016"></a>**WI-016** Offline listings | Console, basic HTML and detailed HTML listings with source evidence. | ✅ Done | [build] | - | - | - | old #8/#17-19/#23/#25-30 |
+| <a name="wi-017"></a>**WI-017** Duplication cut | Cut detailed-report size about 20% and kept full search. | ✅ Done | [build] | - | - | - | old #35 |
+| <a name="wi-018"></a>**WI-018** Compressed reports | Optional gzip and Brotli detailed reports. | ✅ Done | [build] | - | - | - | |
 
-| Identity | Status | Delivered boundary and legacy pointers |
+### Capture and failure handling
+
+| Item | What it is | Status | Type | Who | Size | Do after | Links |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <a name="wi-022"></a>[WI-022 Frozen captures and cleanup](work-items/WI-022-source-captures-cache-cleanup.md) | Freezes source inputs, checks the saved file, keeps captures safely and deletes only after you approve. | ✅ Done | [build] | - | - | - | WI-023 |
+| <a name="wi-023"></a>**WI-023** Failed-export handling | Failed exports keep their evidence and write a private log; a demo reproduces the failures. | ✅ Done | [build] | - | - | - | WI-022 |
+
+### Project upkeep
+
+| Item | What it is | Status | Type | Who | Size | Do after | Links |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <a name="wi-001"></a>**WI-001** Work-tracking setup | Move the old work log into this dashboard and topics, one batch at a time. Waits for your review of this redesign. | ⏳ Waiting · High | [build] | both | L | - | |
+| <a name="wi-002"></a>**WI-002** Docs consistency | Bring README, SPEC and other docs in line once the WI-004 policy is decided. | 📋 Backlog · Medium | [build] | agent | M | WI-004 | old #12 |
+| <a name="wi-010"></a>**WI-010** Graph refresh | Re-index the code graph if you plan to use graph tools. | 📋 Backlog · Low; Quick win | [build] | agent | S | - | old #32 |
+
+## Inbox
+
+Format: `YYMMDD [tag] text (from: you|agent)`. Append only. Reread before adding.
+
+- 261023 [research] Does AGENTS.md's Layer D "presence only" claim match the source-aware checks in code and SPEC? (from: you)
+- 261023 [question] [WI-003](work-items/WI-003-remaining-manual-acceptance.md#acceptance-inventory): approve the proposed checklist and say which print cases matter. (from: agent)
+- 261023 [question] [WI-004](work-items/WI-004-fidelity-policy-research.md#owner-decisions-still-needed): answer the open policy questions when you resume policy work. (from: agent)
+- 261023 [question] [WI-009](#wi-009): approve or drop the anonymized sample report. (from: agent)
+- 261023 [question] [WI-001](#wi-001): review this tracking redesign and confirm the agent's proposed type, size and who for each row. (from: agent)
+- 261023 [idea] Use the auto-resolved model as the listing's answering model; old #11 left it out. (from: agent)
+
+## Closed lookup
+
+Done items keep their ✅ row above. Dropped and rejected ideas, so nobody proposes them again:
+
+| Idea | Why it was dropped | See |
 | --- | --- | --- |
-| <a name="wi-015"></a>**WI-015 Discovery, roots, and selection** | Done | Approved discovery/root and explicit Local selector work delivered. Legacy #1/#5-7/#22. Residual inventory evidence is WI-007, not a reopened selector implementation. |
-| <a name="wi-016"></a>**WI-016 Offline listings and evidence design** | Done | Approved offline report layout and evidence behavior delivered. Legacy #8/#17-19/#23/#25-30. Manual acceptance and optional design fixtures have separate entries. |
-| <a name="wi-017"></a>**WI-017 Detailed-report duplication reduction** | Done | Original #35 duplication reduction delivered. Compact evidence experimentation remains WI-012; it is not a completion criterion added after delivery. |
-| <a name="wi-018"></a>**WI-018 Compressed report delivery** | Done | Gzip/Brotli report delivery and hardening delivered. WI-013 is a separate experiment, not missing basic compressed-report support. |
-| <a name="wi-019"></a>**WI-019 SDK export and usage** | Done | Approved SDK export/usage scope delivered, including legacy #9/#20. Optional or newly discovered policy work does not expand this original outcome. |
-| <a name="wi-020"></a>**WI-020 Local recorded-content fidelity** | Done | Approved text/input/error fixes and identity-keyed terminal deltas delivered, including `b1bcb61`. Legacy #15/#16 and `next-terminal-delta`. Fidelity-policy decisions and resource clipping remain WI-004/WI-006. |
-| <a name="wi-021"></a>**WI-021 Source-aware verification** | Done | Delivered source-aware checks, parser/fuzz/scoring work, and request-slot verifier correction. Legacy #10. Exact historical mismatch closure is WI-025, not a claim that the whole verifier remains unfinished. |
-| <a name="wi-022"></a>**WI-022 [Frozen captures, cache, and cleanup](work-items/WI-022-source-captures-cache-cleanup.md)** | Done | Frozen inputs, selected captures, saved-file verification, retention/receipts, isolated testing, and approved safe cleanup delivered. Related diagnostics/demo are WI-023. |
-| <a name="wi-023"></a>**WI-023 Failed-export diagnostics and demo** | Done | Failure publication, private diagnostic logs, build identity/local times, cached-log cleanup, and repeatable synthetic demo delivered through the latest receipts. |
-| <a name="wi-024"></a>**WI-024 Recorded image companions** | Done | Recorded Local/SDK image-byte companions and independent hash checks delivered. This does not authorize image redaction, resizing, or a new presentation policy. |
+| Separate model-chip icon (old #21) | You skipped it. | - |
+| Generic adjacent-text join detector | Real stream fragments made blind joins wrong; source-aware handling replaced it. | WI-021 |
+| Whole-record JSON for high fidelity | Duplicates the conversation and conflicts with the no-raw-bundle rule. | WI-004 |
+| Nested backup journals (`bkup2`) in discovery | You excluded them; exact-path export still works. | WI-015 |
+| Extract non-image Base64 payloads | The audit found only images (now saved) and opaque reasoning (omitted on purpose). | WI-024 |
+| Delete cache before showing targets | Unsafe; cleanup now previews and asks first. | WI-022 |
 
-## Historical evidence
+## Old history
 
-The [legacy root log at the promotion baseline](https://github.com/rrabb/copilot-chat-exporter/blob/180a06ce10eace027c8937c6c20331e5f3b524b0/work-log.md#L3) and [archive](work-log-archive.md) keep earlier goals, decisions, rejected approaches, receipts, and research requirements discoverable. Read the relevant section when needed, not both logs by default. Older pending statements can be superseded by later receipts. The archive remains unchanged; full topic migration and reconciliation of its old root-heading links await a separately approved batch.
+The [old root log](https://github.com/rrabb/copilot-chat-exporter/blob/180a06ce10eace027c8937c6c20331e5f3b524b0/work-log.md#L3) and the [archive](work-log-archive.md) hold earlier goals, decisions and receipts. Later entries can supersede older pending notes. Read them through links, not by default.
