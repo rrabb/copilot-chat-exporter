@@ -5,7 +5,7 @@ applyTo: "src/**/*.ts,src/**/*.js,scripts/**/*.ts,scripts/**/*.js,scripts/**/*.m
 
 # TypeScript And JavaScript Style
 
-Apply these rules to executable code you write or modify. Follow [documentation-style.instructions.md](documentation-style.instructions.md) for comments, JSDoc, user-facing strings, and other prose. Do not reformat unrelated code only to match these rules.
+Apply these rules to executable code you write or modify. Follow [writing-style.instructions.md](writing-style.instructions.md) for comments, JSDoc, user-facing strings, and other prose. Do not reformat unrelated code only to match these rules.
 
 ## Prefer Short-Circuit Calls For Simple Side Effects
 
@@ -83,7 +83,7 @@ Choose the precise term that matches the code:
 | Serialized data | format or wire format |
 | One case in a union | variant or union member |
 
-Reserve `shape` for array or tensor dimensions, JavaScript engine object layouts when that exact concept is under discussion, quoted external API terminology, or an established public identifier that cannot be renamed within the task. Follow the broader replacement table in [documentation-style.instructions.md](documentation-style.instructions.md).
+Reserve `shape` for array or tensor dimensions, JavaScript engine object layouts when that exact concept is under discussion, quoted external API terminology, or an established public identifier that cannot be renamed within the task. Follow the broader replacement table in [writing-style.instructions.md](writing-style.instructions.md).
 
 ## Keep Side Effects At The Boundary
 
