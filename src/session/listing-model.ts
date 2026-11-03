@@ -1,10 +1,13 @@
 import type { InventoryDiagnostic, SessionOccurrence } from './sources.ts';
+import { formatLocalListingDate } from './listing-preview.ts';
 
 export interface SessionListingOptions {
   showIgnored?: boolean;
   last25?: boolean;
   fullIds?: boolean;
   terminalWidth?: number;
+  /** Local year of the listing run. Omit to keep the year in every console date. */
+  referenceYear?: number;
   diagnostics?: readonly InventoryDiagnostic[];
 }
 
@@ -122,8 +125,20 @@ export function fit (value: string, width: number): string {
   return `${characters.slice(0, Math.max(0, width - 1)).join('')}…`;
 }
 
-export function dateCell (timestamp: number | null): string {
-  return timestamp === null || !Number.isFinite(timestamp) ? 'unknown' : new Date(timestamp).toISOString().slice(0, 10);
+export function dateCell (timestamp: number | null, referenceYear?: number): string {
+  if (timestamp === null || !Number.isFinite(timestamp))
+    return 'unknown';
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime()))
+    throw new RangeError('Timestamp is outside the supported date range.');
+  const offsetMinutes = -date.getTimezoneOffset();
+  const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+  const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
+  const offsetRemainder = String(Math.abs(offsetMinutes) % 60).padStart(2, '0');
+  const offset = offsetRemainder === '00' ? `${offsetHours}h` : `${offsetHours}:${offsetRemainder}`;
+  const full = formatLocalListingDate(timestamp).replace('_', '-');
+  const localDate = date.getFullYear() === referenceYear ? full.slice(2) : full;
+  return `${localDate} (UTC${offsetSign}${offset})`;
 }
 
 export function ignoredCounts (groups: readonly ConversationGroup[]) {

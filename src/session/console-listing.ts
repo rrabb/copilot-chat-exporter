@@ -20,20 +20,27 @@ export function formatSessionListing (
       return 10;
     return Array.from(cleanCell(options.fullIds ? sessionId : ids.get(sessionId) ?? sessionId)).length;
   }));
-  const titleWidth = Math.max(12, terminalWidth - (76 + idWidth));
-  const headings = ['CREATED', 'UPDATED', 'PROMPTS', 'TYPE', 'ID/PREFIX', 'TITLE', 'STATUS'];
-  const widths = [10, 10, 7, 11, idWidth, titleWidth, 20];
-  const renderLine = (cells: string[]) => cells.map((cell, index) => fit(cell, widths[index])).join(' | ');
+  const rows = shown.map((group) => ({
+    group, created: dateCell(group.createdTimestamp, options.referenceYear),
+    updated: dateCell(group.activityTimestamp, options.referenceYear),
+  }));
+  const headings = ['CREATED (LOCAL)', 'UPDATED (LOCAL)', 'PROMPTS', 'TYPE', 'ID/PREFIX', 'TITLE', 'STATUS'] as const;
+  const createdWidth = Math.max(headings[0].length, ...rows.map((row) => row.created.length));
+  const updatedWidth = Math.max(headings[1].length, ...rows.map((row) => row.updated.length));
+  const titleWidth = Math.max(20, terminalWidth - (createdWidth + updatedWidth + 7 + 11 + idWidth + 20 + 6 * 3));
+  const widths = [createdWidth, updatedWidth, 7, 11, idWidth, titleWidth, 20];
+  const duplicateCount = occurrences.length - groups.length;
+  const renderLine = (cells: readonly string[]) => cells.map((cell, index) => fit(cell, widths[index])).join(' | ');
   const lines = [
     options.showIgnored
       ? `Showing ${shown.length} of ${candidates.length} total conversations (${eligible.length} eligible before ignored filters)${options.last25 ? ' (newest 25)' : ''}.`
       : `Showing ${shown.length} of ${candidates.length} eligible conversations${options.last25 ? ' (newest 25)' : ''}.`,
-    `${occurrences.length} source occurrences; ${occurrences.length - groups.length} duplicate occurrences grouped.`,
+    `${occurrences.length} source occurrences across ${groups.length} conversations; ${duplicateCount} duplicate ${duplicateCount === 1 ? 'occurrence' : 'occurrences'} merged.`,
     '',
     renderLine(headings),
     renderLine(widths.map((width) => '-'.repeat(width))),
   ];
-  for (const group of shown) {
+  for (const { group, created, updated } of rows) {
     const session = group.representative;
     const status = group.visibility.status === 'hidden' && group.visibility.reason === 'ambiguous'
       ? '🟠 ❓ ambiguous' : group.visibility.status === 'hidden'
@@ -44,8 +51,8 @@ export function formatSessionListing (
     const selectorStatus = session.provider === 'local' && (idAmbiguity.get(session.sessionId) ?? 0) > 1
       ? 'path required' : statusWithChildren;
     lines.push(renderLine([
-      dateCell(group.createdTimestamp),
-      dateCell(group.activityTimestamp),
+      created,
+      updated,
       group.promptCount === null ? 'unknown' : String(group.promptCount),
       sessionType(session),
       options.fullIds ? session.sessionId : ids.get(session.sessionId) ?? session.sessionId,
@@ -55,12 +62,23 @@ export function formatSessionListing (
   }
   if (shown.length === 0)
     lines.push('(no conversations to show)');
-  const ignoredSummary = [...ignored.entries()].map(([reason, count]) => `${count} ${reason}`).join(', ');
-  ignoredSummary && lines.push(`Ignored by default: ${ignoredSummary}.`);
   const ambiguousChildren = groups.filter((group) =>
     group.visibility.status === 'hidden' && group.visibility.reason === 'ambiguous'
     && group.representative.sessionId.includes('#subagent/')).length;
-  ambiguousChildren > 0 && lines.push(`🟠 ❓ ${ambiguousChildren} ambiguous child scope(s) are hidden; verified parent conversations remain listed.`);
+  const ignoredSummary = [...ignored.entries()].flatMap(([reason, count]) => {
+    if (reason === 'fix')
+      return [`${count} chat${count === 1 ? '' : 's'} with a title${count === 1 ? '' : 's'} starting with /fix`];
+    if (reason === 'ambiguous') {
+      const otherCount = count - ambiguousChildren;
+      return [
+        ...(otherCount > 0 ? [`${otherCount} ${otherCount === 1 ? 'entry' : 'entries'} with unresolved identity or scope`] : []),
+        ...(ambiguousChildren > 0 ? [`${ambiguousChildren} ambiguous child scope${ambiguousChildren === 1 ? '' : 's'}`] : []),
+      ];
+    }
+    return [`${count} ${reason}`];
+  }).join(', ');
+  ignoredSummary && lines.push(`Ignored by default: ${ignoredSummary}.`);
+  ambiguousChildren > 0 && lines.push('🟠 ❓ Verified parent conversations remain listed; ambiguous child scopes are hidden.');
   const diagnostics = diagnosticCounts(occurrences, options.diagnostics);
   const warningParts = [
     diagnostics.issues > 0 ? `${diagnostics.issues} distinct source issue(s)` : '',
@@ -68,9 +86,11 @@ export function formatSessionListing (
     diagnostics.scopeWarnings > 0 ? `${diagnostics.scopeWarnings} child-scope warning(s)` : '',
   ].filter(Boolean);
   warningParts.length > 0 && lines.push(`Warnings: ${warningParts.join(', ')}. Detailed storage paths are omitted.`);
-  lines.push('Type: local = VS Code journal; agent = Agent Host main chat; sub-agent = child chat entry; CLI agent = Copilot CLI. Status shows whether its backing is verified.');
-  lines.push('Status: verified = backing identity checked; unresolved = no verified chat backing; ambiguous (🟠 ❓) = multiple possible mappings. “path required” means this Local ID exists in multiple workspaces.');
-  lines.push('Unknown dates/counts mean the source has no trustworthy value, not zero. New Chat rows with unknown creation and prompt count are hidden by default; use --show-ignored to include them.');
+  lines.push('Type: local = VS Code journal; agent = Agent Host main chat; sub-agent = child chat entry; CLI agent = Copilot CLI; external = provider reference outside Local, Agent Host and CLI sources. External references are unsupported for export.');
+  lines.push('Status: verified = backing identity checked; unresolved = no verified chat backing; ambiguous (🟠 ❓) = identity or scope could not be resolved safely. “path required” means this Local ID exists in multiple workspaces.');
+  lines.push('Dates use this machine’s local time; each timestamp includes its UTC offset. Unknown dates/counts mean the source has no trustworthy value, not zero.');
+  options.referenceYear !== undefined && lines.push(`Year ${options.referenceYear} is omitted from matching dates; other years use YYMMDD.`);
+  lines.push('New Chat rows with unknown creation and prompt count are hidden by default; use --show-ignored to include them.');
   lines.push('Use a verified Local ID/prefix from the ID / PREFIX column as the export selector. Unresolved rows have no verified export source; use an exact .jsonl path when status says “path required”.');
   lines.push('Prompt counts: main user prompts; child counts add one delegation plus recorded child user prompts.');
   lines.push('', 'Export a verified Local source: copilot-chat-export <sessionId> [outputPath] --user-data-root <path>');

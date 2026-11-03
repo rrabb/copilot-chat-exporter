@@ -56,8 +56,8 @@ The page is one `<main>`, rendered in this order. A [draw.io wireframe](diagrams
 |         · ℹ️ How to use · 🔎 Audit legend · 🙈 Ignored (N)                     |
 |   .warning  privacy notice (prompt text and local paths; best-effort redaction)|
 +--------------------------------------------------------------------------------+
-| .metrics   [N grouped conversations][N workspace occurrences][N main candidates]|
-|            [N initially shown][N ignored groups][N answering model IDs]        |
+| .metrics [N conversations after merging duplicates] [N source occurrences]    |
+|          [N eligible][N hidden][N main rows][N ignored groups][N models]       |
 +--------------------------------------------------------------------------------+
 | .grid  (three .panel charts, bars = share of all groups; not additive)         |
 |   [Backing status]       [Chat types]            [Answering models (top 8)]    |
@@ -79,7 +79,7 @@ The page is one `<main>`, rendered in this order. A [draw.io wireframe](diagrams
 |   quick chips: [🙈 …][edits][errors]…  (AND semantics, aria-pressed)          |
 |   <details> Date / numeric ranges                                              |
 |   View ▾  Detail ▾  Sort ▾  [⬇️ Descending]  [Reset filters] [Show all]        |
-|   #row-count "X of Y grouped conversations shown"   #action-status (live)     |
+|   #row-count "X of Y conversations shown"   #action-status (live)              |
 +--------------------------------------------------------------------------------+
 | #comparison  (hidden until a chat is pinned)  2 side-by-side summaries         |
 +--------------------------------------------------------------------------------+
@@ -139,7 +139,7 @@ The first and second summary lines contain only the information a user needs to 
 
 ### TOC item
 
-Each TOC entry is a list item with two flowing lines. Entries cover every grouped conversation, including ignored and newest-25-limited ones, in report order (most recently active first; `#N` is that report-local rank).
+Each TOC entry is a list item with two flowing lines. Entries cover every conversation after matching duplicate occurrences, including ignored and newest-25-limited ones, in report order (most recently active first; `#N` is that report-local rank).
 
 ```text
 **#54** Title in Arial Narrow (link)  [💬 Local]  **12 turns**
@@ -317,7 +317,7 @@ There is one row per unique artifact path across the card's references. Above th
 | `MD` | Markdown; use in compact chips instead of spelling out the word |
 | `TOC` | Table of contents |
 | `ref` / `refs` | Reference(s), not copies |
-| `3 w/s refs · 1 conv` | One grouped conversation referenced from three distinct workspace stores |
+| `3 w/s refs · 1 conv` | One conversation referenced from three distinct workspace stores after matching duplicates |
 | `W1`, `W2`, `W3` | Reference labels local to this card/report snapshot; not global IDs or priority rankings |
 | `#54` | Position in the generated report, not a persistent session identifier |
 | `wsID` | Workspace storage directory name; do not diagnose corruption from its length |

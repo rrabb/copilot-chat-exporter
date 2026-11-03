@@ -228,7 +228,7 @@ test('conventional attention action resets prior filters, matches its condition 
 
 test('detailed controller combines exact ranges, unknown/model/chip/search filters and occurrence view', () => {
   const f = controllerFixture();
-  assert.equal(f.ids.get('row-count')!.textContent, '2 of 3 grouped conversations shown');
+  assert.equal(f.ids.get('row-count')!.textContent, '2 of 3 conversations shown');
   f.input('prompts-known', 'unknown');
   assert.deepEqual(f.cards.filter((card) => !card.hidden).map((card) => card.id), ['unknown']);
   f.ids.get('reset')!.fire('click');

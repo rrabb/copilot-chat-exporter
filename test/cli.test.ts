@@ -571,6 +571,30 @@ test('listing supports --no-html and explicit HTML destinations with safe overwr
   assert.match(await fs.readFile(reportPath, 'utf8'), /<!doctype html>/i);
 });
 
+test('listing ends with a separator only on a terminal and never changes JSON output', async (context) => {
+  const { home, root, sessionPath, env, invoke } = await fixture(context);
+  const ending = `\n\n${'-'.repeat(60)}\n\n`;
+  const redirected = invoke('--list', '--no-html', '--user-data-root', root);
+  assert.equal(redirected.status, 0, redirected.stderr);
+  assert.ok(!redirected.stdout.endsWith(ending));
+  assert.match(redirected.stdout, new RegExp(`Year ${new Date().getFullYear()} is omitted`, 'u'));
+
+  const preload = path.join(home, 'terminal-output.mjs');
+  await fs.writeFile(preload, "Object.defineProperty(process.stdout, 'isTTY', { value: true });");
+  env.NODE_OPTIONS = `${env.NODE_OPTIONS} --import=${pathToFileURL(preload).href}`;
+  const plain = invoke('--list', '--no-html', '--user-data-root', root);
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.ok(plain.stdout.endsWith(ending), plain.stdout);
+  const reportPath = path.join(home, 'terminal-report.html');
+  const html = invoke('--list', '--html-output', reportPath, '--user-data-root', root);
+  assert.equal(html.status, 0, html.stderr);
+  assert.ok(html.stdout.endsWith(`HTML report: ${reportPath}${ending}`), html.stdout);
+  const json = invoke('--verify', sessionPath, '--json');
+  assert.equal(json.status, 0, json.stderr);
+  assert.doesNotThrow(() => JSON.parse(json.stdout));
+  assert.ok(!json.stdout.endsWith(ending));
+});
+
 test('non-interactive ambiguity never chooses the first or newest root', async (context) => {
   const { root, invoke } = await fixture(context, true);
   const ambiguous = invoke('--list');
@@ -638,7 +662,7 @@ test('approved Agent Host default fallback is visible in console warnings', asyn
   const result = invoke('--list', '--no-html', '--user-data-root', root);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /agent\s+\|.*verified/);
-  assert.match(result.stdout, /2026-10-01\s+\|\s+2026-10-01\s+\|\s+1/);
+  assert.match(result.stdout, /(?:\d{2})?\d{4}-\d{2}:\d{2} \(UTC[+-]\d+(?:h|:\d{2})\)\s+\|\s+(?:\d{2})?\d{4}-\d{2}:\d{2} \(UTC[+-]\d+(?:h|:\d{2})\)\s+\|\s+1/);
   assert.match(result.stdout, /identity warning\(s\)/);
   assert.doesNotMatch(result.stdout, /existing local session database and matching SDK session.start/);
   assert.doesNotMatch(result.stderr, /Identity warning/);
@@ -671,7 +695,7 @@ test('ambiguous children show orange question icons without invalidating main id
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Main stays available/);
   assert.doesNotMatch(result.stdout, /Ambiguous subagent/);
-  assert.match(result.stdout, /1 ambiguous child scope\(s\) are hidden/);
+  assert.match(result.stdout, /Ignored by default: 1 ambiguous child scope/);
   const all = invoke('--list', '--show-ignored', '--no-html', '--user-data-root', root);
   assert.equal(all.status, 0, all.stderr);
   assert.match(all.stdout, /🟠 ❓ ambiguous/);

@@ -84,7 +84,7 @@ export const detailedListingController = String.raw`
     for(const row of cards) row.hidden = !match(row,words) || row.dataset.limited==='true';
     for(const row of occurrences) row.hidden = !match(row,words) || row.dataset.limited==='true';
     const count = rows.filter(row=>!row.hidden).length;
-    input('row-count').textContent = count+' of '+rows.length+' '+(view==='grouped'?'grouped conversations':'workspace occurrences')+' shown';
+    input('row-count').textContent = count+' of '+rows.length+' '+(view==='grouped'?'conversations':'workspace occurrences')+' shown';
     input('grouped-view').hidden = view!=='grouped';
     input('occurrence-view').hidden = view!=='occurrences';
   };

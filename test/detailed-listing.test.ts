@@ -14,6 +14,7 @@ test('detailed report contains requested identification sections with static exe
   const evidence = detailedEvidence();
   evidence.turns[0]!.prompt = `${prompt} <img src=x onerror=alert(2)>`;
   const html = formatDetailedSessionListingHtml([row], new Map([['one', evidence]]), {}, '2026-10-08T19:00:00Z');
+  assert.ok(html.includes('conversations after merging duplicates'));
   for (const id of ['conversation-index', 'models-used', 'storage-guide', 'ids-sizes', 'how-to', 'audit-legend', 'ignored-sessions', 'comparison'])
     assert.ok(html.includes(`id="${id}"`), id);
   assert.ok(html.includes('Titles at each storage level'));
@@ -139,7 +140,7 @@ test('newest-25 detailed mode keeps all TOC targets while showing exactly 25 col
   assert.equal(cards.length, 30);
   assert.equal(cards.filter((tag) => !tag.includes(' hidden')).length, 25);
   assert.ok(cards.every((tag) => !/\bopen\b/u.test(tag)));
-  assert.ok(html.includes('Session TOC / grouped conversation index (30)'));
+  assert.ok(html.includes('Session TOC / conversation index (30)'));
   assert.ok(html.includes('data-limited="true"'));
 });
 test('rich SDK headers, filters, index and initial ordering use every recorded child follow-up and last scoped event', () => {

@@ -63,6 +63,12 @@ One line per idea, newest at the bottom:
 - A [question] that blocks the next step also goes in Do now.
 - A line leaves the Inbox when you make it a WI row, drop it (closed lookup), or answer it.
 
+### Closing an item
+
+- Done needs two things: the Done-when criteria are met, and the dev says so. Don't close an item on your own. When the criteria look met, say so in your reply and ask.
+- "Approve" or "looks good" about a plan or an approach doesn't mean close. If unsure, ask.
+- When the dev confirms, do this in one edit: set Done on the row; record the outcome and date in the topic; remove it from Do now and refresh the Updated date; update the parent's Work tree and progress line if it has one; answer or remove its Inbox lines, noting where each went; leave open children open and say so in your reply.
+
 ## Capture check
 
 - After a prompt that produced something worth keeping (an idea, finding, decision or status change), update tracking. Skip the update for plain Q&A.
@@ -87,6 +93,7 @@ Tracking is part of finishing the task. Before reporting completion:
 3. Record an Inbox line's outcome or destination before removing it. Completed work stays in a Done row, rejected work goes in the closed lookup, and answered questions go with the item they concern.
 4. Separate unresolved follow-ups from completed work. Use the existing child-item rules for new tasks. Don't leave a completed parent open because independent work remains.
 5. Reread the updated entries against the code, validation results and approved scope. Make sure the final reply's `Tracking:` line names the actual updates.
+6. After any tracking edit, list the lines you changed in the reply.
 
 If tracking can't be updated, report the task as incomplete and explain why. For read-only work, respect the no-edit boundary and report any tracking updates still needed.
 

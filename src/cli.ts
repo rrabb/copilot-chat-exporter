@@ -300,14 +300,15 @@ try {
     if (selectedRoot === undefined)
       throw new Error('Listing requires a resolved user-data root.');
     const inventory = await inventorySessions(selectedRoot);
+    const generatedAt = new Date();
     const listingOptions = {
       showIgnored: showIgnoredMode,
       last25: last25Mode,
       fullIds: fullIdsMode,
       terminalWidth: process.stdout.columns,
+      referenceYear: generatedAt.getFullYear(),
       diagnostics: inventory.diagnostics,
     };
-    const generatedAt = new Date();
     let htmlPath: string | null = null;
     if (!noHtmlMode) {
       const destination = htmlOutputArg === null
@@ -328,6 +329,7 @@ try {
     console.log(formatSessionListing(inventory.occurrences, listingOptions));
     detailedMode && noHtmlMode && console.warn('Invalid flag combination: --detailed requests an HTML report but --no-html suppresses it. Only the compact console listing was produced.');
     htmlPath && console.log(`HTML report: ${htmlPath}`);
+    process.stdout.isTTY && console.log(`\n${'-'.repeat(60)}\n`);
     process.exit(0);
   }
 } catch (error) {

@@ -7,6 +7,7 @@ All notable changes to this project are documented here.
 ### Changed
 
 - Development and CI examples use the pinned pnpm version and `pnpm-lock.yaml`. Installation rejects other package managers through a local guard, without downloading a helper. CI templates now target this standalone repository and remain opt-in.
+- Console and HTML listings distinguish source occurrences, merged conversations and duplicate occurrences. Console ignore reasons and provider types use clearer labels. Console timestamps show local time, omit the run's year when it matches, and use compact UTC offsets. Date columns leave more room for titles. Terminal listing runs end with a dashed separator; redirected output and JSON don't.
 
 ### Added
 
