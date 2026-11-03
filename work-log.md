@@ -1,6 +1,6 @@
 # Work dashboard
 
-Updated 261102. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
+Updated 261103. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
 🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
@@ -10,14 +10,14 @@ Updated 261102. New here? Read the [handbook](work-items/README.md) first. Produ
 
 | # | Item | Next action | Who | Size |
 | --- | --- | --- | --- | --- |
-| 1 | [WI-003](#wi-003) Manual acceptance | [question] Confirm the [checklist](work-items/WI-003-remaining-manual-acceptance.md#acceptance-inventory), then run the two required checks | you | S |
-| 2 | [WI-006](#wi-006) Resource clipping | [research] Test the 96 KiB limit with small synthetic cases, then write up options for you to pick | agent | M |
+| 1 | [WI-003](#wi-003) Manual acceptance | **Now:** [question] Approve the [checklist](work-items/WI-003-remaining-manual-acceptance.md#acceptance-inventory).<br>**After approval:** [research] Run the two required checks. | you | S |
+| 2 | [WI-001](#wi-001) Work-tracking setup | [build] Move WI-019, then WI-024 and WI-023, then WI-015 to WI-018, alongside real work. | both | L |
 
 **Decisions you owe:** see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then.
 
 **Inbox:** see [Inbox](#inbox).
 
-**In flight:** Nothing active. [WI-001](#wi-001) waits for your review.
+**In flight:** Nothing active.
 
 ## Overview
 
@@ -26,21 +26,26 @@ Updated 261102. New here? Read the [handbook](work-items/README.md) first. Produ
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <a name="wi-004"></a>[WI-004 Fidelity policy](work-items/WI-004-fidelity-policy-research.md) | Decide extra metadata, omission notices and redaction, then plan `--high-fidelity` and `--no-redact`. Resumes when you pick policy work up again. | 💤 Deferred · Medium | [research] | you | M | - | old #15/#16 |
-| <a name="wi-006"></a>[WI-006 Resource clipping](work-items/WI-006-persisted-resource-clipping.md) | Find out what the 96 KiB limit on saved tool resources hides, then fix it or accept it. | 🔜 Next · Medium | [research] | agent | M | - | WI-004 |
+| <a name="wi-006"></a>[WI-006 Resource clipping](work-items/WI-006-persisted-resource-clipping.md) | Synthetic research exposed clipping. You chose a preview plus a complete redacted companion as the direction. | ✅ Done | [research] | - | - | - | WI-004; [decision](work-items/WI-006-persisted-resource-clipping.md#options) |
+| <a name="wi-028"></a>↳ **WI-028** Resource policy choice | Part of WI-006. You chose a preview plus a complete redacted companion as the direction. | ✅ Done | [question] | - | - | - | [WI-006 decision](work-items/WI-006-persisted-resource-clipping.md#options) |
+| <a name="wi-029"></a>↳ **WI-029** Resource preview and companion | Part of WI-006. Replace clipping with a Unicode-safe preview and a complete redacted companion. | 📋 Backlog · Medium | [build] | agent | M | - | [WI-006](#wi-006) |
+| <a name="wi-030"></a>↳ **WI-030** Resource text verification | Part of WI-006. Independently verify resource text, including redacted companions, and report missing content. Waits for WI-029. | ⏳ Waiting · Medium | [build] | agent | M | WI-029 | [WI-006](#wi-006) |
+| <a name="wi-031"></a>↳ **WI-031** Unmatched resources | Part of WI-006. Research how to report unmatched files without attaching them to the wrong call. | 📋 Backlog · Medium | [research] | agent | S | - | [WI-006](#wi-006) |
 | <a name="wi-014"></a>**WI-014** Inline images | Decide whether to show images inline as well as linking the saved files. Resumes when you review a display proposal. | 💤 Deferred · Low | [idea] | both | M | - | WI-024 |
 | <a name="wi-019"></a>**WI-019** Agent chat export | Exports Agent Host and Copilot CLI chats with usage and credits. | ✅ Done | [build] | - | - | - | old #9/#20 |
-| <a name="wi-020"></a>**WI-020** Local content fidelity | Keeps Local text, inputs and errors; repeated terminal output shows only the new part (`b1bcb61`). | ✅ Done | [build] | - | - | - | old #15/#16 |
-| <a name="wi-021"></a>**WI-021** Source-aware verification | Checks exports against the source, with parser and fuzz tests and faster scoring. | ✅ Done | [build] | - | - | - | old #10, WI-025 |
+| <a name="wi-020"></a>[WI-020 Local content fidelity](work-items/WI-020-local-content-fidelity.md) | Records the Local text fixes and identity-keyed terminal deltas. [WI-033](#wi-033) researches reasoning IDs. | ✅ Done | [build] | - | - | - | old #15/#16 |
+| <a name="wi-033"></a>↳ **WI-033** Local reasoning identity | Part of WI-020. Investigate lost reasoning positions and checks when different IDs have identical or prefix text. | 📋 Backlog · Medium | [research] | agent | M | - | [WI-020 finding](work-items/WI-020-local-content-fidelity.md#local-reasoning-identity) |
+| <a name="wi-021"></a>[WI-021 Source-aware verification](work-items/WI-021-source-aware-verification.md) | Checks Local and agent exports with source-aware text and structural checks. | ✅ Done | [build] | - | - | - | old #10; [WI-025](#wi-025) |
+| <a name="wi-032"></a>↳ **WI-032** Parser install hint | Part of WI-021. Change the missing-parser hint to recommend `pnpm install` and also check other messages for stale npm wording. | 📋 Backlog · Low | [build] | agent | S | - | [Finding](work-items/WI-021-source-aware-verification.md#parser-install-hint), [WI-026](#wi-026) |
 | <a name="wi-024"></a>**WI-024** Image companions | Saves recorded images as exact-byte files and checks their hashes. | ✅ Done | [build] | - | - | - | WI-014 |
 
 ### Confidence
 
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| <a name="wi-003"></a>[WI-003 Manual acceptance](work-items/WI-003-remaining-manual-acceptance.md) | Check by hand that the root chooser and the final listing work as agreed. | 🔜 Next · Medium | [research] | you | S | - | old #5/#6/#13 |
+| <a name="wi-003"></a>[WI-003 Manual acceptance](work-items/WI-003-remaining-manual-acceptance.md) | Check by hand that the root chooser and the final listing work as agreed. Now: [question] Approve the checklist. After approval: [research] Run the two required checks. | 🔜 Next · Medium | [research] | you | S | - | old #5/#6/#13 |
 | <a name="wi-007"></a>**WI-007** Inventory evidence | Collect evidence for the listing cases still unverified (placeholders, child chats). Waits for an approved way to capture it. | ⏳ Waiting · Medium | [research] | both | M | - | old #7, WI-015 |
-| <a name="wi-008"></a>**WI-008** Browser timeout and cleanup | A full verification run timed out and hung on 261102. Later runs exited normally; the cause remains unknown. Reproduce timeout/cancellation and check CDP connections, child processes and temporary-profile cleanup before changing code. The separate CSP assertion failure is resolved in WI-027. | 📋 Backlog · Low | [research] | agent | S | - | [Browser helper](test/browser-cdp.ts), [timeout log](temp-tool-output/pnpm-cleanup-261102-1252/verify.log), [WI-027](#wi-027) |
-| <a name="wi-027"></a>**WI-027** Browser CSP assertions | Completed 261102: a synthetic probe isolated `script-src-attr` events to detached-template parsing before validation on Chrome 156. Approved test changes accept no events or that directive for rejected handler cases. Rejection, zero execution, zero inserted cards and strict checks elsewhere remain. Production code is unchanged. Full verification passes. Older browser behavior wasn't rerun. | ✅ Done | [build] | - | - | - | [Test](test/compressed-listing-browser.test.ts), [probe](temp-tool-output/pnpm-finish-261102-1415/csp-probe-results.json), [verification](temp-tool-output/pnpm-finish-261102-1415/verify-after-csp.log), [WI-008](#wi-008) |
+| <a name="wi-008"></a>**WI-008** Browser timeout and cleanup | Reproduce the browser timeout and check cleanup after cancellation. Later runs exited normally, but the earlier hang remains unexplained. | 📋 Backlog · Low | [research] | agent | S | - | [Browser helper](test/browser-cdp.ts), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-027](#wi-027), [Chrome debugger-port failure](work-items/WI-020-local-content-fidelity.md#261103---synthetic-reasoning-and-focused-checks) |
 | <a name="wi-015"></a>**WI-015** Discovery and selection | Finds chats in the covered stores and picks the root and exact chat safely. | ✅ Done | [build] | - | - | - | old #1/#5-7/#22 |
 | <a name="wi-025"></a>**WI-025** Old tool-call gap | Confirm the old 1,040 vs 1,039 tool-call gap was the request-slot bug fixed in `a23fe4e`. Waits for a privacy-safe way to link that case. | ⏳ Waiting · Low | [research] | agent | S | - | WI-021 |
 
@@ -66,20 +71,19 @@ Updated 261102. New here? Read the [handbook](work-items/README.md) first. Produ
 
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| <a name="wi-001"></a>**WI-001** Work-tracking setup | Move the old work log into this dashboard and topics, one batch at a time. Waits for your review of this redesign. | ⏳ Waiting · High | [build] | both | L | - | |
+| <a name="wi-001"></a>**WI-001** Work-tracking setup | Finish the work-tracking migration. The dashboard, handbook and first topics are done. Type, size and who guesses accepted 261102. Next action: [build] Move WI-019, then WI-024 and WI-023, then WI-015 to WI-018, alongside real work. | 🔜 Next · High | [build] | both | L | - | [Handbook](work-items/README.md), [completion check](work-items/README.md#completion-check) |
 | <a name="wi-002"></a>**WI-002** Docs consistency | Bring README, SPEC and other docs in line once the WI-004 policy is decided. | 📋 Backlog · Medium | [build] | agent | M | WI-004 | old #12 |
 | <a name="wi-010"></a>**WI-010** Graph refresh | Re-index the code graph if you plan to use graph tools. | 📋 Backlog · Low; Quick win | [build] | agent | S | - | old #32 |
-| <a name="wi-026"></a>**WI-026** pnpm migration | Completed 261102: development commands, docs and standalone CI templates use pinned pnpm. A local install guard replaces the downloaded helper. Historical npm receipts stay unchanged. Local install, build, package check and full verification pass. CI templates remain opt-in and weren't run remotely. | ✅ Done | [build] | - | - | - | [Setup](README.md#install), [guard](scripts/require-pnpm.mjs), [validation](temp-tool-output/pnpm-finish-261102-1415/), [WI-027](#wi-027) |
+| <a name="wi-026"></a>[WI-026 pnpm migration](work-items/WI-026-pnpm-migration.md) | Development commands and CI examples use pinned pnpm with a local install guard. Local validation passes, but remote CI hasn't been run. | ✅ Done | [build] | - | - | - | [Setup](README.md#install), [guard](scripts/require-pnpm.mjs), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-027](#wi-027) |
+| <a name="wi-027"></a>↳ **WI-027** Browser CSP assertions | Part of WI-026. Handler-case tests allow browser CSP reporting differences while keeping rejection, execution and insertion checks. | ✅ Done | [build] | - | - | - | [Test](test/compressed-listing-browser.test.ts), [findings](work-items/WI-026-pnpm-migration.md#findings), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-008](#wi-008) |
 
 ## Inbox
 
 Format: `YYMMDD [tag] text (from: you|agent)`. Append only. Reread before adding.
 
-- 261023 [research] Does AGENTS.md's Layer D "presence only" claim match the source-aware checks in code and SPEC? (from: you)
 - 261023 [question] [WI-003](work-items/WI-003-remaining-manual-acceptance.md#acceptance-inventory): approve the proposed checklist and say which print cases matter. (from: agent)
 - 261023 [question] (due when WI-004 resumes) [WI-004](work-items/WI-004-fidelity-policy-research.md#owner-decisions-still-needed): answer the open policy questions. (from: agent)
 - 261023 [question] [WI-009](#wi-009): approve or drop the anonymized sample report. (from: agent)
-- 261023 [question] [WI-001](#wi-001): review this tracking redesign and confirm the agent's proposed type, size and who for each row. (from: agent)
 - 261023 [idea] Use the auto-resolved model as the listing's answering model; old #11 left it out. (from: agent)
 
 ## Closed lookup

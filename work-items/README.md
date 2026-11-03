@@ -5,7 +5,7 @@ How to keep the [dashboard](../work-log.md) and topic files useful. The dashboar
 ## Start a session
 
 1. Read **Start here** on the dashboard: Do now, Decisions you owe, Inbox, In flight.
-2. Triage the Inbox. For each line, propose one of: make a WI row, drop it with a reason, or keep it. If the Inbox passes about 15 lines, say so once.
+2. Go through the Inbox. For each line, say what to do: make a row, drop it with a reason, or keep it. If the Inbox passes about 15 lines, say so once.
 3. Open the topic for the item you work on. Read **At a glance** first. Read the rest only when you need it.
 4. Skip `work-log-archive.md` unless a link sends you there.
 
@@ -14,13 +14,15 @@ How to keep the [dashboard](../work-log.md) and topic files useful. The dashboar
 | Fact | Owner |
 | --- | --- |
 | Status, priority, who, size, do after, next action | Dashboard row |
-| Ideas not yet triaged | Dashboard Inbox |
+| Ideas not yet reviewed | Dashboard Inbox |
 | Dropped and rejected ideas, with reasons | Dashboard closed lookup |
 | Goal, done when, work tree, findings, decisions, evidence, notes | Topic |
 | Current product behavior | README and SPEC |
 | Old chronology | Archive and pinned old log |
 
 Link to the owner. Don't copy. Topics never state status.
+
+Do now lists the Next rows in order. When a row's status or next action changes, update Do now in the same edit, and refresh the 'Updated' date at the top of the dashboard.
 
 ## Statuses and priority
 
@@ -58,35 +60,54 @@ One line per idea, newest at the bottom:
 
 - No ID, status or priority. Append only.
 - Reread the Inbox right before you add a line. Two agents sometimes run at once.
-- A line leaves the Inbox when triage makes it a WI row, drops it (closed lookup), or answers it.
+- A [question] that blocks the next step also goes in Do now.
+- A line leaves the Inbox when you make it a WI row, drop it (closed lookup), or answer it.
 
 ## Capture check
 
-After any substantive prompt that produced an idea, finding, decision or status change, update tracking. Skip the update for plain Q&A.
+- After a prompt that produced something worth keeping (an idea, finding, decision or status change), update tracking. Skip the update for plain Q&A.
+- If you find something worth keeping during read-only work, propose the Inbox line in your reply and let the dev say yes.
+- Put the Tracking line only on the last message of a turn, not on progress notes.
 
 | What happened | Where it goes |
 | --- | --- |
 | New idea, bug, question, research topic | Inbox line |
 | Status or next action changed | Dashboard row |
 | Finding, decision, rejected approach, evidence limit | Topic |
-| Detour resolved part of the goal | Return-to-goal note in the topic |
+| Detour resolved part of the goal | A note on how this got back to the goal in the topic |
 
 End every reply, including plain Q&A, with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, on the line just above the `Evidence:` line. The line also shows that AGENTS.md loaded.
+
+### Completion check
+
+Tracking is part of finishing the task. Before reporting completion:
+
+1. Identify the WI that owns the work. If the work started in the Inbox, give completed work a dashboard row.
+2. Reconcile the row and any topic with what actually happened: outcome, status, remaining work, decisions and evidence limits. Keep short outcomes in the row; use a topic when more detail is needed.
+3. Record an Inbox line's outcome or destination before removing it. Completed work stays in a Done row, rejected work goes in the closed lookup, and answered questions go with the item they concern.
+4. Separate unresolved follow-ups from completed work. Use the existing child-item rules for new tasks. Don't leave a completed parent open because independent work remains.
+5. Reread the updated entries against the code, validation results and approved scope. Make sure the final reply's `Tracking:` line names the actual updates.
+
+If tracking can't be updated, report the task as incomplete and explain why. For read-only work, respect the no-edit boundary and report any tracking updates still needed.
 
 ## Rabbit holes
 
 When work on one item turns up new work, make each new piece a **child WI**. Don't grow the parent's row.
 
+A small child needs only its indented row, with 'Part of WI-NNN' at the start of its description. The parent's topic holds the detail. Give a child its own topic only if it needs one.
+
 | Field | Where | Rule |
 | --- | --- | --- |
-| Part of | Child topic first line; child row indented under parent | Exactly one parent |
+| Part of | Child description; topic first line if it has one; child row indented under parent | Exactly one parent |
 | Do after | Dashboard row and parent work tree | Items that must finish first |
 | Related | Dashboard links column | Optional |
 | Size, type | Dashboard row and work tree | S/M/L, one tag |
 
-The child topic's first line is: `Part of WI-NNN, found while working on: <parent goal>`.
+If a child has its own topic, its first line is: `Part of WI-NNN, found while working on: <parent goal>`.
 
 The parent topic keeps its **Original goal** and a **Work tree**. The tree lists order, link, type, size and do-after. It does not repeat status. Refresh its single progress line whenever a child changes.
+
+The Work tree copies type, size and do-after from the dashboard. Update both in the same edit.
 
 Example with made-up IDs:
 
@@ -100,7 +121,7 @@ Progress as of 261023: 1 of 3 done
 | 3 | WI-903 Ask: preview + companion, or keep?  | [question] | S    | WI-901   |
 ```
 
-On the dashboard, children sit under the parent with `↳`. When the tree is done, add a return-to-goal note and check the parent's Done when.
+On the dashboard, children sit under the parent with `↳`. When the tree is done, add a note on how this got back to the goal and check the parent's Done when.
 
 ## Filing agent output
 
@@ -122,7 +143,7 @@ Don't paste routine command output, test totals or transcripts.
 | Work tree | Parent topics only: the ordered list of child items |
 | Current understanding | A summary of what we know now, not a diary. Use evidence labels: documented, inferred from source, observed here, unknown |
 | Decisions and tradeoffs | Choices, rejected options, reasons |
-| Findings and outcomes | Results, gotchas, return-to-goal notes |
+| Findings and outcomes | Results, gotchas, notes on how this got back to the goal |
 | Resume point | Optional while Active: where you stopped. Delete when it closes |
 | References | Links to code, docs, commits, evidence |
 | Notes | Filed agent output, dated |

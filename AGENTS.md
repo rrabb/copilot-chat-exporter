@@ -9,8 +9,11 @@ This is the single project instruction file for all agents and harnesses. `.gith
 
 Read in this order: the [handbook](work-items/README.md) (statuses, tags, rules), the **Start here** section of the [work-log.md](work-log.md) dashboard, then the topic in `work-items/` for the item you work on. Skip `work-log-archive.md` unless a link sends you there.
 
+For this project the dashboard's Do now table is the handoff for a new chat. Don't add a kickoff prompt to it; put 'what next' notes in your reply.
+
 - **Inbox:** put each new idea, bug, question or research topic in the dashboard Inbox as one line: `YYMMDD [tag] text (from: you|agent)`. Tags: `[idea]` `[research]` `[build]` `[question]`. Append only, and reread before you add. At session start, say what to do with each line: make a row, drop it, or keep it.
-- **Capture check:** after any substantive prompt that produced an idea, finding, decision or status change, update the Inbox, the dashboard row or the topic. Skip the update for plain Q&A. End every reply, including plain Q&A, with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, just above the `Evidence:` line. The line also shows that this file loaded.
+- **Capture check:** after a prompt that produced something worth keeping (an idea, finding, decision or status change), update the Inbox, the dashboard row or the topic. Skip the update for plain Q&A. End every reply, including plain Q&A, with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, just above the `Evidence:` line. The line also shows that this file loaded.
+- **Completion check:** before reporting completion, run the handbook's [Completion check](work-items/README.md#completion-check). Tracking is part of finishing the task. If tracking can't be updated, report the task as incomplete and explain why.
 - **Rabbit holes:** new work found while working on an item becomes a child WI with exactly one `Part of` parent and its `Do after` items. Add it to the parent's Work tree and refresh the tree's progress line.
 - Don't log routine actions, test totals or transcripts. Reread an entry before you edit it, and keep other chats' changes.
 
@@ -68,7 +71,7 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 | `src/session/journal.ts`, `classify.ts`, `enrich.ts` | Local journal replay, node classification, enrichment |
 | `src/session/sdk-*.ts` | Agent chat events, export, and usage |
 | `src/session/listing*.ts`, `detailed-*.ts` | Console listing and the HTML listing reports |
-| `src/verify/` | Structural, journal, and rendered-output checks. Layer D (`loss-account.ts`, `sdk-loss-account.ts`) checks content presence only, not order, repeats, or joined text. |
+| `src/verify/` | Structural, journal, and rendered-output checks. Layer D text checks vary by category. Details and limits: [WI-021](work-items/WI-021-source-aware-verification.md) and [SPEC 9.1](docs/SPEC.md#91-audit-architecture-independence-model). It doesn't check persisted resource bodies (see [WI-006](work-items/WI-006-persisted-resource-clipping.md)). |
 | `src/types.ts` | Exporter-owned parsed model and shared types |
 | `test/fixtures/golden/` | Portable committed fixture and expected output |
 | `test/baseline/` | Machine-local large fixture, ignored by Git |
