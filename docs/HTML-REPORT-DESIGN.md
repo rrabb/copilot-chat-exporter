@@ -453,7 +453,7 @@ This section is the checklist for another engineer or AI to rebuild the detailed
 5. Render Why/source from the source module, preserving per-reference attribution and the non-additive size rules.
 6. Add the occurrence view, guides, ignored section and footer.
 7. Add the hash-authorized controller and CSP.
-8. Verify with `npm run verify`, then check both themes, a narrow viewport and the no-JavaScript reading. The acceptance script and screenshots are in the work log and the local reference archive.
+8. Verify with `pnpm run verify`, then check both themes, a narrow viewport and the no-JavaScript reading. The acceptance script and screenshots are in the work log and the local reference archive.
 
 Sample fixtures and golden renders are in the repository tests; see [detailed-listing.test.ts](../test/detailed-listing.test.ts) and [detailed-listing-rules.test.ts](../test/detailed-listing-rules.test.ts). A rebuild is faithful when those assertions and the acceptance checks pass, not when the markup matches byte for byte.
 

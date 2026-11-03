@@ -23,24 +23,22 @@ Principles: evidence before inference, unknown is never shown as zero, every omi
 
 ## Install
 
-Zero runtime dependencies - Node built-ins only. Drop the folder into any repo, or add it as a
-workspace member:
+Zero runtime dependencies - Node built-ins only. Run these commands from the exporter repository root:
 
-```jsonc
-// host package.json
-"workspaces": ["tools/*"],
-"scripts": {
-  "ai:export:chat": "node ./tools/copilot-chat-exporter/src/cli.ts"
-}
+```sh
+pnpm install
+pnpm run build
 ```
 
-Requires Node >= 22.18, where TypeScript type stripping is on by default, so `src/cli.ts` runs
-directly with no build step. Run `npm run build` to emit the bundled `dist/` files used by the
+Requires Node >= 22.18 (the dev pin is Node 24.18, in `.node-version`). Use the pnpm version pinned in `package.json` (currently 12.16.1). The install guard rejects other package managers without downloading a helper. Use `pnpm install --frozen-lockfile` in CI to check the committed lockfile without changing it.
+
+TypeScript type stripping is on by default in Node 22.18 and later, so `src/cli.ts` runs
+directly with no build step. Run `pnpm install` to install dependencies, and `pnpm run build` to emit the bundled `dist/` files used by the
 package `bin` and import map. A git dependency runs the package's `prepare` hook and builds
 `dist/` automatically because generated files are not committed.
 
 The build has no runtime dependencies. `esbuild` is a development dependency used to bundle the
-CLI and API; Node built-ins remain external. `npm pack --dry-run` is the quick check that the
+CLI and API; Node built-ins remain external. `pnpm pack --dry-run` is the quick check that the
 bundle, license, README, docs and CI templates are the files that would ship.
 
 ## Build output
@@ -57,7 +55,7 @@ Layer D verifies image bytes independently of the export decoder. Each unique im
 
 Library callers using `renderSession` must supply its `overflow` companion sink to save image artifacts. Without that destination, the Markdown reports unresolved images rather than inventing file links.
 
-`npm run build` writes two bundles and TypeScript declarations into `dist/`:
+`pnpm run build` writes two bundles and TypeScript declarations into `dist/`:
 
 | File | Built from | Purpose |
 |---|---|---|
@@ -78,7 +76,7 @@ should not have.
 **Entry points.** `dist/cli.js` (command `copilot-chat-export`) for the terminal;
 `dist/index.js` for `import ... from 'copilot-chat-exporter'`.
 
-**Running from `dist/`.** After `npm run build`:
+**Running from `dist/`.** After `pnpm run build`:
 
 ```
 node dist/cli.js <sessionId> out.md      # direct
@@ -87,8 +85,7 @@ node dist/cli.js --current               # explicit current Local session
 copilot-chat-export <sessionId> out.md   # via the bin name, once installed or linked
 ```
 
-The `bin` and `exports` names resolve only after the package is published, linked (`npm link`),
-or installed from the tarball or git, because it is `private: true` as a workspace member. During
+The `bin` and `exports` names resolve after installation from a folder, tarball or git. Use `pnpm add --global .` to register the current package's command globally. Registry publication is disabled by `private: true`. During
 development you do not need `dist/` at all: the scripts run the TypeScript sources directly (for
 example `node src/cli.ts`) via Node type stripping. Build only when you are testing the shipped
 artifact.
@@ -149,7 +146,7 @@ Altered payload bytes must still pass codec integrity checks. Before insertion, 
 
 When Brotli's complete output is larger than gzip would be, the CLI warns with both byte counts and recommends `--compression gzip`; it still writes the requested Brotli file. Library calls remain silent.
 
-Maintainers: the exact `brotli-dec-wasm@2.3.2` development dependency generates the browser assets in [brotli-decoder.ts](src/generated/brotli-decoder.ts). `npm run build` regenerates them; `npm run generate:brotli` runs only that step. `npm run verify` first runs read-only `verify:generated`, checking the installed decoder version, pinned WASM SHA-256 and reproducibility of the generated decoder/loaders, WASM and notices. Stale or modified assets fail without being rewritten. Commit the generator, pinned lockfile, notices and generated assets together. Generated CLI/library bundles and reports require no decoder installation. Keep [upstream notices](docs/BROTLI-NOTICES.txt) and the generated package license with any decoder update.
+Maintainers: the exact `brotli-dec-wasm@2.3.2` development dependency generates the browser assets in [brotli-decoder.ts](src/generated/brotli-decoder.ts). `pnpm run build` regenerates them; `pnpm run generate:brotli` runs only that step. `pnpm run verify` first runs read-only `verify:generated`, checking the installed decoder version, pinned WASM SHA-256 and reproducibility of the generated decoder/loaders, WASM and notices. Stale or modified assets fail without being rewritten. Commit the generator, pinned lockfile, notices and generated assets together. Generated CLI/library bundles and reports require no decoder installation. Keep [upstream notices](docs/BROTLI-NOTICES.txt) and the generated package license with any decoder update.
 
 The repository's compressed-report browser tests enforce actual CSP, including negative controls, without disabling web security. They locate Chrome/Edge on Windows or Chromium/Chrome on Linux; set `CCE_TEST_BROWSER` to an explicit Chromium-family executable to select another installation. Without a detected browser the suite reports a visible skip; an invalid explicit path fails. Firefox is not covered by this CDP test harness.
 
@@ -176,7 +173,7 @@ Local artifact counts use the same five session-keyed locations as the sister to
 #### Listing and export commands
 
 List known sessions, then export one by id or exact journal path. No arguments means listing, even when `VSCODE_TARGET_SESSION_LOG` is set. Use `--current` to request a verified current Local session explicitly; missing/conflicting identity never falls back to newest. An output path alone is no longer an export selector. During development, run the TypeScript source directly with
-`node src/cli.ts`; after `npm run build` the same arguments work against `dist/cli.js`.
+`node src/cli.ts`; after `pnpm run build` the same arguments work against `dist/cli.js`.
 
 ```
 node src/cli.ts --list
@@ -262,36 +259,34 @@ non-zero exit code, and `--verify` prints the full schema census.
 ### Exporting an Agent Host or Copilot CLI chat
 
 ```
-npm run export -- <chat id | backing id | prefix of 8+ characters> [outputPath] [--user-data-root <path>]
+pnpm run export <chat id | backing id | prefix of 8+ characters> [outputPath] [--user-data-root <path>]
 ```
 
 The selector is matched against the verified agent chats of the selected root. The command exports the main conversation: your prompts, readable reasoning (thinking text or the model-written summary; reasoning stored only as an encrypted token is counted but cannot be read), assistant messages, tool calls with readable arguments, outputs, errors and diffs, compaction summaries and model changes. System prompts, skill files and images are written as linked files in a sibling `_assets_<timestamp>` folder. Local and agent exports both save tool text over 300 lines and 15 KiB the same way: the Markdown shows the first 10 lines and links a file with the full text, so nothing is clipped. Permission prompts, hook records and model request copies are counted and left out; the closing "Left out of this export" section lists the counts. Sub-agent conversations are nested inline at their delegation point, collapsed and labelled. Usage is shown as AI credits (recorded nano-AIU divided by 1,000,000,000; 1 credit = $0.01) per model, per turn and per sub-agent, from the Copilot CLI session store (`~/.copilot/session-store.db`) or the log's own usage events, with the number of usage rows against the assistant replies and the last logged session total. Credits are never estimated from token counts; where nothing was recorded the export says "not recorded", never zero. Chats without per-call rows still get credits per turn, taken from the differences between the log's running totals (labelled "from running totals"; a difference that covers several turns is shown as a range), with the most expensive turns listed in the Cost section. The exporter only reads the event log; it never deletes or changes it. Policy and rationale: `docs/SPEC.md`, "Agent chat export policy".
 
 ### Package shortcuts
 
-These are this package's own `package.json` scripts. Run them from the package directory
-(`tools/copilot-chat-exporter`), or from a host repo that lists it as a workspace with
-`-w copilot-chat-exporter`. Anything after `--` is passed straight to the CLI.
+These are this package's own `package.json` scripts. Run them with pnpm from the repo root. Don't add `--` before CLI flags: pnpm passes it on and the CLI rejects it as an unknown option.
 
 | Script | Runs | Purpose |
 |---|---|---|
-| `npm run export -- <sessionId> [out]` | `node src/cli.ts` | export an explicit session; no arguments lists; `--current [out]` requests current Local |
-| `npm run list` | `node src/cli.ts --list` | list known sessions (id, date, title) |
-| `npm run golden` / `golden:update` | `--golden check` / `update` | the small in-repo recorded check |
-| `npm run snapshot -- update\|check <id>` | `node src/cli.ts --snapshot` | record or compare one of your own sessions |
-| `npm run baseline` / `baseline:update` | `node test/baseline.ts` | the machine-local ~30 MB recorded check |
-| `npm run test` | `node scripts/test.mjs` | unit tests in an isolated cache, with a real-cache write guard |
-| `npm run typecheck` / `typecheck:test` | `tsc` over src / tests | type check, no emit |
-| `npm run verify` | typecheck + typecheck:test + test + golden | everything a fresh clone can run |
-| `npm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
-| `npm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
-| `npm run demo:failure` | `node scripts/failure-demo.mjs` | generate synthetic failed-export review artifacts |
+| `pnpm run export <sessionId> [out]` | `node src/cli.ts` | export an explicit session; no arguments lists; `--current [out]` requests current Local |
+| `pnpm run list` | `node src/cli.ts --list` | list known sessions (id, date, title) |
+| `pnpm run golden` / `golden:update` | `--golden check` / `update` | the small in-repo recorded check |
+| `pnpm run snapshot update\|check <id>` | `node src/cli.ts --snapshot` | record or compare one of your own sessions |
+| `pnpm run baseline` / `baseline:update` | `node test/baseline.ts` | the machine-local ~30 MB recorded check |
+| `pnpm run test` | `node scripts/test.mjs` | unit tests in an isolated cache, with a real-cache write guard |
+| `pnpm run typecheck` / `typecheck:test` | `tsc` over src / tests | type check, no emit |
+| `pnpm run verify` | typecheck + typecheck:test + test + golden | everything a fresh clone can run |
+| `pnpm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
+| `pnpm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
+| `pnpm run demo:failure` | `node scripts/failure-demo.mjs` | generate synthetic failed-export review artifacts |
 
-`npm run demo:failure` runs five synthetic Local and SDK verification failures using only the
+`pnpm run demo:failure` runs five synthetic Local and SDK verification failures using only the
 committed fixtures. It writes the failed Markdown, warning header, console output, failure log,
 non-deleting cleanup preview and a summary under
 `temp-tool-output/failure-demo-<local timestamp>/`. It is for manual review and is not part of
-`npm run verify`.
+`pnpm run verify`.
 
 For commits in this repository, enable [the commit-message hook](.githooks/commit-msg) with `git config core.hooksPath .githooks`. It removes Copilot co-author trailers, keeps other authors and body text, and requires Node.js on `PATH`. The hook is tested through a real commit in a temporary repository.
 
@@ -343,7 +338,7 @@ Each failed export writes a private `failed-<sessionid>-YYMMDD_HHMMSS.log` besid
 
 Post-export verification reads the saved staging file and its linked companions from disk. Both Local and SDK reports identify that target as `file`; in-memory checks remain labelled `in-memory`.
 
-Export provenance shows the package version beside the Git build identity. `npm run build` embeds `git describe --always --dirty` in both bundles; building requires Git metadata. Failure logs record both as `exporterVersion` and `exporterCommit`. Source-mode exports say `source (not built)` instead of claiming a build commit. **Export generated** uses local time with a UTC offset.
+Export provenance shows the package version beside the Git build identity. `pnpm run build` embeds `git describe --always --dirty` in both bundles; building requires Git metadata. Failure logs record both as `exporterVersion` and `exporterCommit`. Source-mode exports say `source (not built)` instead of claiming a build commit. **Export generated** uses local time with a UTC offset.
 
 Tests, golden checks and baselines run under isolated cache roots and remove them afterward. The runner fails if the real default cache or legacy receipt/capture stores change. For selected tests, use `node scripts/test.mjs test/source-snapshot.test.ts test/cli.test.ts`, not bare `node --test`.
 
@@ -352,10 +347,10 @@ Layer D verification fails on partial as well as absent text, even without `--st
 Flags without a dedicated script go through `export`:
 
 ```
-npm run export -- --verify <sessionId> [renderedFile]
-npm run export -- --verify --strict <sessionId>
-npm run export -- --workspace-root <path> <sessionId>
-npm run export -- --out-dir <path> <sessionId>
+pnpm run export --verify <sessionId> [renderedFile]
+pnpm run export --verify --strict <sessionId>
+pnpm run export --workspace-root <path> <sessionId>
+pnpm run export --out-dir <path> <sessionId>
 ```
 
 An existing archive destination is refused unless `--overwrite` is supplied. With no path, the file is named
@@ -597,7 +592,7 @@ re-saving the recorded exports without destroying them - is in
 | `test/index.test.ts` | unit tests for the pipeline, the document, and `sessionToJson` |
 | `test/fixtures/golden/` | the saved small session, its digest, and its expected output |
 | `ci/gitlab-ci.yml` | opt-in CI job for a GitLab host; inert until a pipeline includes it |
-| `ci/github-workflow.yml` | CI workflow for a GitHub host; copy to `.github/workflows/` after extraction |
+| `ci/github-workflow.yml` | opt-in GitHub CI template; copy to `.github/workflows/` to enable it |
 | `test/snapshots/` | digests of your own sessions, from `--snapshot update` (gitignored) |
 | `test/baseline/` | generated exports (gitignored) |
 | `test/baseline.ts` | replays one frozen real session and compares it to the saved copy |
@@ -607,17 +602,17 @@ re-saving the recorded exports without destroying them - is in
 One command runs everything a fresh clone can run:
 
 ```
-npm run verify       -w copilot-chat-exporter   # typecheck (src + tests), unit tests, golden
-npm run verify:local -w copilot-chat-exporter   # the above plus the machine-local baseline
+pnpm run verify         # typecheck (src + tests), unit tests, golden
+pnpm run verify:local   # the above plus the machine-local baseline
 ```
 
 Or individually, cheapest first:
 
 ```
-npm run typecheck -w copilot-chat-exporter    # catches a missing binding in seconds
-npm run test      -w copilot-chat-exporter    # unit tests
-npm run golden    -w copilot-chat-exporter    # small made-up session, kept in the repo
-npm run baseline  -w copilot-chat-exporter    # large real session, this machine only
+pnpm run typecheck   # catches a missing binding in seconds
+pnpm run test        # unit tests
+pnpm run golden      # small made-up session, kept in the repo
+pnpm run baseline    # large real session, this machine only
 ```
 
 The type check must report zero. It is the first gate because it catches a missing binding in
@@ -635,9 +630,9 @@ A few KB even for a long conversation. So you can point the same before-and-afte
 conversation containing something neither committed session has:
 
 ```
-npm run snapshot -w copilot-chat-exporter -- update <sessionId>   # record it
+pnpm run snapshot update <sessionId>   # record it
 # ...change the code...
-npm run snapshot -w copilot-chat-exporter -- check <sessionId>    # see what moved
+pnpm run snapshot check <sessionId>    # see what moved
 ```
 
 A failure names the field and the turn, so a newly handled node kind shows up as
@@ -678,7 +673,7 @@ include:
 cp ci/github-workflow.yml .github/workflows/verify.yml
 ```
 
-Both run `npm run verify`, never `verify:local`, because no runner has the machine-local fixture.
+Both run `pnpm run verify`, never `verify:local`, because no runner has the machine-local fixture.
 The GitHub one runs a ubuntu/windows matrix: the recorded checks compare bytes and have only ever
 been produced on Windows, so that matrix is what turns "machine-independent" from a claim into a
 result.

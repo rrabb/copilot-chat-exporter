@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [0.1.0] - Unreleased
 
+### Changed
+
+- Development and CI examples use the pinned pnpm version and `pnpm-lock.yaml`. Installation rejects other package managers through a local guard, without downloading a helper. CI templates now target this standalone repository and remain opt-in.
+
 ### Added
 
 - CLI and library builds embed `git describe --always --dirty`. Export provenance and failure logs show this Git identity beside the package version. Export generation time now uses local time with the UTC offset.

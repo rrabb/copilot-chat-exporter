@@ -13,7 +13,7 @@ Assume I've been away for days and don't remember the details. Every item must m
 
 1. Read [work-log.md](../../work-log.md) (the dashboard owns status, priority, and next action), [work-items/README.md](../../work-items/README.md), and linked topics as needed. Read [AGENTS.md](../../AGENTS.md) for project rules.
 2. Check Git: branch, `git status --short`, `git log origin/main..HEAD --oneline`, and recent commits. Classify each uncommitted path as mine, the user's customization, another session's, generated, line-ending only, or unexplained.
-3. Report what was last validated (`npm run verify` count, build, built-CLI tests, corpus run) and on which commit. Never imply a check ran on a later commit than it did. Corpus figures must come from a recorded corpus report; give the stable source hash alongside any S-number.
+3. Report what was last validated (`pnpm run verify` count, build, built-CLI tests, corpus run) and on which commit. Never imply a check ran on a later commit than it did. Corpus figures must come from a recorded corpus report; give the stable source hash alongside any S-number.
 4. If the work log and Git disagree, report the conflict instead of picking one. Priorities in the dashboard are proposals until I approve them.
 
 ## Output

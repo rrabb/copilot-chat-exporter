@@ -122,12 +122,12 @@ The approved upgrade is tracked in [the work log](../work-log.md). Root-scoped j
 | Agent Host identity | Exact central `session_chats.provider_data` takes precedence; otherwise exact chat/default legacy metadata. Default-only provider-ID fallback requires an existing local session database and matching SDK header, with console warning and retained Markdown notice data. Never fall back from corrupt metadata or guess a peer. |
 | SDK scope | One version 1 header, matching backing ID, stable strict UTF-8 read and preserved raw records. Child tool/agent mapping must be unique. Ambiguous children remain unresolved with `🟠 ❓` UI indicators; an independently verified main remains usable with warnings. Missing/cyclic parent evidence omits the relationship, never invents one. |
 
-- Script: `tools/copilot-chat-exporter/src/cli.ts`
-- npm entry: `npm run ai:export:chat`
-- Run prompt (invoke the exporter): `.github/prompts/export-chat.prompt.md`
-- Run skill (agent parity): `tools/copilot-chat-exporter/skill/SKILL.md`, surfaced to this repo through `.github/skills/export-chat/SKILL.md`
-- Build prompt (recreate the exporter from this spec): `tools/copilot-chat-exporter/docs/BUILD-PROMPT.md`
-- Reference output: `docs/chat-exports/reference-live-session-export.md`, regenerated from the frozen live-session fixture with `npm run ai:export:chat:reference`
+- Script: `src/cli.ts`
+- pnpm entry from the exporter repository root: `pnpm run export`
+- Run prompt (invoke the exporter): `skill/export-chat.prompt.md`
+- Run skill (agent parity): `skill/SKILL.md`, installed into a target project's `.github/skills/export-chat/SKILL.md`
+- Build prompt (recreate the exporter from this spec): `docs/BUILD-PROMPT.md`
+- Machine-local reference: the frozen fixture checked by `pnpm run baseline`. Update it with `pnpm run baseline:update` after reviewing the intended change.
 
 ### Listing report module boundary
 
@@ -566,22 +566,22 @@ HTML source details expand in a dedicated row spanning all seven table columns, 
 
 HTML listing dates use the generator's local timezone in `YYMMDD_HH:MM` format, with smaller Arial Narrow dates/selectors and bold prompt counts. Date sorting uses numeric timestamps rather than displayed two-digit years. Row details include full session and occurrence IDs, backing IDs and JSONL links when verified, workspace storage hashes and path links, index provenance, diagnostics, and folder/workspace identities read from `workspace.json`. Workspace/project display labels are explicitly URI basenames, not reconstructed custom names; multi-root folder names remain unknown. Links to expected metadata/index locations do not imply file existence. A collapsed bottom section retains every ignored grouped session even without `--show-ignored` and regardless of `--last25`; `--show-ignored` additionally includes ignored rows in the main table and console. The main-table search/filter controls do not hide rows in that bottom section.
 
-- `npm run ai:export:chat` - list occurrences from one resolved VS Code user-data root; never implicitly export.
-- `npm run ai:export:chat -- --current [outputPath.md]` - explicitly request the Local session identified by `VSCODE_TARGET_SESSION_LOG`; validate its workspace/root/journal identity, with no fallback.
-- `npm run ai:export:chat -- --user-data-root <path>` - explicitly select the root for listing or UUID/current selection. Multiple discovered roots require interactive selection or fail non-interactively with candidates.
-- `npm run ai:export:chat -- <sessionId> [outputPath]` - a specific session by id.
-- `npm run ai:export:chat -- <chatSessions/...jsonl> [outputPath]` - a specific journal file.
-- `npm run ai:export:chat -- <source> [outputPath] --overwrite` - deliberately replace an existing Markdown archive after staged content is saved and verified. Without this flag, existing destinations are refused. Golden scratch output has a dedicated internal overwrite allowance so regression checking remains repeatable.
-- `npm run ai:export:chat -- --list` - show grouped conversations with creation/activity dates, scoped prompt counts, chat type, selector ID/prefix, backing status and an `X of Y` summary. `/fix`, confirmed-empty, ambiguous, and exact `New Chat` + unknown-created-date + unknown-prompt-count entries are hidden by default; `--show-ignored` restores them and `--last25` limits output to the newest 25. Other unresolved/index-only entries remain visible. UUIDs are shown as copyable unique hexadecimal prefixes (at least 8 characters, no ellipsis); listing-only `--full-ids` prints complete IDs. A prefix selects a Local journal only when exactly one journal matches in the selected root; duplicate IDs across workspaces require an exact `.jsonl` path. `verified` means backing identity was checked, `unresolved` means no backing was verified, and `ambiguous` means identity/scope could not be safely resolved. A verified SDK backing does not by itself imply Markdown export support. By default, listing also creates a self-contained offline HTML report in the invoking directory; `--no-html` disables it, `--html-output <path>` chooses a destination, and `--overwrite` is required to replace an existing report. It is never opened automatically and stays readable without JavaScript. SDK Markdown rendering and complete sister-filter parity remain pending.
-- `npm run ai:export:chat -- --verify <sessionId|chatSessions/...jsonl>` - run source-side machine verification (Layers A + B) without writing an export file.
-- `npm run ai:export:chat -- --verify <sessionId> <outputFile>` - additionally run Layer C against an existing rendered file.
-- `npm run ai:export:chat -- --audit ...` - alias for `--verify`.
-- `npm run ai:export:chat -- --golden check` - diff the golden fixture's digest
-  against the committed baseline.
-- `npm run ai:export:chat -- --golden update` - recompute and overwrite the committed digest.
-- `npm run ai:export:chat -- --snapshot update <sessionId>` - record a digest of one of your own
-  sessions under `test/snapshots/` (gitignored). See 9.7.
-- `npm run ai:export:chat -- --snapshot check <sessionId>` - recompute and diff against it.
+Run these commands from the exporter repository root. pnpm forwards script arguments without a bare `--` separator.
+
+- `pnpm run export` - list occurrences from one resolved VS Code user-data root; never implicitly export.
+- `pnpm run export --current [outputPath.md]` - explicitly request the Local session identified by `VSCODE_TARGET_SESSION_LOG`; validate its workspace/root/journal identity, with no fallback.
+- `pnpm run export --user-data-root <path>` - explicitly select the root for listing or UUID/current selection. Multiple discovered roots require interactive selection or fail non-interactively with candidates.
+- `pnpm run export <sessionId> [outputPath]` - a specific session by id.
+- `pnpm run export <chatSessions/...jsonl> [outputPath]` - a specific journal file.
+- `pnpm run export <source> [outputPath] --overwrite` - deliberately replace an existing Markdown archive after staged content is saved and verified. Without this flag, existing destinations are refused. Golden scratch output has a dedicated internal overwrite allowance so regression checking remains repeatable.
+- `pnpm run export --list` - show grouped conversations with creation/activity dates, scoped prompt counts, chat type, selector ID/prefix, backing status and an `X of Y` summary. `/fix`, confirmed-empty, ambiguous, and exact `New Chat` + unknown-created-date + unknown-prompt-count entries are hidden by default; `--show-ignored` restores them and `--last25` limits output to the newest 25. Other unresolved/index-only entries remain visible. UUIDs are shown as copyable unique hexadecimal prefixes (at least 8 characters, no ellipsis); listing-only `--full-ids` prints complete IDs. A prefix selects a Local journal only when exactly one journal matches in the selected root; duplicate IDs across workspaces require an exact `.jsonl` path. `verified` means backing identity was checked, `unresolved` means no backing was verified, and `ambiguous` means identity/scope could not be safely resolved. A verified SDK backing does not by itself imply Markdown export support. By default, listing also creates a self-contained offline HTML report in the invoking directory; `--no-html` disables it, `--html-output <path>` chooses a destination, and `--overwrite` is required to replace an existing report. It is never opened automatically and stays readable without JavaScript. SDK Markdown rendering and complete sister-filter parity remain pending.
+- `pnpm run export --verify <sessionId|chatSessions/...jsonl>` - run source-side machine verification (Layers A + B) without writing an export file.
+- `pnpm run export --verify <sessionId> <outputFile>` - additionally run Layer C against an existing rendered file.
+- `pnpm run export --audit ...` - alias for `--verify`.
+- `pnpm run golden` - diff the golden fixture's digest against the committed baseline.
+- `pnpm run golden:update` - recompute and overwrite the committed digest.
+- `pnpm run snapshot update <sessionId>` - record a digest of one of your own sessions under `test/snapshots/` (gitignored). See 9.7.
+- `pnpm run snapshot check <sessionId>` - recompute and diff against it.
 
 Markdown is the only output format. `sessionToJson` in `src/index.ts` returns the parsed model as
 data for a caller that wants it, but it is deliberately not exposed as a flag: it is untruncated,
@@ -811,14 +811,12 @@ layers are complementary.
 
 ### 9.2 Fast automated gate
 
-1. **Types and syntax:** `npm run typecheck -w copilot-chat-exporter` (must report zero).
-2. **Lint/type errors:** check the file has no problems (editor diagnostics / `get_errors`).
-   `npm run typecheck -w copilot-chat-exporter` is the eventual gate; it stays red until the
-   annotation pass lands.
-3. **Run the verifier first** from a session id (never a transcripts path):
-   `npm run ai:export:chat -- --verify <sessionId>`. Add `--strict` to fail on schema drift.
-4. **Regenerate the baseline** from a session id:
-   `npm run ai:export:chat:reference`.
+Run these commands from the exporter repository root.
+
+1. **Types and syntax:** `pnpm run typecheck` (must report zero).
+2. **Test types:** `pnpm run typecheck:test` (must report zero).
+3. **Run the verifier first** from a session id (never a transcripts path): `pnpm run export --verify <sessionId>`. Add `--strict` to fail on schema drift.
+4. **Compare the frozen machine-local baseline:** `pnpm run baseline`. Use `pnpm run baseline:update` after reviewing an intended change.
 5. **Counts sanity:** the printed `Turns / tool calls / reasoning thoughts / resources` should be
    non-zero and within a small delta of the last known-good run. A sudden drop (e.g. tool calls
    falling by hundreds, or turns -> 0) means a parsing regression - stop and investigate.

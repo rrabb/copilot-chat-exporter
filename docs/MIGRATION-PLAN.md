@@ -2,6 +2,8 @@
 
 Status: Phases 0-6 complete locally. The activated CI job still needs its first runner execution.
 
+Historical record: the npm commands and parent-workspace paths below describe the original extraction. They aren't current setup instructions. Use the [README](../README.md#install) for pnpm setup and the current opt-in CI templates.
+
 This document records the method, not just the checklist. The checklist is easy to reproduce;
 the method is the part worth reusing on the next refactor.
 

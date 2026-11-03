@@ -1157,7 +1157,7 @@ with a fabricated, minimal example of the shape.
 ### 6. Re-run the project gate
 
 ```powershell
-npm run verify -w copilot-chat-exporter
+pnpm run verify
 node src/cli.ts --verify --strict <session-id>
 ```
 
@@ -1180,10 +1180,10 @@ node src/cli.ts --snapshot update <session-id>
 node src/cli.ts --snapshot check <session-id>
 
 # run the committed, reviewable checks
-npm run verify -w copilot-chat-exporter
+pnpm run verify
 
 # include the large machine-local baseline
-npm run verify:local -w copilot-chat-exporter
+pnpm run verify:local
 ```
 
 ## Sources and Search Results

@@ -7,8 +7,10 @@
   "author": { "name": "Reiman Rabbani", "email": "rrabbani@esri.com", "url": "https://github.com/rrabb" },
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.18",
+    "pnpm": ">=10.0.0"
   },
+  "packageManager": "pnpm@12.16.1",
   "bin": {
     "copilot-chat-export": "./dist/cli.js"
   },
@@ -30,6 +32,7 @@
     "README.md"
   ],
   "scripts": {
+    "preinstall": "node scripts/require-pnpm.mjs",
     "export": "node src/cli.ts",
     "list": "node src/cli.ts --list",
     "golden": "node scripts/test.mjs --command src/cli.ts --golden check",
@@ -40,13 +43,13 @@
     "test": "node scripts/test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
-    "verify": "npm run verify:generated && npm run typecheck && npm run typecheck:test && npm run test && npm run golden",
+    "verify": "pnpm run verify:generated && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run golden",
     "verify:generated": "node scripts/generate-brotli.mjs --check",
-    "verify:local": "npm run verify && npm run baseline",
+    "verify:local": "pnpm run verify && pnpm run baseline",
     "build": "node scripts/build.mjs",
     "demo:failure": "node scripts/failure-demo.mjs",
     "generate:brotli": "node scripts/generate-brotli.mjs",
-    "prepare": "npm run build"
+    "prepare": "pnpm run build"
   },
   "keywords": [
     "vscode",
@@ -58,7 +61,7 @@
   ],
   "devDependencies": {
     "@types/markdown-it": "14.2.0",
-    "@types/node": "^25.9.1",
+    "@types/node": "^24.0.0",
     "brotli-dec-wasm": "2.3.2",
     "esbuild": "^0.27.7",
     "markdown-it": "14.3.3",

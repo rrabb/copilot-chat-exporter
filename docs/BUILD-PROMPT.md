@@ -10,7 +10,7 @@ preserving the exact layout and formatting. Pair it with the spec:
 
 Build a standalone Node.js ESM tool, `tools/copilot-chat-exporter`, that exports a VS Code
 Copilot chat session into a single, human-readable Markdown archive with visual aids. Expose it as
-`npm run ai:export:chat`. Then generate one reference archive and self-verify it.
+`pnpm run export` from the exporter repository root. Then generate one reference archive and self-verify it.
 
 Layout and formatting fidelity are acceptance criteria, not nice-to-haves. Follow the spec's
 document layout (spec section 3), per-turn block (section 4), tool rendering (section 5), and visual
@@ -81,14 +81,13 @@ schema, yields 0 turns). Never export an implicit current/newest session or choo
 
 - ESM (`import ...`), always-semicolons, short-circuit (`&&`) guard calls, if-bodies on their own
   line, plain hyphens (no em/en dashes) in comments and strings.
-- Add `"ai:export:chat": "node ./tools/copilot-chat-exporter/src/cli.ts"` to the host `package.json`,
-  and register the tool with `"workspaces": ["tools/*"]`.
+- Add `"export": "node src/cli.ts"` to the exporter's `package.json`. Use its pinned pnpm version and committed lockfile.
 
 ## Definition of done (self-verify - spec section 8)
 
-1. `npm run typecheck -w copilot-chat-exporter` reports zero; no editor errors.
+1. `pnpm run typecheck` from the exporter repository root reports zero; no editor errors.
 2. Regenerate a rich baseline by **session id** (not a transcripts path):
-   `npm run ai:export:chat -- <sessionId> docs/chat-exports/<name>.md`.
+   `pnpm run export <sessionId> docs/chat-exports/<name>.md`.
 3. Counts are non-zero and reasonable (turns, tool calls, reasoning, resources).
 4. Structural checks pass on the output: `<details>` balanced (ignoring copies inside fenced code),
    no orphan ``` above `> 📄 Edited`, no-output tools are plain lines, every `💳` credit is 2dp,

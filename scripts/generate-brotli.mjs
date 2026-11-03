@@ -69,7 +69,7 @@ const target = new URL('../src/generated/brotli-decoder.ts', import.meta.url);
 if (check) {
   const stored = await readFile(target, 'utf8');
   if (stored.replace(/\r\n/gu, '\n') !== generated)
-    throw new Error('Generated report assets are stale or modified. Run npm run generate:brotli, review the diff, then verify again.');
+    throw new Error('Generated report assets are stale or modified. Run pnpm run generate:brotli, review the diff, then verify again.');
 } else {
   await mkdir(new URL('../src/generated/', import.meta.url), { recursive: true });
   await writeFile(target, generated);

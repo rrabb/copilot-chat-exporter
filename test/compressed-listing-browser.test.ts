@@ -11,6 +11,8 @@ import { formatDetailedSessionListingHtml } from '../src/session/detailed-listin
 import { detailedEvidence, detailedOccurrence } from './detailed-listing-fixture.ts';
 import { delay, launchTestBrowser } from './browser-cdp.ts';
 
+const handlerCases = new Set(['event-handler', 'svg-event-handler', 'nested-template-handler']);
+
 function rewrap (html: string): string {
   return html.replace(/(<script\b[^>]*type="application\/octet-stream"[^>]*>)([^<]+)(<\/script>)/gu,
     (_, open: string, data: string, close: string) => open + '\r\n' + data.replace(/.{1,76}/gu, '$&\r\n') + close);
@@ -140,7 +142,12 @@ test('production compressed reports survive file re-saves under their actual CSP
       assert.ok(await page.evaluate("document.documentElement.dataset.reportState==='error'&&document.getElementById('report-loading').textContent.includes('Regenerate without')"));
       assert.equal(await page.evaluate("document.querySelectorAll('.session-card').length"), 0);
       assert.equal(await page.evaluate("!!window.__executed"), false);
-      assert.deepEqual(await page.evaluate("window.__violations"), []);
+      // Some Chromium versions (observed in 156, not 155) report script-src-attr while the loader parses
+      // rejected handlers into a detached template. Allow either behavior; other directives still fail.
+      const violations = await page.evaluate<string[]>("window.__violations");
+      handlerCases.has(name)
+        ? assert.ok(violations.every(directive => directive === 'script-src-attr'), JSON.stringify(violations))
+        : assert.deepEqual(violations, []);
     } finally {
       await close();
     }

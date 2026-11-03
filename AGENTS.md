@@ -9,8 +9,8 @@ This is the single project instruction file for all agents and harnesses. `.gith
 
 Read in this order: the [handbook](work-items/README.md) (statuses, tags, rules), the **Start here** section of the [work-log.md](work-log.md) dashboard, then the topic in `work-items/` for the item you work on. Skip `work-log-archive.md` unless a link sends you there.
 
-- **Inbox:** put each new idea, bug, question or research topic in the dashboard Inbox as one line: `YYMMDD [tag] text (from: you|agent)`. Tags: `[idea]` `[research]` `[build]` `[question]`. Append only, and reread before you add. At session start, propose a disposition for each line.
-- **Capture check:** after any substantive prompt that produced an idea, finding, decision or status change, update the Inbox, the dashboard row or the topic. Skip plain Q&A. End those replies with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, just above the `Evidence:` line.
+- **Inbox:** put each new idea, bug, question or research topic in the dashboard Inbox as one line: `YYMMDD [tag] text (from: you|agent)`. Tags: `[idea]` `[research]` `[build]` `[question]`. Append only, and reread before you add. At session start, say what to do with each line: make a row, drop it, or keep it.
+- **Capture check:** after any substantive prompt that produced an idea, finding, decision or status change, update the Inbox, the dashboard row or the topic. Skip the update for plain Q&A. End every reply, including plain Q&A, with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, just above the `Evidence:` line. The line also shows that this file loaded.
 - **Rabbit holes:** new work found while working on an item becomes a child WI with exactly one `Part of` parent and its `Do after` items. Add it to the parent's Work tree and refresh the tree's progress line.
 - Don't log routine actions, test totals or transcripts. Reread an entry before you edit it, and keep other chats' changes.
 
@@ -26,23 +26,24 @@ Capture every Copilot chat session, wherever it lives (VS Code Local journals, A
 - Never delete or modify session data. `chatSessions/`, `~/.copilot/session-state/`, and `~/.copilot/session-store.db` are read-only.
 - [vsc-chat-tool](../vsc-chat-tool) is a read-only sister project for reference.
 - Never add a `Co-authored-by` trailer. As a backstop, `.githooks/commit-msg` (enabled through `core.hooksPath`) strips Copilot co-author trailers.
-- Save review reports, runtime captures, and logs under `temp-tool-output/`, in timestamped run folders, and keep earlier outputs. For listing runs, pass `--html-output` explicitly. Don't change the CLI's default working-directory behavior. Automated fixture sandboxes keep their own cleanup.
+- Save review reports, runtime captures, and logs under `temp-tool-output/`, in timestamped run folders, and keep earlier outputs. For listing runs, pass `--html-output` explicitly. Don't change the CLI's default working-directory behavior. Automated test folders keep their own cleanup.
 - Keep changes focused. Don't reformat unrelated code or docs.
 - Follow [code-style](.github/instructions/code-style.instructions.md) for TypeScript and JavaScript, and [writing-style](.github/instructions/writing-style.instructions.md) for all prose, including chat. The writing-style replacement table covers banned vague terms such as "shape" and "surface".
+- **Instruction loading:** new agent chats can keep old instruction text until you fully quit VS Code (all windows). We observed this on 261023. Agent and Local chats both read `~/.copilot/copilot-instructions.md`. Local chats also read the VS Code profile `prompts` folder and send identical text once. To see what a chat actually loaded, read the first `system.message` in `~/.copilot/session-state/<id>/events.jsonl` instead of asking the model.
 
 ## Runtime and package boundaries
 
-- Requires Node.js 22.18 or newer. Source TypeScript runs directly through Node type stripping.
+- Requires Node.js 22.18 or newer (dev pin: Node 24.18 in `.node-version`). Use the pnpm version pinned in `package.json`. Source TypeScript runs directly through Node type stripping.
 - ESM with strict TypeScript: `moduleResolution: "nodenext"`, `verbatimModuleSyntax`, `isolatedModules`, `erasableSyntaxOnly`. Keep the `.ts` extensions in imports.
 - Zero runtime dependencies unless a dependency has a clear, reviewed benefit over Node built-ins.
 - `src/cli.ts` is the only module that prints output or exits the process. Library modules stay callable in-process.
-- `dist/` is generated. Change the source and run `npm run build`; never hand-edit bundles or declarations.
+- `dist/` is generated. Change the source and run `pnpm run build`; never hand-edit bundles or declarations.
 
 ## Source of truth
 
 - **Local chats:** `chatSessions/<sessionId>.jsonl` decides conversation order, prompts, reasoning, tool calls, assistant text, edits, and per-turn metadata. Sibling stores (transcripts, resources, debug logs, title indexes) only enrich. They never create or reorder turns, and their absence never blocks an export. Match them to the journal by stable ids such as `toolCallId`.
 - **Agent chats (Agent Host, Copilot CLI):** `~/.copilot/session-state/<id>/events.jsonl` is the source. Sub-agents render inline in the parent chat, and the sub-agent prompt is always kept whole.
-- VS Code's storage format is private and changes. Parse records into project-owned types at the boundary. Keep unknown payloads when practical, and report unhandled variants through the schema census instead of dropping them silently.
+- VS Code's storage format is private and changes. Parse records into project-owned types when you first read them. Keep unknown payloads when practical, and report unhandled variants through the schema census instead of dropping them silently.
 - Keep response-stream order. Don't group tool calls, reasoning, edits, or text by type. Deduplicate repeated tool lifecycle records by id, merging later status and results into the first position.
 - Never rebuild missing history from the current working tree. Label missing evidence.
 - Rendering is deterministic. Values that vary by run or machine (clock, output path, Git status) enter through the renderer context.
@@ -79,16 +80,17 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 
 | Command | Use |
 | --- | --- |
-| `npm test` | Full test suite. Don't use `node --test test/`. |
-| `npm run verify` | Generated-file check, both typechecks, tests, golden check. Run it before finishing. |
-| `npm run build` | Rebuild `dist/` |
-| `npm run verify:local` | `verify` plus the machine-local baseline (optional) |
-| `npm run golden:update` | Only for an intentional, reviewed rendering or contract change |
-| `npm run list -- --user-data-root <dir> --html-output <file>` | Session listing |
+| `pnpm install` | Install dependencies. Uses `pnpm-lock.yaml`. Don't use npm. |
+| `pnpm test` | Full test suite. Don't use `node --test test/`. |
+| `pnpm run verify` | Generated-file check, both typechecks, tests, golden check. Run it before finishing. |
+| `pnpm run build` | Rebuild `dist/` |
+| `pnpm run verify:local` | `verify` plus the machine-local baseline (optional) |
+| `pnpm run golden:update` | Only for an intentional, reviewed rendering or contract change |
+| `pnpm run list --user-data-root <dir> --html-output <file>` | Session listing. Don't add `--`: pnpm passes it on and the CLI rejects it. |
 | `node src/cli.ts <id or 8-char prefix>` | Export one chat |
 | `node src/cli.ts --verify <id> <absolute-file>` | Layer D content check. The output path must be absolute. |
 
-- Run the narrowest relevant test right after the first real edit, then `npm run verify`.
+- Run the narrowest relevant test right after the first real edit, then `pnpm run verify`.
 - Write inline probes as `temp-tool-output\*.mts` that import `../src/...`.
 - Working copies are CRLF while `.gitattributes` pins LF, so Git's CRLF warnings are harmless. Use the `edit` tool for multi-line changes.
 

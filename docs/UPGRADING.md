@@ -243,10 +243,10 @@ next VS Code release from becoming a second refactor.
 ## Step 5 - verify, in this order
 
 ```sh
-npm run typecheck -w copilot-chat-exporter   # catches a missing binding in seconds
-npm run test      -w copilot-chat-exporter   # unit tests
-npm run golden    -w copilot-chat-exporter   # committed made-up session: digest + full export
-npm run baseline  -w copilot-chat-exporter   # frozen real session, byte-exact
+pnpm run typecheck   # catches a missing binding in seconds
+pnpm run test        # unit tests
+pnpm run golden      # committed made-up session: digest + full export
+pnpm run baseline    # frozen real session, byte-exact
 node src/cli.ts --snapshot check <sessionId> # the session that actually had the new kind
 ```
 
@@ -255,8 +255,8 @@ cwd-dependent path bug that review had missed:
 
 ```sh
 cd $env:TEMP    # or /tmp
-node <repo>/tools/copilot-chat-exporter/src/cli.ts --golden check
-node <repo>/tools/copilot-chat-exporter/test/baseline.ts
+node <exporter-repo>/src/cli.ts --golden check
+node <exporter-repo>/test/baseline.ts
 ```
 
 Adding a handled kind **will** change the export, so both checks are expected to fail. That is
@@ -270,8 +270,8 @@ the point at which people make the real mistake:
 Only then:
 
 ```sh
-npm run golden:update   -w copilot-chat-exporter
-npm run baseline:update -w copilot-chat-exporter
+pnpm run golden:update
+pnpm run baseline:update
 node src/cli.ts --snapshot update <sessionId>
 ```
 

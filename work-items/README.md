@@ -48,7 +48,7 @@ Priority is High, Medium or Low, shown after the status. "Quick win" is an optio
 | `[build]` | Change code or docs |
 | `[question]` | Needs a decision or answer from the dev |
 
-The same tags prefix every Next action. **Who** is you (the dev), agent or both. **Size:** S under half a day, M about a day, L several days. The agent proposes who and size; the dev confirms.
+The same tags prefix every Next action. Type describes the whole item. The tag on the next action describes that step. **Who** is you (the dev), agent or both. **Size:** S under half a day, M about a day, L several days. The agent proposes who and size; the dev confirms.
 
 ## Inbox
 
@@ -62,7 +62,7 @@ One line per idea, newest at the bottom:
 
 ## Capture check
 
-After any substantive prompt that produced an idea, finding, decision or status change, update tracking. Skip plain Q&A.
+After any substantive prompt that produced an idea, finding, decision or status change, update tracking. Skip the update for plain Q&A.
 
 | What happened | Where it goes |
 | --- | --- |
@@ -71,7 +71,7 @@ After any substantive prompt that produced an idea, finding, decision or status 
 | Finding, decision, rejected approach, evidence limit | Topic |
 | Detour resolved part of the goal | Return-to-goal note in the topic |
 
-End such replies with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, on the line just above the `Evidence:` line.
+End every reply, including plain Q&A, with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, on the line just above the `Evidence:` line. The line also shows that AGENTS.md loaded.
 
 ## Rabbit holes
 
@@ -108,7 +108,7 @@ When the dev decides to act on agent output, file it once:
 
 1. Put the short version (findings, decisions) in the topic's main sections.
 2. Put the full text under **Notes** at the bottom: `### 261023 - one-line summary`, newest first.
-3. When Notes get long or the item closes, fold them into Current understanding and trim.
+3. When Notes get long or the item closes, merge them into Current understanding and trim.
 
 Don't paste routine command output, test totals or transcripts.
 
@@ -120,10 +120,10 @@ Don't paste routine command output, test totals or transcripts.
 | Original goal | The agreed outcome. Change it only by a recorded decision |
 | Done when | Checkable criteria |
 | Work tree | Parent topics only: the ordered list of child items |
-| Current understanding | A synthesis, not a diary. Use evidence labels: documented, inferred from source, observed here, unknown |
+| Current understanding | A summary of what we know now, not a diary. Use evidence labels: documented, inferred from source, observed here, unknown |
 | Decisions and tradeoffs | Choices, rejected options, reasons |
 | Findings and outcomes | Results, gotchas, return-to-goal notes |
-| Resume point | Optional while Active: in-flight state. Delete when it closes |
+| Resume point | Optional while Active: where you stopped. Delete when it closes |
 | References | Links to code, docs, commits, evidence |
 | Notes | Filed agent output, dated |
 

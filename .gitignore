@@ -16,3 +16,12 @@ docs/temp/
 temp-tool-output/
 user-notes.md
 reports/corpus/
+.chat-history/
+
+
+# We DON"T use NPM, so ensure npm lockfiles cannot be checked into source control 
+package-lock.json
+yarn.lock
+
+# We use PNPM, so ensure its lockfile is committed
+!pnpm-lock.yaml

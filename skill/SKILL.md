@@ -15,24 +15,24 @@ Export a VS Code Copilot chat conversation to a human-readable Markdown archive 
 ## How it works
 The exporter reads VS Code's **native chat journal** (`chatSessions/<id>.jsonl`) as the definitive source and enriches raw tool-output bodies from `chat-session-resources`. It produces a Markdown file with: session metadata, a cost/timing summary, a user-questions table of contents, per-turn prompts (styled header + right-aligned timestamp), recovered agent reasoning (🧠/💡), interleaved tool calls (🛠️) with persisted output (📦), assistant text and code blocks, a per-turn `ℹ️ Turn info` panel, and a cost footer (⏱️ 🔢 💳 🤖).
 
-## Commands (run from the workspace root)
-- Current session (auto-detected via `VSCODE_TARGET_SESSION_LOG`), using the host project's script:
+## Commands (run from the exporter repository root)
+- Current session (auto-detected via `VSCODE_TARGET_SESSION_LOG`):
   ```
-  npm run ai:export:chat -- --current
+  pnpm run export --current
   ```
 - Installed package only (the project lists it as a dependency):
   ```
-  npm exec -- copilot-chat-export --current
+  pnpm exec copilot-chat-export --current
   ```
 - Choose the output path:
   ```
-  npm run ai:export:chat -- --current docs/chat-exports/my-session.md
+  pnpm run export --current docs/chat-exports/my-session.md
   ```
 - List all known sessions (id, date, title), then export one by id:
   ```
-  npm run ai:export:chat -- --list
-  npm run ai:export:chat -- --list --full-ids
-  npm run ai:export:chat -- <sessionId-or-unique-prefix> [outputPath]
+  pnpm run export --list
+  pnpm run export --list --full-ids
+  pnpm run export <sessionId-or-unique-prefix> [outputPath]
   ```
 - For a shorter recent list use `--last25`; use `--show-ignored` to include `/fix`, confirmed-empty, and ambiguous entries hidden by default.
 - Compact listings show the shortest unique UUID prefix (at least 8 hexadecimal characters), which can be passed directly for export when exactly one Local journal matches. Use listing-only `--full-ids` for complete IDs; if the same ID exists in multiple workspaces, pass an exact `.jsonl` path.
@@ -42,7 +42,7 @@ The exporter reads VS Code's **native chat journal** (`chatSessions/<id>.jsonl`)
 - Add listing-only `--detailed` for the richer identification report: prompts, models, historical edits, title/date evidence, family links and source diagnostics. It replaces basic HTML only; console output is unchanged. `--detailed --no-html` warns and produces only the console listing. Reports contain private text and paths; best-effort redaction is not full sanitization.
 
 ## Steps
-1. Prefer the host's `ai:export:chat` script when present (a linked install defines it as `node tools/copilot-chat-exporter/dist/cli.js`). Use `npm exec -- copilot-chat-export` only when the package is installed; otherwise npm downloads whatever package has that name from the registry.
+1. Use `pnpm run export` from the exporter repository root. In a host project with the package installed, use `pnpm exec copilot-chat-export` from that project's root instead. If neither location is known, ask for it. Don't use `pnpm dlx`, which downloads a package. Don't add a bare `--` after the script name because this CLI rejects it.
 2. Pass an explicit session id/path when given. Otherwise pass `--current`, plus an output path if supplied. No arguments now lists instead of exporting. If current identity or root selection is unavailable/ambiguous, ask the user to select a root/source; never guess the newest session.
 3. Run the command in the terminal and wait for it to finish.
 4. Report the `Output:` path and the one-line summary (turns, tool calls, reasoning notes, resources).
