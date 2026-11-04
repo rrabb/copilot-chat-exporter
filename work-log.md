@@ -10,7 +10,7 @@ Updated 261103. New here? Read the [handbook](work-items/README.md) first. Produ
 
 | # | Item | Next action | Who | Size |
 | --- | --- | --- | --- | --- |
-| 1 | [WI-001](#wi-001) Work-tracking setup | [build] Move WI-023, then WI-015 to WI-018. | both | L |
+| 1 | [WI-001](#wi-001) Work-tracking setup | [build] Move WI-015 to WI-018 | both | L |
 
 **Decisions you owe:** see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then.
 
@@ -72,7 +72,8 @@ Updated 261103. New here? Read the [handbook](work-items/README.md) first. Produ
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <a name="wi-022"></a>[WI-022 Frozen captures and cleanup](work-items/WI-022-source-captures-cache-cleanup.md) | Freezes source inputs, checks the saved file, keeps captures safely and deletes only after you approve. | ✅ Done | [build] | - | - | - | WI-023 |
-| <a name="wi-023"></a>**WI-023** Failed-export handling | Failed exports keep their evidence and write a private log; a demo reproduces the failures. | ✅ Done | [build] | - | - | - | WI-022 |
+| <a name="wi-023"></a>[WI-023 Failed-export handling](work-items/WI-023-failed-export-handling.md) | Keeps evidence and diagnostics when export verification fails. [WI-043](#wi-043) covers errors writing logs. | ✅ Done | [build] | - | - | - | [WI-022](#wi-022) |
+| <a name="wi-043"></a>↳ **WI-043** Failure log write errors | Part of WI-023. Keep the receipt and report the retained source when a diagnostic log write fails. | 📋 Backlog · Medium | [build] | agent | S | - | [Finding](work-items/WI-023-failed-export-handling.md#failure-log-write-errors) |
 
 ### Project upkeep
 
@@ -113,6 +114,18 @@ Done items keep their ✅ row above. Dropped and rejected ideas, so nobody propo
 | Nested backup journals (`bkup2`) in discovery | You excluded them; exact-path export still works. | WI-015 |
 | Extract non-image Base64 payloads | The audit found only images (now saved) and opaque reasoning (omitted on purpose). | WI-024 |
 | Delete cache before showing targets | Unsafe; cleanup now previews and asks first. | WI-022 |
+| Merge child agent turns into main turns | Separate scopes keep the agent and delegation identifiable. | [WI-019](work-items/WI-019-agent-chat-export.md#decisions-and-tradeoffs) |
+| Treat a returned tool summary as the full child transcript | A summary doesn't contain the child conversation. | [WI-019](work-items/WI-019-agent-chat-export.md#decisions-and-tradeoffs) |
+| Estimate credits from tokens or assign a whole-log total to a child | Needs recorded credits and scope (old item #20). | [WI-019](work-items/WI-019-agent-chat-export.md#decisions-and-tradeoffs) |
+| One flattened order and repeat sequence for verification | False positives; snapshots, merged tools, agent scopes and companions don't share one sequence. | [WI-020](work-items/WI-020-local-content-fidelity.md#decisions-and-tradeoffs) |
+| Fixed 24 KiB tool-text clipping | Omitted real text; companion files replaced it. | [WI-020](work-items/WI-020-local-content-fidelity.md#decisions-and-tradeoffs) |
+| Deduplicate terminal output by matching text alone | Different IDs or same-turn entries can be distinct calls. | [WI-020](work-items/WI-020-local-content-fidelity.md#decisions-and-tradeoffs) |
+| Replace export output directly before verification | A failure could destroy the earlier Markdown; staged replacement chosen. | [WI-023](work-items/WI-023-failed-export-handling.md#decisions-and-tradeoffs) |
+| Regenerate SDK output to prove saved-file integrity | Doesn't check the supplied file or companions. | [WI-023](work-items/WI-023-failed-export-handling.md#decisions-and-tradeoffs) |
+| Delete captures after failed verification | Removes evidence needed for later checks. | [WI-023](work-items/WI-023-failed-export-handling.md#decisions-and-tradeoffs) |
+| Resize, re-encode or cap recorded images | Could alter or drop available bytes. | [WI-024](work-items/WI-024-image-companions.md#decisions-and-tradeoffs) |
+| Open source-image paths, fetch URLs or rebuild missing images | A location isn't proof of the recorded bytes. | [WI-024](work-items/WI-024-image-companions.md#decisions-and-tradeoffs) |
+| Claim text redaction sanitizes images | Redaction can't inspect pixels. | [WI-024](work-items/WI-024-image-companions.md#decisions-and-tradeoffs) |
 
 ## Old history
 

@@ -66,6 +66,7 @@ One line per idea, newest at the bottom:
 ### Closing an item
 
 - Done needs two things: the Done-when criteria are met, and the dev says so. Don't close an item on your own. When the criteria look met, say so in your reply and ask.
+- Finishing the work you were asked to do is not closing. Set it Waiting for the dev's acceptance, say what to check, and ask.
 - "Approve" or "looks good" about a plan or an approach doesn't mean close. If unsure, ask.
 - When the dev confirms, do this in one edit: set Done on the row; record the outcome and date in the topic; remove it from Do now and refresh the Updated date; update the parent's Work tree and progress line if it has one; answer or remove its Inbox lines, noting where each went; leave open children open and say so in your reply.
 
@@ -148,12 +149,22 @@ Don't paste routine command output, test totals or transcripts.
 | Original goal | The agreed outcome. Change it only by a recorded decision |
 | Done when | Checkable criteria |
 | Work tree | Parent topics only: the ordered list of child items |
-| Current understanding | A summary of what we know now, not a diary. Use evidence labels: documented, inferred from source, observed here, unknown |
+| Current understanding | A summary of what we know now, not a diary. Use evidence labels: documented, inferred from source, observed here, from past chat, unknown |
 | Decisions and tradeoffs | Choices, rejected options, reasons |
 | Findings and outcomes | Results, gotchas, notes on how this got back to the goal |
 | Resume point | Optional while Active: where you stopped. Delete when it closes |
 | References | Links to code, docs, commits, evidence |
 | Notes | Filed agent output, dated |
+
+### Evidence labels
+
+| Label | Meaning |
+| --- | --- |
+| Documented | Stated in a doc, the SPEC, the old log or the archive. |
+| Inferred from source | Read from code at a named commit, not run. |
+| Observed here | Seen in a test or probe run during this work. |
+| From past chat | Taken from an earlier chat session. Give the date and a one-line summary, not the text. Another agent can't recheck it, so confirm it in the repo or with the dev before relying on it. |
+| Unknown | Not checked or not available. |
 
 Omit empty sections. No hard size cap; review a topic around 4,000 words. Older topics gain At a glance the next time they are edited.
 
@@ -170,6 +181,7 @@ Omit empty sections. No hard size cap; review a topic around 4,000 words. Older 
 
 - WI IDs are never reused. Gaps are fine (WI-005 and WI-011 are unused). Each row keeps its `wi-NNN` anchor when it moves.
 - Dropped ideas get one line with the reason in the closed lookup, so nobody proposes them again.
+- When you migrate a topic, add a one-line Closed lookup entry for each rejected approach another agent might propose again, linked to the topic. At most three per topic.
 - Reread an entry before you edit it, and keep other chats' changes. Ask if two edits conflict.
 - Keep personal paths, real session IDs and credentials out of tracking files. Missing evidence stays labeled missing.
 - The archive is old history. Nothing new goes there. Read it only through links.

@@ -9,6 +9,8 @@ This is the single project instruction file for all agents and harnesses. `.gith
 
 Read in this order: the [handbook](work-items/README.md) (statuses, tags, rules), the **Start here** section of the [work-log.md](work-log.md) dashboard, then the topic in `work-items/` for the item you work on. Skip `work-log-archive.md` unless a link sends you there.
 
+You may read past chat sessions for context. Name each one you used in the Evidence line. Summarize what you learned; never paste chat text into a tracked file.
+
 For this project the dashboard's Do now table is the handoff for a new chat. Don't add a kickoff prompt to it; put 'what next' notes in your reply.
 
 - **Inbox:** put each new idea, bug, question or research topic in the dashboard Inbox as one line: `YYMMDD [tag] text (from: you|agent)`. Tags: `[idea]` `[research]` `[build]` `[question]`. Append only, and reread before you add. At session start, say what to do with each line: make a row, drop it, or keep it.
