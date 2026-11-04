@@ -41,6 +41,8 @@ Do now lists the Next rows in order. When a row's status or next action changes,
 
 Priority is High, Medium or Low, shown after the status. "Quick win" is an optional marker.
 
+**Priority:** High means confirmed in real data, or a privacy or silent-data-loss risk. A finding seen only in synthetic probes starts at Medium.
+
 ## Tags, who and size
 
 | Tag | Use for |

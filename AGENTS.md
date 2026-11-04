@@ -88,6 +88,7 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 | --- | --- |
 | `pnpm install` | Install dependencies. Uses `pnpm-lock.yaml`. Don't use npm. |
 | `pnpm test` | Full test suite. Don't use `node --test test/`. |
+| `pnpm test <file...>` | Focused tests with cache isolation, e.g. `pnpm test test\args.test.ts`. Prefer this over manual `node --test` commands. |
 | `pnpm run verify` | Generated-file check, both typechecks, tests, golden check. Run it before finishing. |
 | `pnpm run build` | Rebuild `dist/` |
 | `pnpm run verify:local` | `verify` plus the machine-local baseline (optional) |
@@ -98,6 +99,7 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 
 - Run the narrowest relevant test right after the first real edit, then `pnpm run verify`.
 - Write inline probes as `temp-tool-output\*.mts` that import `../src/...`.
+- **Windows fallback:** For a custom preload invocation, use `pnpm test --command --import <preload-file-URL> --test <file...>`. Resolve `test\cache-isolation.ts` to an absolute `file:///` URL, not a backslash path. This keeps the wrapper's cache isolation and checks. The [WI-015 run](work-items/WI-015-discovery-and-selection.md#validation-and-limits) used a file URL after a backslash path failed.
 - Working copies are CRLF while `.gitattributes` pins LF, so Git's CRLF warnings are harmless. Use the `edit` tool for multi-line changes.
 
 ## Keep docs in sync

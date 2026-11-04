@@ -5,7 +5,7 @@ Canonical entry: [WI-001](../work-log.md#wi-001). The dashboard owns status and 
 ## At a glance
 
 - Goal: a light work log that one dev and AI agents share as backlog, notes and handoff, not Jira. The migration moves the old root log into topics, one at a time.
-- Next: see Do now.
+- All required topics are migrated. The dev accepted the migration on 261104.
 - Done when every pending topic is migrated or marked "row is enough", and the dev confirms.
 - WI-040 is the one child in the work tree. It may stay open as its own item.
 - The handbook owns the item-closing and completion-check rules.
@@ -20,7 +20,7 @@ One developer works on this project in spare time with AI agents. AI produces id
 
 ## Work tree
 
-Progress as of 261103: 0 of 1 child done.
+Progress as of 261104: 0 of 1 child done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -30,9 +30,16 @@ Progress as of 261103: 0 of 1 child done.
 
 | Topic | State |
 | --- | --- |
-| WI-002, 003, 004, 006, 019, 020, 021, 022, 023, 024, 026, 041, 042 | Topic exists |
-| WI-015, 016, 017, 018 | Pending |
+| WI-002, 003, 004, 006, 015, 016, 017, 018, 019, 020, 021, 022, 023, 024, 026, 041, 042 | Topic exists |
 | WI-007, 008, 009, 010, 012, 013, 014, 025 | Row is enough unless touched |
+
+## Findings and outcomes
+
+### 261104 - migration accepted
+
+All 17 required topic entries now have files. The eight other legacy entries remain marked "row is enough unless touched". [WI-018](WI-018-compressed-reports.md) was the last pending topic. The dev accepted the migration on 261104.
+
+WI-040 stays separate under the agreed Done-when rule. Its build work wasn't closed by this decision.
 
 ## Design decisions
 
