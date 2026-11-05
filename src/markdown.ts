@@ -1151,6 +1151,16 @@ function subagentSummaryLine (toolNodes: ToolNode[]): string[] {
   return agents ? [`- **Sub-agents:** ${agents} (${thousands(calls)} tool calls inside them, shown nested at the call that started each)`] : [];
 }
 
+function hasLinkedImageNote (turns: readonly Turn[]): boolean {
+  return turns.some((turn) => turn.body.some((node) => {
+    if (node.type === 'note')
+      return Boolean(node.image);
+    if (node.type === 'tool' && node.subagent)
+      return hasLinkedImageNote(node.subagent.turns);
+    return false;
+  }));
+}
+
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
   overflow = context.overflow ?? null;
   fenceRepairs = context.fenceRepairs ?? null;
@@ -1224,7 +1234,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     sdk
       ? '> Conversation archive sourced from the Copilot SDK event log (Agent Host / Copilot CLI): prompts, readable reasoning, assistant messages, tool calls with inputs, outputs and errors, code blocks and timing.'
       : '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',
-    ...(imageReplacements.length || context.overflow?.companions.some((item) => item.kind === 'image')
+    ...(imageReplacements.length || hasLinkedImageNote(turns) || context.overflow?.companions.some((item) => item.kind === 'image')
       ? ['', '> Images bypass text redaction and may contain private information. Review image companions before sharing.'] : []),
     '',
     '## Session Metadata',

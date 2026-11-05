@@ -11,7 +11,7 @@ Canonical entry: [WI-024](../work-log.md#wi-024). The dashboard owns status and 
 - Independent verification compares unique recorded hashes with linked companion bytes.
 - Reference-only and unresolved images are counted separately. Unresolved alone doesn't fail the image check.
 - Images bypass text redaction and may contain private information.
-- A synthetic SDK archive lacked the image-specific privacy warning. [WI-037](../work-log.md#wi-037) tracks it. The pinned old log reports 124 unique SDK image hashes in real archives (historical, not rerun), so real SDK archives with images likely exist. Whether any were shared is unknown.
+- A synthetic SDK archive lacked the image-specific privacy warning. The shared renderer now shows it for linked SDK image notes and omits it when no image companion exists. The dev accepted [WI-037](../work-log.md#wi-037) on 261104. The pinned old log reports 124 unique SDK image hashes in real archives (historical, not rerun), so real SDK archives with images likely exist. Whether any were shared is unknown.
 - Two synthetic prompt entries with the same bytes produced one image link. [WI-038](../work-log.md#wi-038) tracks the position question.
 - A synthetic reused image file got an incorrect MIME-extension note. [WI-039](../work-log.md#wi-039) tracks it.
 - Real-chat frequency and the meaning of repeated entries weren't checked.
@@ -20,7 +20,7 @@ Canonical entry: [WI-024](../work-log.md#wi-024). The dashboard owns status and 
 - Rejected copying other binary or opaque payloads; the approved policy keeps their metadata and omission reasons.
 - Rejected treating text redaction as image sanitization because it doesn't inspect image content.
 - The separate `--inline-images` proposal remains deferred. Current Markdown image links can still display inline in a viewer.
-- Work tree: 0 of 3 children done. Estimates need the dev's confirmation.
+- Work tree: 1 of 3 children done. Estimates need the dev's confirmation.
 
 ## Original goal
 
@@ -38,7 +38,7 @@ These criteria describe the delivered byte-companion slice. The warning, repeate
 
 ## Work tree
 
-Progress as of 261103: 0 of 3 children done.
+Progress as of 261104: 1 of 3 children done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -62,7 +62,7 @@ The unfinished children's who and size are proposed estimates for the dev to con
 | Missing data | [Collection](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/images.ts#L39) doesn't open recorded paths or URLs. With a companion sink, [rendering](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/markdown.ts#L48) links a recorded location as reference-only, or reports an unresolved image. Without a sink it reports an unresolved destination. |
 | Image check | [The independent decoder and inventory](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/verify/images.ts#L26) inspect final Local requests and kept SDK events. [The account](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/verify/images.ts#L110) checks unique hashes, not every recorded position. Missing expected hashes fail with or without strict mode. Unresolved and reference-only counts alone don't fail it. |
 | Existing archives | [The linked-companion reader](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/verify/images.ts#L158) limits reads to sibling archive folders and skips links inside code fences. It doesn't read recorded source-image paths. |
-| Display and privacy | [The renderer](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/markdown.ts#L61) uses Markdown image links for saved bytes. Viewers may display those links inline. Text redaction doesn't sanitize the files; the SDK warning gap is recorded below. |
+| Display and privacy | [The renderer](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/markdown.ts#L61) uses Markdown image links for saved bytes. Viewers may display those links inline. Text redaction doesn't sanitize image files. The shared renderer shows the privacy warning for linked SDK image notes; the synthetic checks are recorded below. |
 
 **Historical receipt, not rerun here:** the [pinned image pass](https://github.com/rrabb/copilot-chat-exporter/blob/180a06ce10eace027c8937c6c20331e5f3b524b0/work-log.md#L196) reported 114 of 114 Local and 124 of 124 SDK unique hashes found. Its 11 excluded draft entries weren't 11 distinct, never-submitted images. This migration didn't reopen that corpus.
 
@@ -76,15 +76,15 @@ The unfinished children's who and size are proposed estimates for the dev to con
 | Treat images as potentially private | Don't claim text redaction sanitizes images; it can't inspect their pixels. |
 | Keep image display choices separate | The `--inline-images` proposal is deferred, not rejected. Existing Markdown image links can still display inline. |
 
-The [pinned decision](https://github.com/rrabb/copilot-chat-exporter/blob/180a06ce10eace027c8937c6c20331e5f3b524b0/work-log.md#L461) records these choices. [SPEC](../docs/SPEC.md#recorded-image-policy) owns the current product policy; its archive-warning claim is broader than the SDK behavior observed below.
+The [pinned decision](https://github.com/rrabb/copilot-chat-exporter/blob/180a06ce10eace027c8937c6c20331e5f3b524b0/work-log.md#L461) records these choices. [SPEC](../docs/SPEC.md#recorded-image-policy) owns the current product policy. The SDK warning gap below records the implementation difference and its fix.
 
 ## Findings and outcomes
 
 ### SDK image privacy warning
 
-**Observed here:** a synthetic SDK `session.binary_asset` with Base64 bytes produced one saved, byte-identical image companion. The saved Markdown lacked the image-specific warning, and the independent image hash check passed. The [SDK builder](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/session/sdk-session.ts#L441) keeps its companions separately from the [renderer overflow sink](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/session/sdk-export.ts#L42). The [header warning](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/markdown.ts#L1227) checks the renderer's images and sink.
+**Observed here:** a synthetic SDK `session.binary_asset` with Base64 bytes produced one saved, byte-identical image companion. Before the fix, the saved Markdown lacked the image-specific warning, while the independent image hash check passed. The shared renderer now shows the warning for linked SDK image notes. Focused synthetic tests confirm the warning appears when an image companion exists and stays absent without one.
 
-The pinned old log reports 124 unique SDK image hashes in real archives (historical, not rerun), so real SDK archives with images likely exist. Whether any were shared is unknown. [WI-037](../work-log.md#wi-037) is the separate warning fix.
+The pinned old log reports 124 unique SDK image hashes in real archives (historical, not rerun), so real SDK archives with images likely exist. Whether any were shared is unknown. The dev accepted [WI-037](../work-log.md#wi-037) on 261104. No real chat data was read for that fix.
 
 ### Repeated image positions
 

@@ -4,6 +4,7 @@
 
 import { scoreLossPieces } from './loss-account.ts';
 import type { LossAccount, LossPiece } from './loss-account.ts';
+import { childScopes } from '../session/sdk-events.ts';
 import type { SdkEvent } from '../session/sdk-events.ts';
 
 const LINES = new Set(['tool-input', 'tool-output', 'tool-detail']);
@@ -29,6 +30,19 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
   const companionKeys = new Set<string>();
   const toolStartsWithArguments = new Set<string>();
   const turns = new Map<string, number>();
+  const childScopeResult = childScopes(events);
+  // The archive warns when it omits ambiguous child text, so Layer D checks only verified scopes.
+  const unresolvedToolCallIds = new Set(childScopeResult.problems.flatMap((problem) => problem.toolCallId ? [problem.toolCallId] : []));
+  const unresolvedAgentIds = new Set<string>();
+  for (const event of events) {
+    if (event.type !== 'subagent.started')
+      continue;
+    const toolCallId = str(event.data.toolCallId);
+    if ((!toolCallId || unresolvedToolCallIds.has(toolCallId)) && event.agentId)
+      unresolvedAgentIds.add(event.agentId);
+  }
+  const isUnresolvedChild = (event: SdkEvent) => (event.agentId !== undefined && unresolvedAgentIds.has(event.agentId))
+    || unresolvedToolCallIds.has(str(event.data.parentToolCallId));
   const scopeOf = (event: SdkEvent) => event.agentId ? `agent:${event.agentId}` : 'main';
   const callKey = (event: SdkEvent, id: string) => `${scopeOf(event)}\0${id}`;
   const add = (category: string, text: string, event: SdkEvent, inSequence = false) => {
@@ -48,6 +62,8 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
     companionPieces.push({ request: Math.max(turns.get(scopeOf(event)) ?? 0, 1), category, text });
   };
   for (const event of events) {
+    if (isUnresolvedChild(event))
+      continue;
     if (event.type !== 'tool.execution_start')
       continue;
     const id = str(event.data.toolCallId);
@@ -55,6 +71,8 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
     id && args && strings(args).join('\n').trim() && toolStartsWithArguments.add(callKey(event, id));
   }
   for (const event of events) {
+    if (isUnresolvedChild(event))
+      continue;
     const data = event.data;
     switch (event.type) {
       case 'user.message':

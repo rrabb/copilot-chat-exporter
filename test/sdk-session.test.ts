@@ -279,7 +279,7 @@ test('SDK tool-argument deduplication is scoped to the agent that owns the call'
 test('agent events whose delegation is not in the conversation are counted, not lost silently', () => {
   const events: SdkEvent[] = [prompt('Hi'), { ...assistant({ content: 'orphan work' }), agentId: 'ghost' }];
   const { leftOut } = buildSdkSession(events, events.filter((item) => item.agentId === undefined), { title: 'T', assetsDirectory: 'a' });
-  assert.equal(leftOut.get('sub-agent events whose delegation is not in this conversation'), 1);
+  assert.equal(leftOut.get('sub-agent events without a verified delegation'), 1);
 });
 
 test('notes render links and images relative to the Markdown file', () => {
@@ -296,6 +296,49 @@ test('notes render links and images relative to the Markdown file', () => {
   assert.match(out.markdown, /<summary>[\s\S]*?📚 Context compacted[\s\S]*?Earlier work summary/u);
 });
 
+test('SDK archives warn about image privacy only when they include an image companion', () => {
+  const warning = '> Images bypass text redaction and may contain private information. Review image companions before sharing.';
+  const image = Buffer.from('synthetic image payload');
+  const withImage = renderSdkExport([
+    prompt('Review this image'),
+    event('session.binary_asset', {
+      assetId: 'image-warning-test', type: 'image', mimeType: 'image/png',
+      data: image.toString('base64'),
+    }),
+  ], source(), { title: 'Image warning', assetsDirectory: 'assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z' });
+  assert.ok(withImage.companions.some((companion) => companion.kind === 'image'));
+  assert.ok(withImage.markdown.includes(warning));
+
+  const withoutImage = renderSdkExport([prompt('No image in this archive')], source(), {
+    title: 'No image', assetsDirectory: 'assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z',
+  });
+  assert.ok(!withoutImage.companions.some((companion) => companion.kind === 'image'));
+  assert.ok(!withoutImage.markdown.includes(warning));
+});
+
+test('ambiguous child conversations are omitted and warned without failing content checks', () => {
+  const events: SdkEvent[] = [
+    prompt('Main question'),
+    assistant({
+      content: 'Main answer',
+      toolRequests: [{ toolCallId: 'delegation', name: 'task' }],
+    }),
+    event('tool.execution_start', { toolCallId: 'delegation', toolName: 'task' }),
+    { ...event('subagent.started', { toolCallId: 'delegation', agentName: 'First child' }), agentId: 'first-child' },
+    { ...event('subagent.started', { toolCallId: 'delegation', agentName: 'Second child' }), agentId: 'second-child' },
+    { ...prompt('Private child prompt'), agentId: 'second-child' },
+    { ...assistant({ content: 'Private child answer' }), agentId: 'second-child' },
+  ];
+  const out = renderSdkExport(events, source(), {
+    title: 'Ambiguous child', assetsDirectory: 'assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z',
+  });
+  assert.match(out.markdown, /Main answer/u);
+  assert.match(out.markdown, /1 child conversation was omitted because its sub-agent mapping was ambiguous or incomplete/u);
+  assert.doesNotMatch(out.markdown, /Private child (?:prompt|answer)/u);
+  assert.equal(out.session.turns[0]!.toolNodes[0]!.subagent, undefined);
+  assert.equal(buildSdkLossAccount(events, out.markdown).failed, false);
+});
+
 test('the export names what was left out, keeps reasoning, and passes the independent content check', () => {
   const events = [
     event('session.start', { copilotVersion: '1.2.3' }),
@@ -308,6 +351,7 @@ test('the export names what was left out, keeps reasoning, and passes the indepe
   ];
   const out = renderSdkExport(events, source(), { title: 'Agent chat', assetsDirectory: 'chat_assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z' });
   assert.match(out.markdown, /Conversation archive sourced from the Copilot SDK event log/u);
+  assert.doesNotMatch(out.markdown, /## Export warnings/u);
   assert.match(out.markdown, /The stack trace points at the parser\./u);
   assert.match(out.markdown, /\*\*Intent:\*\* Open the parser/u);
   assert.match(out.markdown, /## Left out of this export[\s\S]*\| permission prompts \| 1 \|/u);

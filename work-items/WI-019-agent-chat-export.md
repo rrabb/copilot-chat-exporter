@@ -12,15 +12,17 @@ Canonical entry: [WI-019](../work-log.md#wi-019). The dashboard owns status and 
 - Recorded nano-AIU supplies AI credits. Token counts aren't used to estimate credits.
 - Checkpoint and shutdown totals are cumulative. The last total describes the whole event log.
 - A 90% usage-row-to-reply ratio is a heuristic, not proof of complete attribution.
-- A synthetic ambiguous child mapping reached a strict CLI export without an ambiguity warning.
+- A synthetic duplicate-ID case attached the later child under `--strict` without a warning; the real case below did not attach a child.
+- The developer chose to omit ambiguous children, warn in the archive, and keep `--strict` passing; [WI-049](../work-log.md#wi-049) implements the policy and waits for review.
 - Different child and parent task prompts can leave the original task out of Markdown.
 - A task description can also be omitted when the child start record doesn't repeat it.
 - Nested opaque reasoning can be counted in the parsed child but reported as zero in the footer.
-- These findings used synthetic data. Their frequency in real chats is unknown. A 261102 listing shows ambiguous child scopes exist in real chats.
-- [WI-034](../work-log.md#wi-034), [WI-035](../work-log.md#wi-035) and [WI-036](../work-log.md#wi-036) track the follow-ups.
+- A 261102 listing showed 64 ambiguous scopes; a 60-day scan found no conflicting IDs or attachable child messages.
+- One real export had no agent-attributed child messages, so real misattachment remains unconfirmed.
+- [WI-034](../work-log.md#wi-034), [WI-035](../work-log.md#wi-035), [WI-036](../work-log.md#wi-036) and [WI-049](../work-log.md#wi-049) track the follow-ups.
 - Rejected: flattening child turns into the main conversation, treating a summary as a transcript, and using the sister knowledge adapter as a fidelity engine.
 - Rejected: adding cumulative totals, estimating credits from tokens, attributing whole-log totals to children, cross-chat totals, and one flattened verification sequence.
-- Work tree: 0 of 3 children done. Estimates need the dev's confirmation.
+- Work tree: 1 of 4 children done. Estimates need the dev's confirmation.
 
 ## Original goal
 
@@ -75,9 +77,32 @@ The children's who and size are proposed estimates for the dev to confirm. These
 
 **Observed here:** a synthetic tool call had two `subagent.started` records with the same tool-call ID and different agent IDs. [Scope verification](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/session/sdk-events.ts#L70) returned no verified child and one ambiguity. The [builder's metadata map](https://github.com/rrabb/copilot-chat-exporter/blob/306498246c6714f6d496e6a045991889dbf79ad0/src/session/sdk-session.ts#L159) nevertheless used the later agent ID.
 
-261102 listing, Code root: 5 parent chats show 64 ambiguous child scopes (+1, +1, +1, +4, +57). The listing says the mapping is "ambiguous or incomplete". Whether this is the same cause as the synthetic duplicate-ID case is unknown. Whether an export attaches such a child without a warning in a real chat is untested.
+261102 detailed listing, Code root: 5 parent chats show 64 ambiguous child scopes (+1, +1, +1, +4, +57). The listing labels these mappings "ambiguous or incomplete". A real export from the smallest test-labeled case had no agent-attributed child messages, no nested child conversation and no archive warning.
 
-When both synthetic children had text, the first child's text was left out and Layer D failed. When the first child had only a start record, an isolated synthetic CLI export attached the second child's conversation, exited successfully with `--strict`, and reported the checked text present. The Markdown had no mapping warning. The existing synthetic listing test reports the same kind of ambiguous child instead. This doesn't establish that either case occurs in a real chat. [WI-034](../work-log.md#wi-034) tracks the identity and reporting question.
+When both synthetic children had text, the first child's text was left out and Layer D failed. When the first child had only a start record, an isolated synthetic CLI export attached the second child's conversation, exited successfully with `--strict`, and reported the checked text present. The Markdown had no mapping warning. The [synthetic receipt](../temp-tool-output/261103-1300-wi-019/ambiguous-cli-probe.log) records the result. The existing [listing test](https://github.com/rrabb/copilot-chat-exporter/blob/0135c4e27a5c39e5cd18309c33c7c196523f999c/test/cli.test.ts#L689) reports an ambiguous child instead.
+
+**Observed here - real export:** From the [261102 detailed listing](../temp-tool-output/111/copilot-chat-sessions-detailed-listing-261102_214215.html), an exact qualified key selected one 17-turn, test-labeled Agent Host chat with one ambiguous child scope. Its source had one `subagent.started` and one `subagent.completed` record sharing a parent `toolCallId`; neither had an `agentId`. Two main tool lifecycle records used that call ID, but no event in the backing log had an `agentId`. The export had no nested child conversation and no mapping warning. `--strict` exited 0. The listing showed both an ambiguous-child count and an ambiguous-mapping badge. The [local export receipt](../temp-tool-output/261105-0123-wi034-real/) keeps the raw output; no real chat IDs, paths, titles or text are recorded here.
+
+This real case confirms an unresolved mapping and inconsistent reporting, not a wrong child attachment. It had no agent-attributed child conversation events to attach. It doesn't establish whether other real logs can match the synthetic duplicate-ID case.
+
+**Observed here - 60-day metadata scan:** The active Copilot `session-state` root had 65 session directories and 52 event logs. Of those logs, 48 were modified within 60 days; all 48 had an event timestamp in the window. The scan found 64 incomplete mappings. None had duplicate start records with different `agentId` values, and none had both a matching parent tool call and an agent-attributed child message for the builder's last recorded agent ID. The scan classified records using event type, timestamp, `toolCallId` and `agentId`; it didn't print or save conversation text. Four older logs and 13 directories without event logs weren't opened. No second export was made because the scan found no attachable candidate.
+
+The developer chose to stop the search at 60 days and decide from current evidence.
+
+Current code confirms the distinction: [`childScopes`](../src/session/sdk-events.ts#L70) finds unresolved mappings, and the [builder](../src/session/sdk-session.ts#L160) attaches only verified agent IDs. The [archive renderer](../src/session/sdk-export.ts#L65) warns and omits the affected child. The [independent text check](../src/verify/sdk-loss-account.ts#L27) excludes candidate text tied to unresolved mappings, while still checking the main conversation and verified children. Listing provider resolution, badges and source details continue to show ambiguity in the [provider](https://github.com/rrabb/copilot-chat-exporter/blob/0135c4e27a5c39e5cd18309c33c7c196523f999c/src/session/provider-sources.ts#L317), [detailed listing](https://github.com/rrabb/copilot-chat-exporter/blob/0135c4e27a5c39e5cd18309c33c7c196523f999c/src/session/detailed-listing.ts#L341) and [source panel](https://github.com/rrabb/copilot-chat-exporter/blob/0135c4e27a5c39e5cd18309c33c7c196523f999c/src/session/detailed-source.ts#L193).
+
+[WI-034](../work-log.md#wi-034) was accepted and closed on 261105. [WI-049](../work-log.md#wi-049) implements the selected response and waits for review.
+
+#### WI-034 product response
+
+| Option | Benefit | Cost or risk | Status |
+| --- | --- | --- | --- |
+| Omit ambiguous children by default and add an archive warning | Keeps the verified parent and makes the unresolved child count visible | Drops any child text with a weak mapping; `--strict` still passes | Implemented in WI-049 |
+| Attach a candidate child and label its identity as uncertain | Keeps more recorded text | Can place another agent's private conversation under the wrong parent call | Not selected |
+| Omit ambiguous children by default, warn in the archive and make `--strict` fail on unresolved mappings | Prevents a misleading attachment and gives audits a clear failure | Can omit useful child history or block strict exports that otherwise pass | Not selected |
+| Make no export change and rely on the listing warning | No implementation cost | The Markdown can be shared without the listing and loses the ambiguity context | Not selected |
+
+The detailed listing already shows the child count and mapping badge, while its source panel keeps warning details on demand. A readability improvement could use one concise parent-level warning and link it to source evidence. It should distinguish a recorded parent `toolCallId` from a verified child `agentId`, then use matching wording in the export. This would avoid repeating warning text while making the archive's omissions clear. See the [listing design guide](../docs/HTML-REPORT-DESIGN.md#purpose-and-principles).
 
 ### Delegated task input
 
@@ -102,6 +127,10 @@ A second synthetic case kept the same prompt but omitted `agentDescription` from
 | Use one flattened order sequence for all events | Rejected after false positives. Child conversations and companions don't render in raw event order. See [WI-021](WI-021-source-aware-verification.md#decisions-and-tradeoffs). |
 
 ## Notes
+
+### 261105 - ambiguous child archive handling
+
+The exporter now attaches only verified tool-call/agent-ID mappings. It omits unresolved child conversations and adds an archive warning. Layer D treats candidate text from those mappings as an intentional omission while still checking verified scopes. The synthetic CLI export passed `--strict`; the real wrong-child case remains unconfirmed. WI-034 was accepted and closed; WI-049 waits for review. The [focused tests](../temp-tool-output/261105-0205-wi049/focused-tests.log) and [full verification](../temp-tool-output/261105-0205-wi049/verify.log) are local receipts.
 
 ### 261103 - synthetic migration review
 

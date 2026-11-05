@@ -186,6 +186,51 @@ test('an unknown agent event type is schema drift that --verify --strict reports
   assert.deepEqual(report.census.unhandled, { 'brand.new.kind': 1 });
 });
 
+test('ambiguous child content is omitted with an archive warning while --strict passes', async (context) => {
+  const { home, root, workspace, env, invoke } = await fixture(context);
+  const chat = 'cccccccc-1111-4111-8111-111111111111';
+  const database = new DatabaseSync(path.join(workspace, 'state.vscdb'));
+  try {
+    const row = database.prepare('SELECT value FROM ItemTable WHERE key = ?').get('chat.ChatSessionStore.index') as { value: string };
+    const index = JSON.parse(String(row.value));
+    index.entries[`agent-host-copilotcli:/${chat}`] = { title: 'Ambiguous child' };
+    database.prepare('UPDATE ItemTable SET value = ? WHERE key = ?').run(JSON.stringify(index), 'chat.ChatSessionStore.index');
+  } finally {
+    database.close();
+  }
+  const metadata = path.join(root, 'agentSessionData', chat, 'session.db');
+  await fs.mkdir(path.dirname(metadata), { recursive: true });
+  const agentDb = new DatabaseSync(metadata);
+  try {
+    agentDb.exec('CREATE TABLE session_metadata (key TEXT PRIMARY KEY, value TEXT)');
+  } finally {
+    agentDb.close();
+  }
+  const eventPath = path.join(env.COPILOT_HOME, 'session-state', chat, 'events.jsonl');
+  await fs.mkdir(path.dirname(eventPath), { recursive: true });
+  await fs.writeFile(eventPath, [
+    { id: 'start', type: 'session.start', data: { sessionId: chat, version: 1 } },
+    { id: 'prompt', type: 'user.message', data: { content: 'Main question' } },
+    { id: 'answer', type: 'assistant.message', data: {
+      content: 'Main answer',
+      toolRequests: [{ toolCallId: 'delegation', name: 'task' }],
+    } },
+    { id: 'tool', type: 'tool.execution_start', data: { toolCallId: 'delegation', toolName: 'task' } },
+    { id: 'child-start-a', type: 'subagent.started', agentId: 'first-child', data: { toolCallId: 'delegation', agentName: 'First child' } },
+    { id: 'child-start-b', type: 'subagent.started', agentId: 'second-child', data: { toolCallId: 'delegation', agentName: 'Second child' } },
+    { id: 'child-prompt', type: 'user.message', agentId: 'second-child', data: { content: 'Private child prompt' } },
+    { id: 'child-answer', type: 'assistant.message', agentId: 'second-child', data: { content: 'Private child answer' } },
+  ].map((event) => JSON.stringify(event)).join('\n'));
+
+  const output = path.join(home, 'ambiguous-child.md');
+  const result = invoke('cccccccc', output, '--strict', '--user-data-root', root);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const markdown = await fs.readFile(output, 'utf8');
+  assert.match(markdown, /1 child conversation was omitted because its sub-agent mapping was ambiguous or incomplete/u);
+  assert.match(markdown, /Main answer/u);
+  assert.doesNotMatch(markdown, /Private child (?:prompt|answer)/u);
+});
+
 test('--verify prints the independent content check and --strict fails only when content is missing', async (context) => {
   const { invoke } = await fixture(context);
   const clean = invoke('--verify', UUID);

@@ -1,18 +1,12 @@
 # Work dashboard
 
-Updated 261104. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
+Updated 261105. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
 🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
 ## Start here
 
-**Do now**
-
-| # | Item | Next action | Who | Size |
-| --- | --- | --- | --- | --- |
-| 1 | [WI-037](#wi-037) SDK image privacy warning | [build] Show the image privacy warning on SDK archives | agent | S |
-| 2 | [WI-034](#wi-034) Ambiguous subagent mapping | [research] Check whether a real export attaches an ambiguous child with no warning, using metadata only | both | M |
-| 3 | [WI-010](#wi-010) Graph refresh | [build] Refresh the code graph | agent | S |
+**Do now:** Nothing is Next. WI-049 waits for your review.
 
 **Decisions you owe:** see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then.
 
@@ -34,7 +28,8 @@ Updated 261104. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-031"></a>↳ **WI-031** Unmatched resources | Part of WI-006. Research how to report unmatched files without attaching them to the wrong call. | 📋 Backlog · Medium | [research] | agent | S | - | [WI-006](#wi-006) |
 | <a name="wi-014"></a>**WI-014** Inline images | Decide whether to show images inline as well as linking the saved files. Resumes when you review a display proposal. | 💤 Deferred · Low | [idea] | both | M | - | WI-024 |
 | <a name="wi-019"></a>[WI-019 Agent chat export and usage](work-items/WI-019-agent-chat-export.md) | Exports Agent Host and Copilot CLI chats with nested agents and recorded usage. | ✅ Done | [build] | - | - | - | old #9/#20 |
-| <a name="wi-034"></a>↳ **WI-034** Ambiguous subagent mapping | Part of WI-019. Investigate how an ambiguous mapping reached a strict export without warning. | 🔜 Next · High | [research] | both | M | - | [Finding](work-items/WI-019-agent-chat-export.md#ambiguous-subagent-mapping) |
+| <a name="wi-034"></a>↳ **WI-034** Ambiguous subagent mapping | Part of WI-019. Research accepted 261105; no real wrong-child attachment was found. The developer chose omission with an archive warning; WI-049 tracks implementation. | ✅ Done | [research] | - | - | - | [Finding](work-items/WI-019-agent-chat-export.md#ambiguous-subagent-mapping) |
+| <a name="wi-049"></a>↳ **WI-049** Ambiguous child archive warning | Part of WI-019. Omit ambiguous child conversations and warn in the archive; keep `--strict` passing. Implementation complete 261105; waiting for your review. | ⏳ Waiting · High | [build] | agent | M | - | [WI-034 finding](work-items/WI-019-agent-chat-export.md#ambiguous-subagent-mapping) |
 | <a name="wi-035"></a>↳ **WI-035** Delegation inputs | Part of WI-019. Investigate missing original task prompts and descriptions when child records differ. | 📋 Backlog · Medium | [research] | agent | M | - | [Finding](work-items/WI-019-agent-chat-export.md#delegated-task-input) |
 | <a name="wi-036"></a>↳ **WI-036** Child opaque reasoning count | Part of WI-019. Count opaque reasoning messages in nested child conversations. | 📋 Backlog · Medium | [build] | agent | S | - | [Finding](work-items/WI-019-agent-chat-export.md#child-opaque-reasoning-count) |
 | <a name="wi-020"></a>[WI-020 Local content fidelity](work-items/WI-020-local-content-fidelity.md) | Records the Local text fixes and identity-keyed terminal deltas. [WI-033](#wi-033) researches reasoning IDs. | ✅ Done | [build] | - | - | - | old #15/#16 |
@@ -42,7 +37,7 @@ Updated 261104. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-021"></a>[WI-021 Source-aware verification](work-items/WI-021-source-aware-verification.md) | Checks Local and agent exports with source-aware text and structural checks. | ✅ Done | [build] | - | - | - | old #10; [WI-025](#wi-025) |
 | <a name="wi-032"></a>↳ **WI-032** Parser install hint | Part of WI-021. Change the missing-parser hint to recommend `pnpm install` and also check other messages for stale npm wording. | 📋 Backlog · Low | [build] | agent | S | - | [Finding](work-items/WI-021-source-aware-verification.md#parser-install-hint), [WI-026](#wi-026) |
 | <a name="wi-024"></a>[WI-024 Image companions](work-items/WI-024-image-companions.md) | Saves recorded image bytes as hash-checked companions. | ✅ Done | [build] | - | - | - | [WI-014](#wi-014) |
-| <a name="wi-037"></a>↳ **WI-037** SDK image privacy warning | Part of WI-024. Show the archive warning when SDK image companions bypass text redaction. | 🔜 Next · High | [build] | agent | S | - | [Finding](work-items/WI-024-image-companions.md#sdk-image-privacy-warning) |
+| <a name="wi-037"></a>↳ **WI-037** SDK image privacy warning | Part of WI-024. SDK archives with image companions now show the warning that text redaction can't inspect image pixels. Accepted 261104. | ✅ Done | [build] | - | S | - | [Finding](work-items/WI-024-image-companions.md#sdk-image-privacy-warning) |
 | <a name="wi-038"></a>↳ **WI-038** Repeated image positions | Part of WI-024. Investigate lost same-byte image positions without duplicating tool metadata. | 📋 Backlog · Medium | [research] | agent | M | - | [Finding](work-items/WI-024-image-companions.md#repeated-image-positions) |
 | <a name="wi-039"></a>↳ **WI-039** Image MIME reuse note | Part of WI-024. Correct misleading MIME notes when deduplication reuses an existing file. | 📋 Backlog · Low | [build] | agent | S | - | [Finding](work-items/WI-024-image-companions.md#mime-note-after-deduplication) |
 
@@ -88,7 +83,7 @@ Updated 261104. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-001"></a>**WI-001** Work-tracking setup | The dashboard, handbook and topic migration were accepted 261104. WI-040 remains separate. Type, size and who guesses accepted 261102. | ✅ Done | [build] | - | - | - | [Topic](work-items/WI-001-work-tracking-setup.md), [Handbook](work-items/README.md), [completion check](work-items/README.md#completion-check) |
 | <a name="wi-040"></a>↳ **WI-040** Tracking check script | Part of WI-001. Write `scripts/check-tracking.mjs` and a pnpm script `check:tracking`, then point the handbook's Completion check at it. | 📋 Backlog · Medium | [build] | agent | S | - | [WI-001](#wi-001) |
 | <a name="wi-002"></a>[WI-002 Docs consistency](work-items/WI-002-docs-consistency.md) | Fix the doc conflicts that don't depend on WI-004, listed in its topic. Changes that depend on the WI-004 policy wait for it. | 📋 Backlog · Medium | [build] | agent | M | - | [Topic](work-items/WI-002-docs-consistency.md) |
-| <a name="wi-010"></a>**WI-010** Graph refresh | Re-index the code graph if you plan to use graph tools. | 🔜 Next · Low; Quick win | [build] | agent | S | - | old #32 |
+| <a name="wi-010"></a>**WI-010** Graph refresh | Full graph refreshed 261105 and saved to `.codebase-memory/graph.db.zst`. `src/index.ts` remains partially parsed at lines 24, 25 and 29. | ✅ Done | [build] | - | - | - | old #32 |
 | <a name="wi-026"></a>[WI-026 pnpm migration](work-items/WI-026-pnpm-migration.md) | Development commands and CI examples use pinned pnpm with a local install guard. Local validation passes, but remote CI hasn't been run. | ✅ Done | [build] | - | - | - | [Setup](README.md#install), [guard](scripts/require-pnpm.mjs), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-027](#wi-027) |
 | <a name="wi-027"></a>↳ **WI-027** Browser CSP assertions | Part of WI-026. Handler-case tests allow browser CSP reporting differences while keeping rejection, execution and insertion checks. | ✅ Done | [build] | - | - | - | [Test](test/compressed-listing-browser.test.ts), [findings](work-items/WI-026-pnpm-migration.md#findings), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-008](#wi-008) |
 | <a name="wi-046"></a>**WI-046** Focused test guidance | Added `pnpm test <file...>` as the default and kept a file URL fallback with the wrapper's cache checks. Accepted 261104. | ✅ Done | [build] | - | - | - | [Commands](AGENTS.md#commands) |

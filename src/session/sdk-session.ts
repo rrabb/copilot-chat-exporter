@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import type { CompanionArtifact } from '../export-policy.ts';
 import { collectRecordedImages, saveImageCompanion } from '../images.ts';
 import type { Census, NoteNode, ParsedSession, ToolNode, Turn, TurnNode, TurnScalars } from '../types.ts';
-import { isRecord } from './sdk-events.ts';
+import { childScopes, isRecord } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
 
 /** Event types left out of the export on purpose, with the group name shown in the omission line. */
@@ -58,6 +58,7 @@ export interface SdkSessionResult {
   companions: CompanionArtifact[];
   /** Left-out groups and how many records each held. */
   leftOut: Map<string, number>;
+  unresolvedChildScopes: number;
   copilotVersion: string;
   producer: string | null;
 }
@@ -155,21 +156,21 @@ interface Shared {
 
 const MAX_NESTING = 8;
 
-/** Delegated agents by the tool call that started them, from `subagent.started` and `subagent.completed`. */
-function subagentMeta (events: readonly SdkEvent[]): Map<string, SubagentMeta> {
+/** Metadata for children whose tool-call/agent mapping has been verified. */
+function subagentMeta (events: readonly SdkEvent[], verifiedAgentIds: ReadonlyMap<string, string>): Map<string, SubagentMeta> {
   const result = new Map<string, SubagentMeta>();
   for (const event of events) {
     if (event.type !== 'subagent.started' && event.type !== 'subagent.completed')
       continue;
     const id = text(event.data.toolCallId);
-    if (!id)
+    const agentId = verifiedAgentIds.get(id);
+    if (!id || !agentId)
       continue;
     const entry = result.get(id) ?? {
-      agentId: '', name: '', displayName: '', description: '', agentType: '', model: '',
+      agentId, name: '', displayName: '', description: '', agentType: '', model: '',
       durationMs: null, totalToolCalls: null, totalTokens: null, cancelled: false,
     };
     const data = event.data;
-    event.agentId && (entry.agentId = event.agentId);
     entry.name = text(data.agentName) || entry.name;
     entry.displayName = text(data.agentDisplayName) || entry.displayName;
     entry.description = text(data.agentDescription) || entry.description;
@@ -492,15 +493,17 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
 
 /** The main conversation of one verified scope, with every delegated agent's conversation nested at its call. */
 export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkEvent[], options: SdkSessionOptions): SdkSessionResult {
+  const childScopeResult = childScopes(all);
+  const verifiedAgentIds = new Map(childScopeResult.scopes.map((scope) => [scope.parentToolCallId, scope.agentId]));
   const ctx: Shared = {
-    options, all, meta: subagentMeta(all), attached: new Set(), seen: new Map(), dropped: new Map(), unhandled: new Map(),
+    options, all, meta: subagentMeta(all, verifiedAgentIds), attached: new Set(), seen: new Map(), dropped: new Map(), unhandled: new Map(),
     leftOut: new Map(), companions: [], systemFiles: new Map(), copilotVersion: 'unknown', producer: null, creationDate: null, workingDirectory: '',
   };
   const turns = processScope(ctx, scoped, null, 0);
   // Events attributed to an agent that no call in this conversation started cannot be placed; say so.
   const unplaced = all.filter((event) => event.agentId !== undefined && !ctx.attached.has(event.agentId)
     && !SDK_LEFT_OUT.has(event.type) && !SDK_MARKERS.has(event.type)).length;
-  unplaced && ctx.leftOut.set('sub-agent events whose delegation is not in this conversation', unplaced);
+  unplaced && ctx.leftOut.set('sub-agent events without a verified delegation', unplaced);
   const census: Census = {
     seen: ctx.seen, dropped: ctx.dropped, toolData: new Map(), unrecognizedToolData: [],
     unhandled: [...ctx.unhandled].sort((left, right) => right[1] - left[1]),
@@ -509,5 +512,9 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
     title: options.title, customTitle: '', defaultTitle: options.title, creationDate: ctx.creationDate, responderUsername: 'GitHub Copilot',
     initialLocation: 'agent', workingDirectory: ctx.workingDirectory, turns, rawRequests: [], census, editedFiles: [], errors: [],
   };
-  return { session, companions: ctx.companions, leftOut: ctx.leftOut, copilotVersion: ctx.copilotVersion, producer: ctx.producer };
+  return {
+    session, companions: ctx.companions, leftOut: ctx.leftOut,
+    unresolvedChildScopes: childScopeResult.problems.length,
+    copilotVersion: ctx.copilotVersion, producer: ctx.producer,
+  };
 }

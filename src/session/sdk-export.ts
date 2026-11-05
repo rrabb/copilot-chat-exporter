@@ -62,8 +62,16 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     fenceRepairs,
   });
   const omissions = [...built.leftOut].sort(([left], [right]) => left.localeCompare(right));
+  const childWarning = built.unresolvedChildScopes === 1
+    ? '- 1 child conversation was omitted because its sub-agent mapping was ambiguous or incomplete. The parent conversation remains included.'
+    : `- ${built.unresolvedChildScopes} child conversations were omitted because their sub-agent mappings were ambiguous or incomplete. The parent conversation remains included.`;
   const lines = [
-    '', '## Left out of this export', '',
+    '',
+    ...(built.unresolvedChildScopes === 0 ? [] : [
+      '## Export warnings', '', childWarning,
+      '',
+    ]),
+    '## Left out of this export', '',
     'These record kinds were counted and deliberately not exported (permissions, hooks and model request copies are noise; see the project notes).',
     '',
     '| What | Records |', '|---|---|',
