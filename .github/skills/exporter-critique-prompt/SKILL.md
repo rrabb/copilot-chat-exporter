@@ -1,8 +1,8 @@
 ---
 name: exporter-critique-prompt
 description: "Critically review a draft prompt or plan for copilot-chat-exporter before anything runs: devil's advocate, pros and cons, repercussions, conflicts with project decisions, simpler alternatives, and a revised prompt."
+disable-model-invocation: true
 argument-hint: "Paste the draft prompt or plan to review"
-agent: agent
 ---
 
 Review the draft below critically. **Don't execute any of it.** This is a review only: read files, docs, and Git state as needed, but don't edit, stage, commit, push, delete, install, export, or run builds, tests, or corpus runs.
@@ -11,7 +11,7 @@ Assume I may not know an area well, so my ask can have consequences I can't see.
 
 ## Project context to check first
 
-- [AGENTS.md](../../AGENTS.md), [work-log.md](../../work-log.md) (dashboard and decisions), and [docs/SPEC.md](../../docs/SPEC.md) (behavior contract).
+- [AGENTS.md](../../../AGENTS.md), [work-log.md](../../../work-log.md) (dashboard and decisions), and [docs/SPEC.md](../../../docs/SPEC.md) (behavior contract).
 - Does the draft contradict an approved decision, reopen a closed work item, or skip a waiting one?
 - Could it touch native session stores, print private session content, or put private values in a public commit or history?
 - Does a before/after comparison use frozen copies? Results on live sources aren't comparable.
@@ -41,8 +41,8 @@ Lead with the verdict, then the details.
 5. **Questions for me**: only those whose answer changes the plan, each with options and your recommendation.
 6. **Revised prompt**: ready to send, in a fenced block. Keep my numbering where it fits, and mark what you changed.
 
-Cite evidence for factual claims and label inferences. Follow [writing-style.instructions.md](../instructions/writing-style.instructions.md).
+Cite evidence for factual claims and label inferences. Follow [writing-style.instructions.md](../../instructions/writing-style.instructions.md).
 
 ## Draft to review
 
-${input:draft:Paste the draft prompt or plan}
+The draft is the text I typed after the command, or the draft I pasted or attached in the same message. If there's no draft, ask me to paste it and stop. Don't review anything else.

@@ -7,7 +7,7 @@ Canonical entry: [WI-001](../work-log.md#wi-001). The dashboard owns status and 
 - Goal: a light work log that one dev and AI agents share as backlog, notes and handoff, not Jira. The migration moves the old root log into topics, one at a time.
 - All required topics are migrated. The dev accepted the migration on 261104.
 - Done when every pending topic is migrated or marked "row is enough", and the dev confirms.
-- WI-040 is the one child in the work tree. It may stay open as its own item.
+- WI-040 is the one child in the work tree. [WI-050](../work-log.md#wi-050) superseded it on 261106, so the check script is now built in the kit repo.
 - The handbook owns the item-closing and completion-check rules.
 
 ## Original goal
@@ -20,7 +20,7 @@ One developer works on this project in spare time with AI agents. AI produces id
 
 ## Work tree
 
-Progress as of 261104: 0 of 1 child done.
+Progress as of 261106: 0 of 1 child done. WI-040 was superseded by WI-050.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -34,6 +34,10 @@ Progress as of 261104: 0 of 1 child done.
 | WI-007, 008, 009, 010, 012, 013, 014, 025 | Row is enough unless touched |
 
 ## Findings and outcomes
+
+### 261106 - WI-040 superseded by WI-050
+
+The dev chose to build the tracking check script in the portable kit ([WI-050](../work-log.md#wi-050)) instead of here. A minimal version comes before the first pilot and the full version after. The 261105 Inbox idea moved with it. Its scope: dashboard anchors, topic links, Closed lookup rows, statuses, and line links that point at non-blank lines on pinned commits. The 261103-261105 migrations checked these by hand.
 
 ### 261104 - migration accepted
 

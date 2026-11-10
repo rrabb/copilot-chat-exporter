@@ -7,16 +7,13 @@ dist/
 # command that recreates both lives in test/baseline.ts.
 test/fixtures/live-session/
 test/baseline/
+test/snapshots/
 
 # Machine-local digests of your own sessions, taken with --snapshot update. They name a session
 # that only exists in your VS Code storage, so they are meaningless in anyone else's checkout.
-test/snapshots/
 node_modules/
 docs/temp/
-temp-tool-output/
 user-notes.md
-reports/corpus/
-.chat-history/
 
 
 # We DON"T use NPM, so ensure npm lockfiles cannot be checked into source control 
@@ -25,3 +22,20 @@ yarn.lock
 
 # We use PNPM, so ensure its lockfile is committed
 !pnpm-lock.yaml
+
+
+# Local development and temporary files
+.playwright-mcp/
+.chat-history/
+reports/corpus/
+temp-tool-output/
+
+#
+# Codebase-memory-mcp local index files created when persistence=true.
+# No benefit in using local index for CBM for single dev, and no benefit in committing.
+# CBM always keeps its working index in central storage (~/.cache/codebase-memory-mcp/).
+# The README says "Local indexes persist regardless."
+# .codebase-memory/graph.db.zst is a compressed copy of the graph "so teammates can reuse an indexed baseline."
+# Once the file exists, every later index rewrites it including CBM watcher's automatic updates.
+#
+.codebase-memory/

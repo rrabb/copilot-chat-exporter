@@ -100,6 +100,16 @@ Tracking is part of finishing the task. Before reporting completion:
 
 If tracking can't be updated, report the task as incomplete and explain why. For read-only work, respect the no-edit boundary and report any tracking updates still needed.
 
+### Pausing work
+
+When you stop before the work is done (the dev says "pause" or "stop here", or the chat ends), don't run the Completion check. Instead:
+
+1. Update the dashboard row and Do now for anything that changed.
+2. Write or refresh the Resume point in the topic: where you stopped, what's unfinished, and what the next agent does first. Items with no topic need only the row.
+3. Say in your reply what is done and what remains.
+
+A paused item keeps its status (usually 🔨 Active). Pausing is an action, not a status.
+
 ## Rabbit holes
 
 When work on one item turns up new work, make each new piece a **child WI**. Don't grow the parent's row.

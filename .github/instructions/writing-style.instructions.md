@@ -6,12 +6,13 @@ applyTo: "**"
 
 Apply these rules to all text you write or change: Markdown, code comments, JSDoc, test descriptions, fixture prose, user-facing text (UI strings, log and error messages), commit messages, work logs, and chat or agent responses. Don't rewrite unrelated text just to match these rules.
 
-Write like a senior engineer explaining something to a teammate. The reader is a developer skimming between tasks. They should understand each sentence on the first read.
+Write like a senior engineer explaining/teaching something to a junior teammate. The reader is a developer skimming between tasks. They should understand each sentence on the first read.
+
+Prefer tables/list/emojis/icons/diagrams/visual markers/aids etc over long prose whenever possible.
 
 ## Write Plainly
 
 - Lead with the point: what the reader should do or what happened, and why it matters. Put details and edge cases after.
-- Cut detail the reader doesn't need. Say each thing once.
 - Use one idea per sentence. Aim for under 20 words.
 - Don't chain clauses with semicolons. Use separate sentences or a list.
 - Use a bulleted list when there are 3 or more separate facts or rules.
@@ -23,7 +24,7 @@ Write like a senior engineer explaining something to a teammate. The reader is a
 - Don't invent hyphenated adjectives ("detailed-only", "journal-owned"). Write it out: "only runs in detailed mode."
 - Name commands, files, settings, stored records, and behavior precisely. Put identifiers, paths, and commands in `backticks`. Don't put ordinary words in backticks.
 - Use contractions (don't, isn't, it's). They read more naturally.
- - Prefer tables (especially for prose lists or repeating fields) - see that section.
+- Prefer tables (especially for prose lists or repeating fields) - see that section.
 - Avoid terms the reader must decode. If one is needed, explain it in a short phrase.
 
 ## Tone
@@ -42,6 +43,7 @@ Prefer the plain option. Use the original word when it's shorter or more precise
 | retain, preserve | keep |
 | reveal | show |
 | surface (see the section below) | show, report, return, list |
+| shape (see the section below) | type, record, structure |
 | precedence | priority, or "X wins over Y" |
 | definite, definitely, definitive | (delete), or "main", "source of truth" |
 | absolutely, totally | (delete) |
@@ -91,7 +93,7 @@ The `.env.e2e.local` file holds your portal credentials and is sensitive, wherea
 
 ## Don't Use "Shape" As A Generic Term
 
-Don't use `shape` just to say that something has fields, properties, members, or a particular arrangement. Pick the word that names the subject's role. This applies to Markdown, comments, JSDoc, test descriptions, user-facing text, chat, and identifiers mentioned in prose.
+Don't use `shape` just to say that something has fields, properties, members, or a particular arrangement. Pick the word that names the subject's role. This applies to everything.
 
 Don't add a `Shape` suffix to a function, interface, type, class, variable, parameter, or property:
 
@@ -131,10 +133,11 @@ Pick the replacement that matches the meaning:
 - JavaScript engine internals, where "object shape" is the real term (last row above).
 - A quoted external API term that can't be reworded.
 - An established public identifier that can't be renamed in this task. Existing identifiers can stay when renaming them is unrelated to the task, but don't add new generic uses.
+- when it is used as per the English language definition
 
 ## Don't Use "Surface" As A Generic Term
 
-Don't use `surface` as a vague verb or noun for "show", "expose", "report", or "area". Say what actually happens: where the thing appears and who sees it. This applies to Markdown, comments, JSDoc, test descriptions, user-facing text, chat, and identifiers mentioned in prose.
+Don't use `surface` as a vague verb or noun for "show", "expose", "report", or "area". Say what actually happens: where the thing appears and who sees it. This applies to everything.
 
 Don't add `surface` to a function, interface, type, class, variable, parameter, or property name:
 
@@ -162,6 +165,7 @@ Pick the replacement that matches the meaning:
 - The security term "attack surface".
 - A quoted external API term that can't be reworded.
 - An established public identifier that can't be renamed in this task. Existing identifiers can stay when renaming them is unrelated to the task, but don't add new generic uses.
+- when it is used as per the English language definition (noun or adjective or verb)
 
 ## Use Exporter Terms Consistently
 
@@ -210,7 +214,6 @@ Prefer using tables and lists when suitable.
 
 - Start with the result: what you did, what you found, or the answer. Remember to provide context/reasoning/background.
 - Say clearly when something is a guess, wasn't verified or is ambiguous.
-- Prefer tables/list/emojis/icons/visual markers etc over long prose when the content fits them.
 - Give evidence for factual claims. Link to workspace files and line numbers when relevant.
 - Avoid terms the reader must decode, however if necessary, provide context and brief explanation.
 - When asking user questions always provide context, background, pros and cons, repercussions, risks, better approaches, alternatives, whether overkill, play devil's advocate. 

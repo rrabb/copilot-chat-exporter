@@ -1,8 +1,8 @@
 ---
 name: exporter-status
 description: "Read-only copilot-chat-exporter status and prioritized todo table from the work-log dashboard and Git: done, waiting on me, next items with priority, effort (LOE), dependencies, quick wins, and risks."
+disable-model-invocation: true
 argument-hint: "Optional: work item or area to focus on"
-agent: agent
 ---
 
 Give me a status update and a prioritized todo table for this project. **This is read-only.** Don't edit, stage, commit, push, delete, build, export, or start any item. Read-only commands such as `git status` and `git log` are fine.
@@ -11,7 +11,7 @@ Assume I've been away for days and don't remember the details. Every item must m
 
 ## Gather
 
-1. Read [work-log.md](../../work-log.md) (the dashboard owns status, priority, and next action), [work-items/README.md](../../work-items/README.md), and linked topics as needed. Read [AGENTS.md](../../AGENTS.md) for project rules.
+1. Read [work-log.md](../../../work-log.md) (the dashboard owns status, priority, and next action), [work-items/README.md](../../../work-items/README.md), and linked topics as needed. Read [AGENTS.md](../../../AGENTS.md) for project rules.
 2. Check Git: branch, `git status --short`, `git log origin/main..HEAD --oneline`, and recent commits. Classify each uncommitted path as mine, the user's customization, another session's, generated, line-ending only, or unexplained.
 3. Report what was last validated (`pnpm run verify` count, build, built-CLI tests, corpus run) and on which commit. Never imply a check ran on a later commit than it did. Corpus figures must come from a recorded corpus report; give the stable source hash alongside any S-number.
 4. If the work log and Git disagree, report the conflict instead of picking one. Priorities in the dashboard are proposals until I approve them.
@@ -39,6 +39,8 @@ Lead with a two- or three-sentence summary: where things stand and the single mo
 
 **Risks and open questions**: anything stale, contradictory, unverified, or easy to break.
 
-Cite the file, line, or command behind each claim. Label guesses. Unknown is never zero. Don't print private session content. Follow [writing-style.instructions.md](../instructions/writing-style.instructions.md).
+Cite the file, line, or command behind each claim. Label guesses. Unknown is never zero. Don't print private session content. Follow [writing-style.instructions.md](../../instructions/writing-style.instructions.md).
 
-${input:focus:Optional: work item or area to focus on}
+## Focus
+
+If I typed text after the command, focus the update on that work item or area. If I typed nothing, cover the whole project.
