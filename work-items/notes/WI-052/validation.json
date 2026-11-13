@@ -1,0 +1,20 @@
+{
+  "productionChanges": "None. Research scripts, HTML/JSON evidence and work tracking only.",
+  "repositoryVerify": {
+    "command": "pnpm run verify",
+    "result": "Failed at the test stage: 607 passed, 1 failed. Later golden stage was not reached by this command.",
+    "failure": "The public-docs privacy guard reports an existing non-synthetic UUID in a work-log.md evidence link.",
+    "baselineEvidence": "git show HEAD:work-log.md contains the same evidence link. The research edits did not add it.",
+    "action": "Left unchanged because it predates this task. Report it rather than changing unrelated tracking.",
+    "log": "repository-verify.log"
+  },
+  "researchChecks": [
+    "node --check build-report.mjs passed before report assembly.",
+    "ideas.json and repository-inventory.json parse successfully.",
+    "pnpm run golden passed separately. Saved digest and normalized render match the committed baseline.",
+    "Built the report and ran validate-report.mjs: all 41 controls present, unique HTML IDs, local evidence links resolve, no remote assets, valid search-script syntax.",
+    "Browser opened report.html successfully. Searching ask_user narrowed visible table rows from 335 to 3. Clear restored 335 rows.",
+    "Browser resource inventory was empty. Page content fit the 1357-pixel viewport without document overflow."
+  ],
+  "browserPage": "file:///C:/_DEV/copilot-chat-exporter/temp-tool-output/261113-121310-lod-research/report.html"
+}

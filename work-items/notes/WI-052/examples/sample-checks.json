@@ -1,0 +1,59 @@
+{
+  "purpose": "Portable, invented examples only. These are not redacted versions of real research conversations.",
+  "local": {
+    "fixture": "Committed synthetic golden fixture",
+    "cliExit": 0
+  },
+  "sdk": {
+    "events": 27,
+    "unhandledKinds": [],
+    "independentTextCheckFailed": false,
+    "categories": {
+      "prompt": {
+        "present": 3,
+        "partial": 0,
+        "absent": 0
+      },
+      "reasoning": {
+        "present": 1,
+        "partial": 0,
+        "absent": 0
+      },
+      "assistant-text": {
+        "present": 5,
+        "partial": 0,
+        "absent": 0
+      },
+      "tool-intent": {
+        "present": 1,
+        "partial": 0,
+        "absent": 0
+      },
+      "tool-input": {
+        "present": 6,
+        "partial": 0,
+        "absent": 0
+      },
+      "tool-output": {
+        "present": 6,
+        "partial": 0,
+        "absent": 0
+      },
+      "tool-error": {
+        "present": 1,
+        "partial": 0,
+        "absent": 0
+      },
+      "compaction-summary": {
+        "present": 1,
+        "partial": 0,
+        "absent": 0
+      },
+      "tool-detail": {
+        "present": 1,
+        "partial": 0,
+        "absent": 0
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "findings": [
+    {
+      "finding": "Input, result and attachment detail need separate controls",
+      "evidence": "SDK documentation describes result.content, detailedContent and contents, while MCP supports text/image/audio/resource/resource_link plus structuredContent.",
+      "implication": "A tool's concise model-facing text is not necessarily its full display result. A no-results choice must also govern newly generated result companions.",
+      "source": "https://github.com/github/copilot-sdk/blob/ed814e4134fdba86e2e88b82dcac85b1c125ed8a/docs/features/streaming-events.md"
+    },
+    {
+      "finding": "Ephemeral is an availability boundary, not a way to restore past output",
+      "evidence": "The SDK reference marks live-only event families, including user-input/elicitation and shell-output channels.",
+      "implication": "An offline export can select only what was recorded. Do not promise complete historical questions, live deltas or per-call usage merely because the live API defines them.",
+      "source": "https://github.com/github/copilot-sdk/blob/ed814e4134fdba86e2e88b82dcac85b1c125ed8a/docs/features/streaming-events.md"
+    },
+    {
+      "finding": "Question/answer output deserves a semantic category",
+      "evidence": "Local questionCarousel state, agent-native user_input events, MCP elicitation and tool-based ask_user use different records. The Local stress example has an unmatched recorded answer string despite a general verification pass.",
+      "implication": "Short form should keep title plus recorded outcome. Show skipped/cancelled/unavailable separately. A string nonmatch is a warning, not conclusive proof of why content is missing.",
+      "source": "corpus/findings.json"
+    },
+    {
+      "finding": "Memory is a documented feature, but not one export format",
+      "evidence": "GitHub documents repository memories and user preferences. The SDK reference separately describes memory-related permission data.",
+      "implication": "Distinguish a memory operation from loaded instructions, graph queries and compaction. Historical content must come from recorded evidence, not today's memory state.",
+      "source": "https://docs.github.com/en/copilot/concepts/prompting-and-context/copilot-memory"
+    },
+    {
+      "finding": "A top-level type union does not prove which content is absent",
+      "evidence": "The checked VS Code SerializedChatResponsePart union includes a generic serialized-progress wrapper whose member definitions were not all opened.",
+      "implication": "The nine top-level members are not nine total persisted kinds. Do not infer that tools, confirmations or warnings cannot persist. The Local survey directly encounters multiple such kinds.",
+      "source": "online/findings.json"
+    },
+    {
+      "finding": "Public documentation and sampled private events have different coverage",
+      "evidence": "The survey sees Fusion, usage_record, skill reference, model snapshot and hook events beyond the verified public event subset. Public Auto routing is not evidence that Fusion is model ensembling.",
+      "implication": "Keep unfamiliar event reporting independent of content filters. The report inventories observed names without inventing undocumented semantics.",
+      "source": "corpus/findings.json"
+    },
+    {
+      "finding": "Dependency inventories do not establish which runtime executed a chat",
+      "evidence": "The online pass records a Codex component entry and a changing VS Code extension layout.",
+      "implication": "These are background source observations. They neither broaden this exporter's provider scope nor establish Copilot runtime behavior. Claude/Codex sessions remain out of scope.",
+      "source": "online/findings.json"
+    }
+  ],
+  "recommendedFirstScope": [
+    "Keep the current detailed default byte-stable where existing deterministic rules apply.",
+    "Offer independent tool-input and tool-result detail, with exact per-tool overrides.",
+    "Treat MCP as an origin selector inside tools, not a second output category.",
+    "Add recorded readable reasoning on/off and a dedicated question/answer representation.",
+    "Keep errors/status, source warnings and intentional-exclusion accounting intelligible.",
+    "Defer shell-based file-read inference, a full rule language, extra media decoding and reopened hook/permission policy."
+  ]
+}

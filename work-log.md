@@ -1,14 +1,14 @@
 # Work dashboard
 
-Updated 261112. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
+Updated 261113. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
 🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
 ## Start here
 
-**Do now:** Nothing is Next. WI-049 waits for your review. WI-051 waits for fresh-chat checks and your acceptance.
+**Do now:** Nothing is Next. WI-053 waits for your review of the Fusion export plan; a separate section for children with missing parent calls is chosen, but no implementation is approved. WI-052 waits for your review of the preserved LOD notes; private Markdown examples remain optional local artifacts. WI-049 waits for your review. WI-051 waits for fresh-chat checks and your acceptance.
 
-**Decisions you owe:** see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then.
+**Decisions you owe:** review [WI-053's implementation plan](work-items/WI-053-agent-host-fusion-export-compatibility.md#implementation-plan---proposed-not-approved) before starting Phase 1. Also see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then.
 
 **Inbox:** see [Inbox](#inbox).
 
@@ -21,6 +21,7 @@ Updated 261112. New here? Read the [handbook](work-items/README.md) first. Produ
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | <a name="wi-004"></a>[WI-004 Fidelity policy](work-items/WI-004-fidelity-policy-research.md) | Decide extra metadata, omission notices and redaction, then plan `--high-fidelity` and `--no-redact`. Resumes when you pick policy work up again. | 💤 Deferred · Medium | [research] | you | M | - | old #15/#16 |
+| <a name="wi-052"></a>[WI-052 Markdown Level of Detail](work-items/WI-052-markdown-level-of-detail-research.md) | Full report, proposals, public research, sanitized census/findings, scripts and synthetic examples are preserved in notes. Six real export bundles have ignored private copies; separate backup needed. Waits for your review and research acceptance; no implementation. | ⏳ Waiting · Medium | [research] | you | M | - | WI-004; [HTML report](work-items/notes/WI-052/report.html); [Research index](work-items/notes/WI-052/README.md) |
 | <a name="wi-006"></a>[WI-006 Resource clipping](work-items/WI-006-persisted-resource-clipping.md) | Synthetic research exposed clipping. You chose a preview plus a complete redacted companion as the direction. | ✅ Done | [research] | - | - | - | WI-004; [decision](work-items/WI-006-persisted-resource-clipping.md#options) |
 | <a name="wi-028"></a>↳ **WI-028** Resource policy choice | Part of WI-006. You chose a preview plus a complete redacted companion as the direction. | ✅ Done | [question] | - | - | - | [WI-006 decision](work-items/WI-006-persisted-resource-clipping.md#options) |
 | <a name="wi-029"></a>↳ **WI-029** Resource preview and companion | Part of WI-006. Replace clipping with a Unicode-safe preview and a complete redacted companion. | 📋 Backlog · Medium | [build] | agent | M | - | [WI-006](#wi-006) |
@@ -67,6 +68,7 @@ Updated 261112. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-018"></a>[WI-018 Compressed reports](work-items/WI-018-compressed-reports.md) | Optional gzip and Brotli reuse detailed HTML, keep the overview/TOC static, validate evidence before insertion and report failures. Historical savings aren't speed guarantees. | ✅ Done | [build] | - | - | - | |
 | <a name="wi-041"></a>[WI-041 Listing labels and dates](work-items/WI-041-listing-labels.md) | Listing labels, compact local timestamps and the terminal-only run separator were accepted 261103. | ✅ Done | [build] | - | - | - | [WI-003](#wi-003) |
 | <a name="wi-042"></a>[WI-042 Fusion and future modes](work-items/WI-042-fusion-and-future-modes.md) | Research recorded selection modes, per-turn models and effort, then propose filters and export labels that handle future modes. | 📋 Backlog · Medium | [research] | both | S | - | [WI-041](#wi-041) |
+| <a name="wi-053"></a>↳ [WI-053 Agent Host Fusion export compatibility](work-items/WI-053-agent-host-fusion-export-compatibility.md) | Part of WI-042. Frozen-input diagnosis and phased export plan recorded 261113. Separate child section chosen. Waits for your review; implementation needs separate approval. | ⏳ Waiting · High | [research] | you | S | - | [Plan](work-items/WI-053-agent-host-fusion-export-compatibility.md#implementation-plan---proposed-not-approved); [WI-052 evidence](#wi-052) |
 
 ### Capture and failure handling
 

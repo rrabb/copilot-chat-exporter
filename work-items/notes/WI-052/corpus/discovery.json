@@ -1,0 +1,2163 @@
+{
+  "created": "2026-11-13T17:24:41.657Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.18.0"
+  },
+  "roots": [
+    {
+      "channel": "stable",
+      "path": "<user-home>\\AppData\\Roaming\\Code",
+      "exists": true
+    },
+    {
+      "channel": "insiders",
+      "path": "<user-home>\\AppData\\Roaming\\Code - Insiders",
+      "exists": true
+    }
+  ],
+  "sdkRoot": "<user-home>\\.copilot\\session-state",
+  "excludedSessionIds": [
+    "private-id-0054"
+  ],
+  "excludeModifiedAtOrAfter": "2026-11-13T17:13:58.000Z",
+  "installations": [
+    {
+      "root": "<user-home>\\.vscode\\extensions",
+      "name": "copilot-chat-saver",
+      "publisher": "dwalter",
+      "version": "1.0.1"
+    },
+    {
+      "root": "<user-home>\\.vscode\\extensions",
+      "name": "copilot-chat-to-markdown",
+      "publisher": "imperium-dev",
+      "version": "0.0.9"
+    },
+    {
+      "root": "<user-home>\\.vscode\\extensions",
+      "name": "copilot-session-manager",
+      "publisher": "luiscantero",
+      "version": "0.7.0"
+    },
+    {
+      "root": "<user-home>\\AppData\\Local\\Programs\\Microsoft VS Code\\dcd3ad6e36\\resources\\app",
+      "name": "Code",
+      "version": "1.145.3"
+    },
+    {
+      "root": "<user-home>\\AppData\\Local\\Programs\\Microsoft VS Code\\dcd3ad6e36\\resources\\app\\extensions\\copilot",
+      "name": "copilot-chat",
+      "publisher": "GitHub",
+      "version": "0.73.0",
+      "bundled": true
+    },
+    {
+      "root": "<user-home>\\AppData\\Local\\Programs\\Microsoft VS Code Insiders\\a3b0c130bd\\resources\\app",
+      "name": "Code - Insiders",
+      "version": "1.139.0-insider"
+    },
+    {
+      "root": "<user-home>\\AppData\\Local\\Programs\\Microsoft VS Code Insiders\\a3b0c130bd\\resources\\app\\extensions\\copilot",
+      "name": "copilot-chat",
+      "publisher": "GitHub",
+      "version": "0.67.2026092203",
+      "bundled": true
+    }
+  ],
+  "otherChatFiles": [
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 194598
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 503574
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10240
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11340
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 14059
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12316
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10310
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10712
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9998
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12057
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12450
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12105
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12458
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9861
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 180388
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11082
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 16989
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 1714667
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 15937
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9946
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 5321014
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10779
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 7425
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9507
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10305
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 40937
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9486
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9930
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10546
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11564
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10244
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11895
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10234
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10358
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 20640
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10609
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 34827
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9798
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10824
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11027
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10651
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 218242
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 13182
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10576
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9662
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9173
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10759
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9809
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9427
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9396
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 568560
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9535
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11148
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9791
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9566
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9250
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12161
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 233687
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 156106
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 15633
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 37332
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11194
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 11279
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 610877
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 12159
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 16757
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 10839
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 9707
+    },
+    {
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "channel": "stable",
+      "extension": ".json",
+      "bytes": 1421007
+    }
+  ],
+  "problems": [],
+  "files": [
+    {
+      "id": "private-id-0058",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0058\\events.jsonl",
+      "bytes": 116353394,
+      "mtime": "2026-10-22T21:18:57.267Z"
+    },
+    {
+      "id": "private-id-0059",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0059\\events.jsonl",
+      "bytes": 103693967,
+      "mtime": "2026-11-05T19:07:10.295Z"
+    },
+    {
+      "id": "private-id-0060",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0060\\events.jsonl",
+      "bytes": 87132913,
+      "mtime": "2026-11-04T00:49:44.453Z"
+    },
+    {
+      "id": "private-id-0061",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0061\\events.jsonl",
+      "bytes": 84002588,
+      "mtime": "2026-10-23T18:46:18.343Z"
+    },
+    {
+      "id": "private-id-0062",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0062\\events.jsonl",
+      "bytes": 67532514,
+      "mtime": "2026-10-22T21:15:46.014Z"
+    },
+    {
+      "id": "S002",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\S002.jsonl",
+      "bytes": 57056127,
+      "mtime": "2026-09-11T17:26:00.785Z"
+    },
+    {
+      "id": "S018",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S018\\events.jsonl",
+      "bytes": 54116755,
+      "mtime": "2026-11-04T22:15:17.612Z"
+    },
+    {
+      "id": "S019",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S019\\events.jsonl",
+      "bytes": 53016742,
+      "mtime": "2026-09-30T23:54:41.681Z"
+    },
+    {
+      "id": "S020",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S020\\events.jsonl",
+      "bytes": 50759752,
+      "mtime": "2026-11-04T22:15:17.492Z"
+    },
+    {
+      "id": "S021",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S021\\events.jsonl",
+      "bytes": 49919694,
+      "mtime": "2026-09-17T22:42:22.000Z"
+    },
+    {
+      "id": "S003",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\S003.jsonl",
+      "bytes": 47380228,
+      "mtime": "2026-08-20T23:37:38.642Z"
+    },
+    {
+      "id": "S003",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S003.jsonl",
+      "bytes": 47380228,
+      "mtime": "2026-08-20T23:37:38.642Z"
+    },
+    {
+      "id": "S004",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S004.jsonl",
+      "bytes": 44002962,
+      "mtime": "2026-09-18T16:06:01.907Z"
+    },
+    {
+      "id": "S022",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S022\\events.jsonl",
+      "bytes": 42420895,
+      "mtime": "2026-09-22T20:51:13.001Z"
+    },
+    {
+      "id": "S023",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S023\\events.jsonl",
+      "bytes": 41933978,
+      "mtime": "2026-11-09T18:45:59.846Z"
+    },
+    {
+      "id": "S004",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\S004.jsonl",
+      "bytes": 37668339,
+      "mtime": "2026-09-14T18:27:33.396Z"
+    },
+    {
+      "id": "S024",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S024\\events.jsonl",
+      "bytes": 36345285,
+      "mtime": "2026-11-09T05:19:10.360Z"
+    },
+    {
+      "id": "private-id-0063",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0063\\events.jsonl",
+      "bytes": 35442910,
+      "mtime": "2026-11-02T21:15:54.456Z"
+    },
+    {
+      "id": "private-id-0064",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0064\\events.jsonl",
+      "bytes": 33280593,
+      "mtime": "2026-10-23T17:46:01.181Z"
+    },
+    {
+      "id": "private-id-0065",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0065\\events.jsonl",
+      "bytes": 31000102,
+      "mtime": "2026-11-10T23:32:39.090Z"
+    },
+    {
+      "id": "S005",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\S005.jsonl",
+      "bytes": 30987605,
+      "mtime": "2026-09-02T07:11:08.663Z"
+    },
+    {
+      "id": "S026",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S026\\events.jsonl",
+      "bytes": 29610189,
+      "mtime": "2026-11-13T01:28:40.823Z"
+    },
+    {
+      "id": "private-id-0066",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0066\\events.jsonl",
+      "bytes": 25474796,
+      "mtime": "2026-11-09T05:19:10.473Z"
+    },
+    {
+      "id": "S006",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\S006.jsonl",
+      "bytes": 24201853,
+      "mtime": "2026-08-26T18:17:14.784Z"
+    },
+    {
+      "id": "S006",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S006.jsonl",
+      "bytes": 24201853,
+      "mtime": "2026-08-26T18:17:14.784Z"
+    },
+    {
+      "id": "private-id-0067",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0067.jsonl",
+      "bytes": 23419534,
+      "mtime": "2026-08-26T19:49:25.411Z"
+    },
+    {
+      "id": "private-id-0067",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0067.jsonl",
+      "bytes": 23419534,
+      "mtime": "2026-08-26T19:49:25.411Z"
+    },
+    {
+      "id": "private-id-0068",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0068\\events.jsonl",
+      "bytes": 22949173,
+      "mtime": "2026-11-13T01:28:40.579Z"
+    },
+    {
+      "id": "private-id-0069",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0069\\events.jsonl",
+      "bytes": 22947401,
+      "mtime": "2026-10-22T21:19:04.951Z"
+    },
+    {
+      "id": "private-id-0070",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0070\\events.jsonl",
+      "bytes": 20247272,
+      "mtime": "2026-10-01T16:51:13.016Z"
+    },
+    {
+      "id": "private-id-0071",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0071\\events.jsonl",
+      "bytes": 19611731,
+      "mtime": "2026-10-14T22:21:43.504Z"
+    },
+    {
+      "id": "private-id-0072",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0072\\events.jsonl",
+      "bytes": 18691791,
+      "mtime": "2026-11-09T18:45:59.977Z"
+    },
+    {
+      "id": "private-id-0073",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0073.jsonl",
+      "bytes": 18666569,
+      "mtime": "2026-05-18T19:19:28.804Z"
+    },
+    {
+      "id": "private-id-0074",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0074.jsonl",
+      "bytes": 16697631,
+      "mtime": "2026-09-10T20:34:36.964Z"
+    },
+    {
+      "id": "private-id-0075",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0075\\events.jsonl",
+      "bytes": 15989293,
+      "mtime": "2026-11-10T23:32:39.304Z"
+    },
+    {
+      "id": "S014",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S014.jsonl",
+      "bytes": 14482655,
+      "mtime": "2026-10-13T03:12:43.530Z"
+    },
+    {
+      "id": "S015",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\S015.jsonl",
+      "bytes": 14165540,
+      "mtime": "2026-09-09T19:30:12.666Z"
+    },
+    {
+      "id": "S015",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S015.jsonl",
+      "bytes": 14165540,
+      "mtime": "2026-09-09T19:30:12.666Z"
+    },
+    {
+      "id": "S032",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S032\\events.jsonl",
+      "bytes": 12357120,
+      "mtime": "2026-11-10T18:24:50.888Z"
+    },
+    {
+      "id": "S017",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S017\\events.jsonl",
+      "bytes": 11369264,
+      "mtime": "2026-11-13T01:28:40.797Z"
+    },
+    {
+      "id": "private-id-0076",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0076\\events.jsonl",
+      "bytes": 10904423,
+      "mtime": "2026-11-02T20:55:30.801Z"
+    },
+    {
+      "id": "S016",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\S016.jsonl",
+      "bytes": 10480351,
+      "mtime": "2026-09-04T19:01:02.283Z"
+    },
+    {
+      "id": "S016",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S016.jsonl",
+      "bytes": 10480351,
+      "mtime": "2026-09-04T19:01:02.283Z"
+    },
+    {
+      "id": "private-id-0077",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0077.jsonl",
+      "bytes": 9633810,
+      "mtime": "2026-08-31T02:32:09.313Z"
+    },
+    {
+      "id": "private-id-0078",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4057b40e\\chatSessions\\private-id-0078.jsonl",
+      "bytes": 9153857,
+      "mtime": "2026-09-15T06:53:19.961Z"
+    },
+    {
+      "id": "private-id-0079",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4057b40e\\chatSessions\\private-id-0079.jsonl",
+      "bytes": 9153857,
+      "mtime": "2026-09-15T06:53:09.570Z"
+    },
+    {
+      "id": "private-id-0080",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4057b40e\\chatSessions\\private-id-0080.jsonl",
+      "bytes": 9153857,
+      "mtime": "2026-09-15T06:55:04.528Z"
+    },
+    {
+      "id": "private-id-0081",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4057b40e\\chatSessions\\private-id-0081.jsonl",
+      "bytes": 9153857,
+      "mtime": "2026-09-15T06:53:14.234Z"
+    },
+    {
+      "id": "private-id-0082",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0082.jsonl",
+      "bytes": 8915678,
+      "mtime": "2026-08-26T19:47:49.276Z"
+    },
+    {
+      "id": "private-id-0082",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0082.jsonl",
+      "bytes": 8915678,
+      "mtime": "2026-08-26T19:47:49.276Z"
+    },
+    {
+      "id": "private-id-0083",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0083\\events.jsonl",
+      "bytes": 8676837,
+      "mtime": "2026-10-14T22:21:43.671Z"
+    },
+    {
+      "id": "private-id-0084",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0084.jsonl",
+      "bytes": 8016191,
+      "mtime": "2026-08-27T20:57:23.037Z"
+    },
+    {
+      "id": "private-id-0085",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0085\\events.jsonl",
+      "bytes": 7598045,
+      "mtime": "2026-07-10T22:16:47.687Z"
+    },
+    {
+      "id": "private-id-0086",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0086.jsonl",
+      "bytes": 7287464,
+      "mtime": "2026-04-14T20:50:15.589Z"
+    },
+    {
+      "id": "private-id-0087",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0087\\events.jsonl",
+      "bytes": 7208477,
+      "mtime": "2026-09-17T17:59:20.375Z"
+    },
+    {
+      "id": "private-id-0088",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0088\\events.jsonl",
+      "bytes": 6896826,
+      "mtime": "2026-07-09T17:49:26.225Z"
+    },
+    {
+      "id": "private-id-0089",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0089.jsonl",
+      "bytes": 6600989,
+      "mtime": "2026-09-18T16:10:54.916Z"
+    },
+    {
+      "id": "private-id-0089",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0089.jsonl",
+      "bytes": 6588181,
+      "mtime": "2026-08-27T01:12:20.400Z"
+    },
+    {
+      "id": "private-id-0090",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0090\\events.jsonl",
+      "bytes": 6247321,
+      "mtime": "2026-10-14T22:21:44.120Z"
+    },
+    {
+      "id": "private-id-0091",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0091.jsonl",
+      "bytes": 5819907,
+      "mtime": "2026-09-18T16:11:42.663Z"
+    },
+    {
+      "id": "private-id-0091",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0091.jsonl",
+      "bytes": 5819242,
+      "mtime": "2026-08-04T21:30:51.083Z"
+    },
+    {
+      "id": "private-id-0092",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0092\\events.jsonl",
+      "bytes": 5379505,
+      "mtime": "2026-10-23T18:46:18.509Z"
+    },
+    {
+      "id": "private-id-0093",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0093.jsonl",
+      "bytes": 5341412,
+      "mtime": "2026-05-19T22:42:47.617Z"
+    },
+    {
+      "id": "private-id-0094",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0094.jsonl",
+      "bytes": 5130172,
+      "mtime": "2026-07-08T20:42:34.173Z"
+    },
+    {
+      "id": "private-id-0094",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0094.jsonl",
+      "bytes": 5130172,
+      "mtime": "2026-07-08T20:42:34.173Z"
+    },
+    {
+      "id": "S025",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S025\\events.jsonl",
+      "bytes": 5012415,
+      "mtime": "2026-11-13T01:49:27.532Z"
+    },
+    {
+      "id": "private-id-0095",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0095\\events.jsonl",
+      "bytes": 4959069,
+      "mtime": "2026-11-10T23:32:39.486Z"
+    },
+    {
+      "id": "private-id-0096",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0096\\events.jsonl",
+      "bytes": 4780666,
+      "mtime": "2026-11-10T23:32:38.987Z"
+    },
+    {
+      "id": "S027",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S027\\events.jsonl",
+      "bytes": 4617460,
+      "mtime": "2026-11-13T01:28:40.616Z"
+    },
+    {
+      "id": "private-id-0097",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0097\\events.jsonl",
+      "bytes": 4195683,
+      "mtime": "2026-10-22T21:19:14.962Z"
+    },
+    {
+      "id": "private-id-0098",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0098\\events.jsonl",
+      "bytes": 4051195,
+      "mtime": "2026-11-10T23:32:39.172Z"
+    },
+    {
+      "id": "private-id-0099",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0099\\events.jsonl",
+      "bytes": 4001024,
+      "mtime": "2026-10-14T22:21:44.369Z"
+    },
+    {
+      "id": "private-id-0100",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0100.jsonl",
+      "bytes": 3970916,
+      "mtime": "2026-08-18T20:00:44.408Z"
+    },
+    {
+      "id": "private-id-0100",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0100.jsonl",
+      "bytes": 3970916,
+      "mtime": "2026-08-18T20:00:44.408Z"
+    },
+    {
+      "id": "private-id-0101",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0101\\events.jsonl",
+      "bytes": 3593369,
+      "mtime": "2026-11-10T23:32:38.891Z"
+    },
+    {
+      "id": "private-id-0102",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0102\\events.jsonl",
+      "bytes": 3520776,
+      "mtime": "2026-11-10T23:32:39.210Z"
+    },
+    {
+      "id": "private-id-0103",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0103.jsonl",
+      "bytes": 3464827,
+      "mtime": "2026-10-02T19:27:39.432Z"
+    },
+    {
+      "id": "private-id-0104",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0104\\events.jsonl",
+      "bytes": 2993833,
+      "mtime": "2026-10-22T03:50:02.500Z"
+    },
+    {
+      "id": "private-id-0105",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0105.jsonl",
+      "bytes": 2967128,
+      "mtime": "2026-10-01T22:14:12.788Z"
+    },
+    {
+      "id": "private-id-0106",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0106\\events.jsonl",
+      "bytes": 2934125,
+      "mtime": "2026-11-04T00:49:44.250Z"
+    },
+    {
+      "id": "private-id-0107",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0107\\events.jsonl",
+      "bytes": 2922756,
+      "mtime": "2026-09-22T20:51:12.400Z"
+    },
+    {
+      "id": "private-id-0108",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0108.jsonl",
+      "bytes": 2639574,
+      "mtime": "2026-10-01T22:23:13.249Z"
+    },
+    {
+      "id": "private-id-0109",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0109.jsonl",
+      "bytes": 2532910,
+      "mtime": "2026-05-22T23:25:10.639Z"
+    },
+    {
+      "id": "private-id-0109",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0109.jsonl",
+      "bytes": 2532910,
+      "mtime": "2026-05-22T23:25:10.639Z"
+    },
+    {
+      "id": "private-id-0110",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0110.jsonl",
+      "bytes": 1873249,
+      "mtime": "2026-08-03T16:51:17.894Z"
+    },
+    {
+      "id": "private-id-0110",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0110.jsonl",
+      "bytes": 1873249,
+      "mtime": "2026-08-03T16:51:17.894Z"
+    },
+    {
+      "id": "private-id-0111",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0111.jsonl",
+      "bytes": 1701393,
+      "mtime": "2026-09-01T03:33:13.746Z"
+    },
+    {
+      "id": "S011",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\S011.jsonl",
+      "bytes": 1659776,
+      "mtime": "2026-03-03T23:13:40.660Z"
+    },
+    {
+      "id": "private-id-0112",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0112.jsonl",
+      "bytes": 1623158,
+      "mtime": "2026-10-02T19:11:20.977Z"
+    },
+    {
+      "id": "S031",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S031\\events.jsonl",
+      "bytes": 1365298,
+      "mtime": "2026-09-22T20:51:12.695Z"
+    },
+    {
+      "id": "private-id-0113",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0113\\events.jsonl",
+      "bytes": 1289759,
+      "mtime": "2026-10-14T22:21:43.898Z"
+    },
+    {
+      "id": "private-id-0114",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0114.jsonl",
+      "bytes": 1276257,
+      "mtime": "2026-08-19T17:20:58.376Z"
+    },
+    {
+      "id": "private-id-0114",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0114.jsonl",
+      "bytes": 1276257,
+      "mtime": "2026-08-19T17:20:58.376Z"
+    },
+    {
+      "id": "private-id-0115",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\private-id-0115.jsonl",
+      "bytes": 1266867,
+      "mtime": "2026-04-08T21:22:17.234Z"
+    },
+    {
+      "id": "private-id-0116",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b7927094a64221f3c405824b51b1e79c\\chatSessions\\private-id-0116.jsonl",
+      "bytes": 1253100,
+      "mtime": "2026-09-09T20:10:43.994Z"
+    },
+    {
+      "id": "private-id-0117",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0117\\events.jsonl",
+      "bytes": 1236209,
+      "mtime": "2026-10-14T22:21:43.754Z"
+    },
+    {
+      "id": "private-id-0118",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0118\\events.jsonl",
+      "bytes": 1234561,
+      "mtime": "2026-10-08T02:54:12.995Z"
+    },
+    {
+      "id": "private-id-0119",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0119.jsonl",
+      "bytes": 1221986,
+      "mtime": "2026-04-21T16:43:23.907Z"
+    },
+    {
+      "id": "private-id-0120",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0120.jsonl",
+      "bytes": 1210820,
+      "mtime": "2026-05-19T20:45:46.663Z"
+    },
+    {
+      "id": "private-id-0121",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0121.jsonl",
+      "bytes": 1205457,
+      "mtime": "2026-08-27T17:34:35.461Z"
+    },
+    {
+      "id": "private-id-0121",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0121.jsonl",
+      "bytes": 1205457,
+      "mtime": "2026-08-27T17:34:35.461Z"
+    },
+    {
+      "id": "private-id-0122",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0122\\events.jsonl",
+      "bytes": 1125303,
+      "mtime": "2026-10-23T18:46:18.693Z"
+    },
+    {
+      "id": "private-id-0123",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0123\\events.jsonl",
+      "bytes": 1047657,
+      "mtime": "2026-10-30T15:31:28.873Z"
+    },
+    {
+      "id": "private-id-0124",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\5d265c7dd78ea06a7b2571dd089370ad\\chatSessions\\private-id-0124.jsonl",
+      "bytes": 1028059,
+      "mtime": "2026-09-19T19:33:26.694Z"
+    },
+    {
+      "id": "private-id-0125",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0125.jsonl",
+      "bytes": 995884,
+      "mtime": "2026-07-08T19:06:01.819Z"
+    },
+    {
+      "id": "private-id-0125",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0125.jsonl",
+      "bytes": 995884,
+      "mtime": "2026-07-08T19:06:01.819Z"
+    },
+    {
+      "id": "private-id-0126",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0126\\events.jsonl",
+      "bytes": 982482,
+      "mtime": "2026-10-23T18:46:18.864Z"
+    },
+    {
+      "id": "private-id-0127",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0127.jsonl",
+      "bytes": 924045,
+      "mtime": "2026-10-02T19:28:42.595Z"
+    },
+    {
+      "id": "private-id-0128",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0128.jsonl",
+      "bytes": 890418,
+      "mtime": "2026-05-22T21:08:36.864Z"
+    },
+    {
+      "id": "private-id-0128",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0128.jsonl",
+      "bytes": 890418,
+      "mtime": "2026-05-22T21:08:36.864Z"
+    },
+    {
+      "id": "private-id-0129",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0129.jsonl",
+      "bytes": 848898,
+      "mtime": "2026-07-23T17:17:58.960Z"
+    },
+    {
+      "id": "private-id-0129",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0129.jsonl",
+      "bytes": 848898,
+      "mtime": "2026-07-23T17:17:58.960Z"
+    },
+    {
+      "id": "private-id-0130",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0130.jsonl",
+      "bytes": 829781,
+      "mtime": "2026-09-01T01:15:30.148Z"
+    },
+    {
+      "id": "S008",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d66780fb3a7b8c05f2e4bf47ade5473a\\chatSessions\\S008.jsonl",
+      "bytes": 825382,
+      "mtime": "2026-11-10T22:01:02.101Z"
+    },
+    {
+      "id": "private-id-0131",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\private-id-0131.jsonl",
+      "bytes": 777438,
+      "mtime": "2026-04-10T22:51:45.134Z"
+    },
+    {
+      "id": "private-id-0132",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0132.jsonl",
+      "bytes": 738327,
+      "mtime": "2026-05-21T23:10:46.999Z"
+    },
+    {
+      "id": "private-id-0132",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0132.jsonl",
+      "bytes": 738327,
+      "mtime": "2026-05-21T23:10:46.999Z"
+    },
+    {
+      "id": "private-id-0133",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0133.jsonl",
+      "bytes": 734393,
+      "mtime": "2026-07-22T15:31:42.381Z"
+    },
+    {
+      "id": "private-id-0133",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0133.jsonl",
+      "bytes": 734393,
+      "mtime": "2026-07-22T15:31:42.381Z"
+    },
+    {
+      "id": "S001",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d66780fb3a7b8c05f2e4bf47ade5473a\\chatSessions\\S001.jsonl",
+      "bytes": 700690,
+      "mtime": "2026-11-12T16:53:35.027Z"
+    },
+    {
+      "id": "private-id-0134",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0134.jsonl",
+      "bytes": 684784,
+      "mtime": "2026-09-02T20:27:35.944Z"
+    },
+    {
+      "id": "private-id-0135",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0135\\events.jsonl",
+      "bytes": 676163,
+      "mtime": "2026-10-23T18:46:19.442Z"
+    },
+    {
+      "id": "private-id-0136",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\06568ba0fec70a5d1c8c3135ba4e0d94\\chatSessions\\private-id-0136.jsonl",
+      "bytes": 648561,
+      "mtime": "2026-04-23T18:11:32.007Z"
+    },
+    {
+      "id": "S013",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\S013.jsonl",
+      "bytes": 529698,
+      "mtime": "2026-03-30T21:02:32.491Z"
+    },
+    {
+      "id": "private-id-0137",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0137.jsonl",
+      "bytes": 525680,
+      "mtime": "2026-08-22T07:47:45.542Z"
+    },
+    {
+      "id": "private-id-0138",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0138.jsonl",
+      "bytes": 458939,
+      "mtime": "2026-08-14T23:37:58.094Z"
+    },
+    {
+      "id": "private-id-0138",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0138.jsonl",
+      "bytes": 458939,
+      "mtime": "2026-08-14T23:37:58.094Z"
+    },
+    {
+      "id": "S009",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d66780fb3a7b8c05f2e4bf47ade5473a\\chatSessions\\S009.jsonl",
+      "bytes": 451000,
+      "mtime": "2026-11-10T20:48:20.794Z"
+    },
+    {
+      "id": "S028",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S028\\events.jsonl",
+      "bytes": 434605,
+      "mtime": "2026-05-18T19:40:33.167Z"
+    },
+    {
+      "id": "private-id-0139",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\chatSessions\\private-id-0139.jsonl",
+      "bytes": 433946,
+      "mtime": "2026-10-13T17:22:26.784Z"
+    },
+    {
+      "id": "private-id-0140",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0140\\events.jsonl",
+      "bytes": 365116,
+      "mtime": "2026-09-30T06:23:40.462Z"
+    },
+    {
+      "id": "private-id-0141",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0141.jsonl",
+      "bytes": 364355,
+      "mtime": "2026-04-24T00:53:28.118Z"
+    },
+    {
+      "id": "private-id-0142",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0142.jsonl",
+      "bytes": 346918,
+      "mtime": "2026-07-29T19:14:40.638Z"
+    },
+    {
+      "id": "private-id-0142",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0142.jsonl",
+      "bytes": 346918,
+      "mtime": "2026-07-29T19:14:40.638Z"
+    },
+    {
+      "id": "private-id-0143",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d66780fb3a7b8c05f2e4bf47ade5473a\\chatSessions\\private-id-0143.jsonl",
+      "bytes": 322315,
+      "mtime": "2026-11-10T19:55:43.047Z"
+    },
+    {
+      "id": "private-id-0144",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0144.jsonl",
+      "bytes": 292005,
+      "mtime": "2026-09-02T20:34:12.909Z"
+    },
+    {
+      "id": "private-id-0145",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0145\\events.jsonl",
+      "bytes": 288137,
+      "mtime": "2026-10-01T00:19:31.054Z"
+    },
+    {
+      "id": "S029",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S029\\events.jsonl",
+      "bytes": 261073,
+      "mtime": "2026-09-01T02:19:22.185Z"
+    },
+    {
+      "id": "private-id-0146",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0146.jsonl",
+      "bytes": 250423,
+      "mtime": "2026-06-10T17:26:47.402Z"
+    },
+    {
+      "id": "private-id-0147",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\private-id-0147.jsonl",
+      "bytes": 247493,
+      "mtime": "2026-08-27T19:23:03.395Z"
+    },
+    {
+      "id": "private-id-0148",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\chatSessions\\private-id-0148.jsonl",
+      "bytes": 227370,
+      "mtime": "2026-09-15T07:00:53.850Z"
+    },
+    {
+      "id": "private-id-0149",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0149\\events.jsonl",
+      "bytes": 212646,
+      "mtime": "2026-10-23T18:35:31.071Z"
+    },
+    {
+      "id": "private-id-0150",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0150\\events.jsonl",
+      "bytes": 207200,
+      "mtime": "2026-10-23T18:28:16.593Z"
+    },
+    {
+      "id": "private-id-0151",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0151\\events.jsonl",
+      "bytes": 195330,
+      "mtime": "2026-10-23T19:50:20.923Z"
+    },
+    {
+      "id": "private-id-0152",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0152\\events.jsonl",
+      "bytes": 192267,
+      "mtime": "2026-10-14T20:05:39.049Z"
+    },
+    {
+      "id": "private-id-0153",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0153\\events.jsonl",
+      "bytes": 169376,
+      "mtime": "2026-10-23T18:46:19.030Z"
+    },
+    {
+      "id": "private-id-0154",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0154\\events.jsonl",
+      "bytes": 159715,
+      "mtime": "2026-10-23T18:10:49.419Z"
+    },
+    {
+      "id": "private-id-0155",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0155\\events.jsonl",
+      "bytes": 153668,
+      "mtime": "2026-10-23T18:12:15.999Z"
+    },
+    {
+      "id": "private-id-0156",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0156\\events.jsonl",
+      "bytes": 148618,
+      "mtime": "2026-11-03T04:00:34.606Z"
+    },
+    {
+      "id": "S030",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\S030\\events.jsonl",
+      "bytes": 147173,
+      "mtime": "2026-09-17T17:59:20.454Z"
+    },
+    {
+      "id": "private-id-0157",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0157\\events.jsonl",
+      "bytes": 145610,
+      "mtime": "2026-11-10T23:32:39.359Z"
+    },
+    {
+      "id": "private-id-0158",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\chatSessions\\private-id-0158.jsonl",
+      "bytes": 145229,
+      "mtime": "2026-09-29T17:13:40.400Z"
+    },
+    {
+      "id": "private-id-0159",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\7ad4c6f338f0cf277e6a57c24de756a6\\chatSessions\\private-id-0159.jsonl",
+      "bytes": 143526,
+      "mtime": "2026-10-06T21:48:33.749Z"
+    },
+    {
+      "id": "private-id-0160",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0160.jsonl",
+      "bytes": 137301,
+      "mtime": "2026-09-18T16:05:54.695Z"
+    },
+    {
+      "id": "S012",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\S012.jsonl",
+      "bytes": 108397,
+      "mtime": "2026-03-13T19:00:22.171Z"
+    },
+    {
+      "id": "private-id-0161",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0161\\events.jsonl",
+      "bytes": 99851,
+      "mtime": "2026-10-30T15:31:27.613Z"
+    },
+    {
+      "id": "private-id-0162",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0162\\events.jsonl",
+      "bytes": 81756,
+      "mtime": "2026-09-22T20:51:13.128Z"
+    },
+    {
+      "id": "private-id-0163",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0163.jsonl",
+      "bytes": 74161,
+      "mtime": "2026-07-14T20:20:37.920Z"
+    },
+    {
+      "id": "private-id-0163",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0163.jsonl",
+      "bytes": 74161,
+      "mtime": "2026-07-14T20:20:37.920Z"
+    },
+    {
+      "id": "private-id-0164",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0164.jsonl",
+      "bytes": 68517,
+      "mtime": "2026-07-08T19:23:23.030Z"
+    },
+    {
+      "id": "private-id-0164",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0164.jsonl",
+      "bytes": 68517,
+      "mtime": "2026-07-08T19:23:23.030Z"
+    },
+    {
+      "id": "private-id-0165",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\private-id-0165.jsonl",
+      "bytes": 62507,
+      "mtime": "2026-04-02T14:50:17.463Z"
+    },
+    {
+      "id": "private-id-0166",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\91faca9878592acb40180367f35c2670\\chatSessions\\private-id-0166.jsonl",
+      "bytes": 61977,
+      "mtime": "2026-10-23T19:28:47.692Z"
+    },
+    {
+      "id": "private-id-0167",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\5d265c7dd78ea06a7b2571dd089370ad\\chatSessions\\private-id-0167.jsonl",
+      "bytes": 58708,
+      "mtime": "2026-07-27T17:59:39.931Z"
+    },
+    {
+      "id": "private-id-0168",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0168.jsonl",
+      "bytes": 46384,
+      "mtime": "2026-10-06T18:40:24.926Z"
+    },
+    {
+      "id": "S010",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bc568fdf6dffcd8070d84ce94c452982\\chatSessions\\S010.jsonl",
+      "bytes": 29146,
+      "mtime": "2026-03-03T22:25:45.166Z"
+    },
+    {
+      "id": "private-id-0169",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\200239e39b2551ff3a85bcb8eecb63fd\\chatSessions\\private-id-0169.jsonl",
+      "bytes": 28797,
+      "mtime": "2026-09-04T05:01:55.075Z"
+    },
+    {
+      "id": "private-id-0170",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\91faca9878592acb40180367f35c2670\\chatSessions\\private-id-0170.jsonl",
+      "bytes": 28620,
+      "mtime": "2026-10-23T20:05:40.904Z"
+    },
+    {
+      "id": "private-id-0171",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0171.jsonl",
+      "bytes": 2748,
+      "mtime": "2026-07-01T19:31:38.566Z"
+    },
+    {
+      "id": "private-id-0171",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0171.jsonl",
+      "bytes": 2748,
+      "mtime": "2026-07-01T19:31:38.566Z"
+    },
+    {
+      "id": "private-id-0172",
+      "family": "sdk",
+      "channel": "agent-host-or-cli",
+      "root": "<user-home>\\.copilot\\session-state",
+      "path": "<user-home>\\.copilot\\session-state\\private-id-0172\\events.jsonl",
+      "bytes": 2360,
+      "mtime": "2026-11-03T03:30:49.497Z"
+    },
+    {
+      "id": "private-id-0173",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup\\chatSessions\\private-id-0173.jsonl",
+      "bytes": 2256,
+      "mtime": "2026-09-11T20:08:05.016Z"
+    },
+    {
+      "id": "S007",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\bb5ce7594592f0ca22c38a7011105e56\\chatSessions\\S007.jsonl",
+      "bytes": 2241,
+      "mtime": "2026-11-10T22:48:53.601Z"
+    },
+    {
+      "id": "private-id-0174",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\globalStorage\\emptyWindowChatSessions\\private-id-0174.jsonl",
+      "bytes": 2160,
+      "mtime": "2026-07-26T20:09:49.032Z"
+    },
+    {
+      "id": "private-id-0175",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\8afd0152872d3d5af57c052839b3370a\\chatSessions\\private-id-0175.jsonl",
+      "bytes": 1785,
+      "mtime": "2026-09-30T15:04:57.798Z"
+    },
+    {
+      "id": "private-id-0176",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\5d265c7dd78ea06a7b2571dd089370ad\\chatSessions\\private-id-0176.jsonl",
+      "bytes": 1782,
+      "mtime": "2026-09-23T18:24:40.867Z"
+    },
+    {
+      "id": "private-id-0177",
+      "family": "local",
+      "channel": "insiders",
+      "root": "<user-home>\\AppData\\Roaming\\Code - Insiders",
+      "path": "<user-home>\\AppData\\Roaming\\Code - Insiders\\User\\globalStorage\\emptyWindowChatSessions\\private-id-0177.jsonl",
+      "bytes": 1782,
+      "mtime": "2026-09-22T20:24:35.265Z"
+    },
+    {
+      "id": "private-id-0178",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\06568ba0fec70a5d1c8c3135ba4e0d94\\chatSessions\\private-id-0178.jsonl",
+      "bytes": 1757,
+      "mtime": "2026-04-15T17:48:46.955Z"
+    },
+    {
+      "id": "private-id-0179",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\06568ba0fec70a5d1c8c3135ba4e0d94\\chatSessions\\private-id-0179.jsonl",
+      "bytes": 1757,
+      "mtime": "2026-04-15T20:39:48.930Z"
+    },
+    {
+      "id": "private-id-0180",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d8dd05e7f8f8cd6c34c31aa4d7a81d8a\\chatSessions\\private-id-0180.jsonl",
+      "bytes": 1703,
+      "mtime": "2026-04-24T21:17:46.412Z"
+    },
+    {
+      "id": "private-id-0181",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\06568ba0fec70a5d1c8c3135ba4e0d94\\chatSessions\\private-id-0181.jsonl",
+      "bytes": 1681,
+      "mtime": "2026-05-18T19:52:47.530Z"
+    },
+    {
+      "id": "private-id-0182",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\5d265c7dd78ea06a7b2571dd089370ad\\chatSessions\\private-id-0182.jsonl",
+      "bytes": 1354,
+      "mtime": "2026-09-23T18:19:07.900Z"
+    },
+    {
+      "id": "private-id-0183",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\5d265c7dd78ea06a7b2571dd089370ad\\chatSessions\\private-id-0183.jsonl",
+      "bytes": 1349,
+      "mtime": "2026-07-29T04:46:50.731Z"
+    },
+    {
+      "id": "private-id-0184",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\995851f86f7d442a50372b852762457f\\chatSessions\\private-id-0184.jsonl",
+      "bytes": 1340,
+      "mtime": "2026-08-19T18:27:48.990Z"
+    },
+    {
+      "id": "private-id-0185",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\01dab9e4d1d066f75d77b5ba8dc99d7d\\bkup2\\chatSessions\\private-id-0185.jsonl",
+      "bytes": 1262,
+      "mtime": "2026-06-09T19:01:43.057Z"
+    },
+    {
+      "id": "private-id-0185",
+      "family": "local",
+      "channel": "stable",
+      "root": "<user-home>\\AppData\\Roaming\\Code",
+      "path": "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\private-id-0185.jsonl",
+      "bytes": 1262,
+      "mtime": "2026-06-09T19:01:43.057Z"
+    }
+  ]
+}

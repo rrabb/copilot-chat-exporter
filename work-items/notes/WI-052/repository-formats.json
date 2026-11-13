@@ -1,0 +1,181 @@
+{
+  "evidence": "Documented in this repository, not a fresh runtime census. See online and corpus inventories for newly checked evidence.",
+  "source": "docs/CHAT-SESSION-SCHEMA.md:453-999",
+  "families": [
+    {
+      "family": "User request text",
+      "types": "message string; parsed message.text; message.parts",
+      "structure": "requestId, timestamp, message, variableData.variables",
+      "lod": "Keep ordinary prompt text. Attached context can have its own detail.",
+      "caveat": "Parts, attachments and draft state are not necessarily submitted prompts."
+    },
+    {
+      "family": "Request state",
+      "types": "modelState; isCanceled; hiddenFromTranscript; isSystemInitiated; systemInitiatedLabel; terminalExecutionId; origin",
+      "structure": "Request-level scalar/control metadata",
+      "lod": "State summary, not ordinary assistant prose.",
+      "caveat": "A hidden/system-initiated request can still affect later conversation."
+    },
+    {
+      "family": "Assistant prose",
+      "types": "kind-less value; markdownContent; markdownVuln",
+      "structure": "Ordered response fragments, Markdown metadata, vulnerability warnings",
+      "lod": "Keep complete by default, with citations and warnings.",
+      "caveat": "Adjacent fragments do not establish missing whitespace. Vulnerability annotations are recorded claims, not exporter-validated findings."
+    },
+    {
+      "family": "Reasoning",
+      "types": "thinking; reasoningText; reasoningBlocks; opaque continuation token",
+      "structure": "Text/parts and optional duration; SDK fields differ",
+      "lod": "Readable on/off; opaque count only.",
+      "caveat": "Keep source labels. A model-written summary is not a full reasoning transcript."
+    },
+    {
+      "family": "Tool lifecycle",
+      "types": "toolInvocationSerialized; toolInvocation (live)",
+      "structure": "toolCallId, toolId, invocationMessage, pastTenseMessage, originMessage, isComplete, isConfirmed, source",
+      "lod": "Identity/status line plus independently selected input/result.",
+      "caveat": "Live API events and persisted records differ. Lifecycle copies are not extra calls."
+    },
+    {
+      "family": "Terminal payload",
+      "types": "terminal",
+      "structure": "commandLine.original/forDisplay, terminalCommandOutput, terminalCommandState, cwd and other optional metadata",
+      "lod": "Description/command/status; preview or complete output.",
+      "caveat": "Displayed command can differ from actual command. Upstream truncation must remain labelled."
+    },
+    {
+      "family": "Todo payload",
+      "types": "todoList",
+      "structure": "Entries with id/title/status; not-started, in-progress, completed",
+      "lod": "Latest list, status changes, or complete recorded updates.",
+      "caveat": "Do not count snapshots as separate tasks."
+    },
+    {
+      "family": "Delegation payload",
+      "types": "subagent",
+      "structure": "agentName, description, prompt, result; separate mapped child scope where present",
+      "lod": "Delegation line/result/verified child transcript.",
+      "caveat": "Summary fields do not contain the full child conversation."
+    },
+    {
+      "family": "Generic tool input",
+      "types": "input",
+      "structure": "rawInput, plus remaining metadata",
+      "lod": "Selected fields, excerpt, complete supported record.",
+      "caveat": "Arguments can contain full files and delegated prompts."
+    },
+    {
+      "family": "Other tool payloads",
+      "types": "extensions; pullRequest; simpleToolInvocation; search; resources; modifiedFilesConfirmation; agentFeedbackReviewConfirmation; sessionCreated; generatedImage; automationConfigured",
+      "structure": "Discriminated toolSpecificData variants",
+      "lod": "Per-kind summary with JSON remainder where supported.",
+      "caveat": "Declaration/previous review does not prove encounter in the new sample."
+    },
+    {
+      "family": "Live-only tool payload",
+      "types": "automationConfiguration",
+      "structure": "Live invocation union variant",
+      "lod": "Research only.",
+      "caveat": "Repository documentation says it is omitted when serializing completed invocations."
+    },
+    {
+      "family": "Tool results",
+      "types": "URI/Location array; input/output details; serialized data",
+      "structure": "input, inputLanguage, output[], isError, mcpOutput; type:data/mimeType/base64Data",
+      "lod": "Inputs/results/errors/attachments independently selectable.",
+      "caveat": "A single invocation can carry terminal, resultDetails and resource evidence together."
+    },
+    {
+      "family": "Result parts",
+      "types": "embed text; embed binary; refs; resource locations; MCP metadata",
+      "structure": "Output discriminators and MIME/content fields",
+      "lod": "Readable body, metadata or companion.",
+      "caveat": "Do not expose raw Base64 to achieve complete text output."
+    },
+    {
+      "family": "References",
+      "types": "inlineReference; contentReferences; codeCitations; usedContext; followups",
+      "structure": "Response nodes and request scalar arrays",
+      "lod": "Keep source identity/ranges separate from attached text.",
+      "caveat": "A reference is not proof of available historical file bytes."
+    },
+    {
+      "family": "Edits",
+      "types": "textEditGroup; workspaceEdit; notebookEditGroup; externalEdit; multiDiffData",
+      "structure": "URI/edit groups and oldResource/newResource operations",
+      "lod": "Paths/status; summary; complete recorded edits.",
+      "caveat": "Do not reconstruct a historical patch from current files. Not every listed type was historically observed."
+    },
+    {
+      "family": "Edit controls",
+      "types": "codeblockUri; undoStop; clearToPreviousToolInvocation; editedFileEvents",
+      "structure": "Response markers and edit-history records",
+      "lod": "Boundary/action summaries.",
+      "caveat": "A UI control marker is not a file edit by itself."
+    },
+    {
+      "family": "Questions and confirmation",
+      "types": "questionCarousel; confirmation; elicitationSerialized; elicitation2 (live)",
+      "structure": "Question/options/answers, approval or elicitation state",
+      "lod": "Keep question and available user decision intelligible.",
+      "caveat": "These are not interchangeable schemas. Historical deliberate ignores are not proof of absent source content."
+    },
+    {
+      "family": "Progress",
+      "types": "progressMessage; progressTaskSerialized; progressTask (live); voiceProgress (live)",
+      "structure": "Messages/tasks/status updates",
+      "lod": "Off/milestones/complete recorded updates.",
+      "caveat": "Live-only variants need not persist."
+    },
+    {
+      "family": "Warnings and notifications",
+      "types": "warning; info; systemNotification; command",
+      "structure": "Response status, command/action references",
+      "lod": "Summary with actual status/error visible.",
+      "caveat": "Dropping command buttons should not drop their explanatory text."
+    },
+    {
+      "family": "Structured response views",
+      "types": "treeData; extensions; pullRequest; planReview",
+      "structure": "Tree, extension suggestions, PR metadata and plan review",
+      "lod": "Semantic text/table if supported, otherwise labelled fallback.",
+      "caveat": "Source declaration is not existing renderer support."
+    },
+    {
+      "family": "Hooks",
+      "types": "hook; disabledClaudeHooks",
+      "structure": "Hook and compatibility markers",
+      "lod": "Keep current exclusions. Inventory for future policy only.",
+      "caveat": "Claude provider chats remain out of scope. A compatibility enum does not broaden provider scope."
+    },
+    {
+      "family": "Model routing",
+      "types": "autoModeResolution; resolved:{id,name}; resolvedModel/resolvedModelName/confidence/predictedLabel",
+      "structure": "Per-request model resolution in newer and older forms",
+      "lod": "Short model label or detailed routing metadata.",
+      "caveat": "Selected and answering models differ. Do not equate Fusion with Auto."
+    },
+    {
+      "family": "Usage/timing",
+      "types": "promptTokens; completionTokens; promptTokenDetails; modelTotals; copilotCredits; sessionCopilotCredits; elapsedMs; timeSpentWaiting",
+      "structure": "Request metrics and potentially cumulative values",
+      "lod": "Session summary, per-turn detail or omitted metrics.",
+      "caveat": "Units and update semantics differ. No mixed-unit or cumulative double counting."
+    },
+    {
+      "family": "Compaction",
+      "types": "/compact confirmation; SDK compaction events",
+      "structure": "Conversation boundary plus recorded summary/status",
+      "lod": "Marker/summary/full recorded compaction.",
+      "caveat": "Compaction is not saved memory, nor a substitute for missing original turns."
+    },
+    {
+      "family": "Images",
+      "types": "Direct Base64; $base64 object; byte array; numeric-keyed byte object; SDK session.binary_asset and assetId descriptors",
+      "structure": "Submitted attachments, tool output image content and saved assets",
+      "lod": "Reference/companion, independently from inline display.",
+      "caveat": "Draft images are not extra submitted positions. Images bypass text redaction."
+    }
+  ]
+}

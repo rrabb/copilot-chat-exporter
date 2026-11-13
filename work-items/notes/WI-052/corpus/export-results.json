@@ -1,0 +1,1794 @@
+[
+  {
+    "label": "S001",
+    "purpose": "Flawed Local askQuestions stress case requested by the brief. Two final requests, not a long exemplary conversation.",
+    "stress": true,
+    "id": "S001",
+    "family": "local",
+    "intendedOutput": "exports\\261113-local-S001-stress.md",
+    "sourceMatchesSurveyBeforeExport": true,
+    "sourceBefore": {
+      "bytes": 700690,
+      "mtime": "2026-11-12T16:53:35.027Z"
+    },
+    "formatting": "Current CLI export defaults. --keep-source changes capture retention, not rendering. No LOD or --detailed flag.",
+    "export": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d66780fb3a7b8c05f2e4bf47ade5473a\\chatSessions\\S001.jsonl",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-local-S001-stress.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code",
+        "--keep-source"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:23.517Z",
+      "durationMs": 638,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S001-export.stdout.log",
+      "stderr": "logs\\S001-export.stderr.log"
+    },
+    "artifacts": [
+      {
+        "path": "exports\\261113-local-S001-stress.md",
+        "bytes": 40640,
+        "sha256": "dc40ba914637dd28b3acd4044a94def62970f5bcc3e0668216e2d35de34c2952",
+        "failedArchive": false
+      }
+    ],
+    "savedFileVerify": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "--verify",
+        "--json",
+        "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\d66780fb3a7b8c05f2e4bf47ade5473a\\chatSessions\\S001.jsonl",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-local-S001-stress.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:24.158Z",
+      "durationMs": 420,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S001-verify.stdout.log",
+      "stderr": "logs\\S001-verify.stderr.log"
+    },
+    "verificationReport": {
+      "version": 3,
+      "path": "local",
+      "strict": false,
+      "exitCode": 0,
+      "failureReasons": [],
+      "layerB": {
+        "rawRequests": 2,
+        "parsedTurns": 2,
+        "missingTurns": 0,
+        "extraTurns": 0,
+        "crossTurnDuplicateToolIds": 0,
+        "mismatchesByKind": {}
+      },
+      "census": {
+        "seen": {
+          "(implicit text)": 27,
+          "toolInvocationSerialized": 33,
+          "thinking": 30,
+          "questionCarousel": 5,
+          "inlineReference": 2,
+          "undoStop": 4,
+          "codeblockUri": 4,
+          "textEditGroup": 4
+        },
+        "unhandled": {},
+        "unrecognizedToolData": {},
+        "representationCounts": {}
+      },
+      "layerA": {
+        "rawToolIds": 33,
+        "parsedToolIds": 33,
+        "rawThinking": 30,
+        "dropped": 0,
+        "invented": 0
+      },
+      "layerC": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors == turns",
+            "ok": true
+          },
+          {
+            "name": "turn anchors sequential 1..N",
+            "ok": true
+          },
+          {
+            "name": "no duplicate turn anchors",
+            "ok": true
+          },
+          {
+            "name": "TOC entries == turns",
+            "ok": true
+          },
+          {
+            "name": "request headers == turns",
+            "ok": true
+          },
+          {
+            "name": "assistant sections == turns",
+            "ok": true
+          },
+          {
+            "name": "tool badges == tool nodes",
+            "ok": true
+          },
+          {
+            "name": "<details> balanced (scaffold-only)",
+            "ok": true
+          },
+          {
+            "name": "compact confirmation under its /compact turn",
+            "ok": true
+          },
+          {
+            "name": "unknown-response JSON round-trips",
+            "ok": true
+          }
+        ],
+        "failed": false
+      },
+      "fenceRepairs": {
+        "early": 0,
+        "earlyByKind": {},
+        "turnEnd": 0,
+        "htmlEscaped": 0,
+        "htmlEscapedByKind": {}
+      },
+      "layerD": {
+        "target": "file",
+        "checked": 55,
+        "totals": {
+          "prompt": {
+            "present": 2,
+            "partial": 0,
+            "absent": 0
+          },
+          "assistant-text": {
+            "present": 20,
+            "partial": 0,
+            "absent": 0
+          },
+          "other:questionCarousel": {
+            "present": 25,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-input": {
+            "present": 4,
+            "partial": 0,
+            "absent": 0
+          },
+          "terminal-output": {
+            "present": 4,
+            "partial": 0,
+            "absent": 0
+          }
+        },
+        "unaccounted": {},
+        "order": {
+          "checked": 22,
+          "outOfOrder": 0
+        },
+        "multiplicity": {
+          "checked": 0,
+          "missing": 0
+        },
+        "failed": false
+      },
+      "images": {
+        "unique": 0,
+        "found": 0,
+        "missing": 0,
+        "referenceOnly": 0,
+        "unresolved": 0,
+        "excludedNotSubmitted": 0,
+        "hashes": [],
+        "foundHashes": [],
+        "missingHashes": [],
+        "failed": false
+      },
+      "parser": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors outside code",
+            "ok": true,
+            "detail": "anchors=2, turns=2"
+          },
+          {
+            "name": "request headings outside code",
+            "ok": true,
+            "detail": "headings=2, turns=2"
+          },
+          {
+            "name": "assistant headings parse as headings",
+            "ok": true,
+            "detail": "headings=2, turns=2"
+          },
+          {
+            "name": "section headings parse as headings",
+            "ok": true,
+            "detail": "sections=9"
+          },
+          {
+            "name": "unknown blocks hold exactly one json code block",
+            "ok": true,
+            "detail": "blocks=0, linked=0"
+          }
+        ],
+        "failed": false,
+        "counts": {
+          "turnAnchors": 2,
+          "requestHeadings": 2,
+          "assistantHeadings": 2,
+          "sectionHeadings": 9,
+          "unknownBlocks": 0,
+          "linkedUnknownBlocks": 0
+        },
+        "ms": 15
+      }
+    },
+    "sourceAfter": {
+      "bytes": 700690,
+      "mtime": "2026-11-12T16:53:35.027Z"
+    },
+    "sourceChangedDuringExport": false,
+    "sourceMatchesSurveyAfterExport": true
+  },
+  {
+    "label": "S014",
+    "purpose": "Long Local conversation with MCP, questions, reasoning, edits and recorded image variants.",
+    "stress": false,
+    "id": "S014",
+    "family": "local",
+    "intendedOutput": "exports\\261113-local-S014.md",
+    "sourceMatchesSurveyBeforeExport": true,
+    "sourceBefore": {
+      "bytes": 14482655,
+      "mtime": "2026-10-13T03:12:43.530Z"
+    },
+    "formatting": "Current CLI export defaults. --keep-source changes capture retention, not rendering. No LOD or --detailed flag.",
+    "export": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S014.jsonl",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-local-S014.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code",
+        "--keep-source"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:24.592Z",
+      "durationMs": 1518,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S014-export.stdout.log",
+      "stderr": "logs\\S014-export.stderr.log"
+    },
+    "artifacts": [
+      {
+        "path": "exports\\261113-local-S014.md",
+        "bytes": 2038242,
+        "sha256": "1c8ef9b0cd9f63f3233f0a4019161a3d7c96c29f4b1f4405f08613f53c599686",
+        "failedArchive": false
+      }
+    ],
+    "savedFileVerify": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "--verify",
+        "--json",
+        "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\b8c3b60285059d1bebc8bb51538d83f5\\chatSessions\\S014.jsonl",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-local-S014.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:26.113Z",
+      "durationMs": 1100,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S014-verify.stdout.log",
+      "stderr": "logs\\S014-verify.stderr.log"
+    },
+    "verificationReport": {
+      "version": 3,
+      "path": "local",
+      "strict": false,
+      "exitCode": 0,
+      "failureReasons": [],
+      "layerB": {
+        "rawRequests": 45,
+        "parsedTurns": 45,
+        "missingTurns": 0,
+        "extraTurns": 0,
+        "crossTurnDuplicateToolIds": 1,
+        "mismatchesByKind": {}
+      },
+      "census": {
+        "seen": {
+          "thinking": 926,
+          "(implicit text)": 1015,
+          "toolInvocationSerialized": 866,
+          "inlineReference": 590,
+          "autoModeResolution": 2,
+          "textEditGroup": 241,
+          "undoStop": 196,
+          "codeblockUri": 196,
+          "progressMessage": 2,
+          "confirmation": 2,
+          "questionCarousel": 5,
+          "progressTaskSerialized": 1,
+          "workspaceEdit": 1
+        },
+        "unhandled": {},
+        "unrecognizedToolData": {},
+        "representationCounts": {
+          "tool-no-content": 15
+        }
+      },
+      "layerA": {
+        "rawToolIds": 855,
+        "parsedToolIds": 855,
+        "rawThinking": 946,
+        "dropped": 0,
+        "invented": 0
+      },
+      "layerC": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors == turns",
+            "ok": true
+          },
+          {
+            "name": "turn anchors sequential 1..N",
+            "ok": true
+          },
+          {
+            "name": "no duplicate turn anchors",
+            "ok": true
+          },
+          {
+            "name": "TOC entries == turns",
+            "ok": true
+          },
+          {
+            "name": "request headers == turns",
+            "ok": true
+          },
+          {
+            "name": "assistant sections == turns",
+            "ok": true
+          },
+          {
+            "name": "tool badges == tool nodes",
+            "ok": true
+          },
+          {
+            "name": "<details> balanced (scaffold-only)",
+            "ok": true
+          },
+          {
+            "name": "compact confirmation under its /compact turn",
+            "ok": true
+          },
+          {
+            "name": "unknown-response JSON round-trips",
+            "ok": true
+          }
+        ],
+        "failed": false
+      },
+      "fenceRepairs": {
+        "early": 0,
+        "earlyByKind": {},
+        "turnEnd": 0,
+        "htmlEscaped": 0,
+        "htmlEscapedByKind": {}
+      },
+      "layerD": {
+        "target": "file",
+        "checked": 1963,
+        "totals": {
+          "prompt": {
+            "present": 45,
+            "partial": 0,
+            "absent": 0
+          },
+          "reasoning": {
+            "present": 428,
+            "partial": 0,
+            "absent": 0
+          },
+          "assistant-text": {
+            "present": 630,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-input": {
+            "present": 261,
+            "partial": 0,
+            "absent": 0
+          },
+          "terminal-output": {
+            "present": 242,
+            "partial": 0,
+            "absent": 0
+          },
+          "inline-reference": {
+            "present": 206,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-output": {
+            "present": 19,
+            "partial": 0,
+            "absent": 0
+          },
+          "request-error": {
+            "present": 1,
+            "partial": 0,
+            "absent": 0
+          },
+          "other:confirmation": {
+            "present": 4,
+            "partial": 0,
+            "absent": 0
+          },
+          "other:questionCarousel": {
+            "present": 122,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-error": {
+            "present": 3,
+            "partial": 0,
+            "absent": 0
+          },
+          "subagent-prompt": {
+            "present": 1,
+            "partial": 0,
+            "absent": 0
+          },
+          "subagent-result": {
+            "present": 1,
+            "partial": 0,
+            "absent": 0
+          }
+        },
+        "unaccounted": {},
+        "order": {
+          "checked": 675,
+          "outOfOrder": 0
+        },
+        "multiplicity": {
+          "checked": 4,
+          "missing": 0
+        },
+        "failed": false
+      },
+      "images": {
+        "unique": 1,
+        "found": 1,
+        "missing": 0,
+        "referenceOnly": 0,
+        "unresolved": 0,
+        "excludedNotSubmitted": 0,
+        "hashes": [
+          "34558d05441cd3af8d9bce52de8fc08b4ceb6e6868bc1d3e5515d739da6e11cc"
+        ],
+        "foundHashes": [
+          "34558d05441cd3af8d9bce52de8fc08b4ceb6e6868bc1d3e5515d739da6e11cc"
+        ],
+        "missingHashes": [],
+        "failed": false
+      },
+      "parser": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors outside code",
+            "ok": true,
+            "detail": "anchors=45, turns=45"
+          },
+          {
+            "name": "request headings outside code",
+            "ok": true,
+            "detail": "headings=45, turns=45"
+          },
+          {
+            "name": "assistant headings parse as headings",
+            "ok": true,
+            "detail": "headings=45, turns=45"
+          },
+          {
+            "name": "section headings parse as headings",
+            "ok": true,
+            "detail": "sections=9"
+          },
+          {
+            "name": "unknown blocks hold exactly one json code block",
+            "ok": true,
+            "detail": "blocks=0, linked=0"
+          }
+        ],
+        "failed": false,
+        "counts": {
+          "turnAnchors": 45,
+          "requestHeadings": 45,
+          "assistantHeadings": 45,
+          "sectionHeadings": 9,
+          "unknownBlocks": 0,
+          "linkedUnknownBlocks": 0
+        },
+        "ms": 51
+      }
+    },
+    "sourceAfter": {
+      "bytes": 14482655,
+      "mtime": "2026-10-13T03:12:43.530Z"
+    },
+    "sourceChangedDuringExport": false,
+    "sourceMatchesSurveyAfterExport": true
+  },
+  {
+    "label": "S026",
+    "purpose": "Long SDK stream with many prompts, MCP, questions, subagents, reasoning and tool results.",
+    "stress": false,
+    "id": "S026",
+    "family": "sdk",
+    "intendedOutput": "exports\\261113-sdk-S026.md",
+    "sourceMatchesSurveyBeforeExport": true,
+    "sourceBefore": {
+      "bytes": 29610189,
+      "mtime": "2026-11-13T01:28:40.823Z"
+    },
+    "formatting": "Current CLI export defaults. --keep-source changes capture retention, not rendering. No LOD or --detailed flag.",
+    "export": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "S026",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-sdk-S026.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code",
+        "--keep-source"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:27.243Z",
+      "durationMs": 2697,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S026-export.stdout.log",
+      "stderr": "logs\\S026-export.stderr.log"
+    },
+    "artifacts": [
+      {
+        "path": "exports\\261113-sdk-S026.md",
+        "bytes": 4991949,
+        "sha256": "31fadd68e324c7b2eab818e6676207f46184e5f5650007bf0cb634cf814b47dd",
+        "failedArchive": false
+      }
+    ],
+    "savedFileVerify": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "--verify",
+        "--json",
+        "S026",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-sdk-S026.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:29.945Z",
+      "durationMs": 1612,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S026-verify.stdout.log",
+      "stderr": "logs\\S026-verify.stderr.log"
+    },
+    "verificationReport": {
+      "version": 3,
+      "path": "sdk",
+      "strict": false,
+      "exitCode": 0,
+      "failureReasons": [],
+      "census": {
+        "seen": {
+          "session.start": 1,
+          "hook.start": 1722,
+          "abort": 1,
+          "hook.end": 1722,
+          "session.fusion_resolved": 8,
+          "user.message": 74,
+          "system.message": 25,
+          "session.usage_record": 665,
+          "permission.requested": 12,
+          "permission.completed": 12,
+          "session.permissions_changed": 2,
+          "assistant.fusion_phase_completed": 16,
+          "session.fusion_commit_started": 8,
+          "assistant.turn_start": 570,
+          "assistant.message": 615,
+          "tool.execution_start": 754,
+          "tool.execution_complete": 754,
+          "assistant.turn_end": 570,
+          "session.fusion_change_checkpoint": 7,
+          "session.fusion_completed": 8,
+          "session.usage_checkpoint": 74,
+          "session.model_change": 76,
+          "session.compaction_start": 10,
+          "model.turn_started": 5,
+          "model.model_call_started": 5,
+          "model.captured_assignment_context": 5,
+          "model.model_call_success": 5,
+          "model.message": 9,
+          "model.response": 9,
+          "model.turn_ended": 5,
+          "model.messages_snapshot": 5,
+          "session.compaction_complete": 11,
+          "session.shutdown": 7,
+          "session.resume": 6,
+          "subagent.deselected": 6,
+          "external_tool.requested": 11,
+          "external_tool.completed": 11,
+          "skill.invoked": 2,
+          "skill.context_delivered_ref": 2,
+          "session.fusion_handoff": 2,
+          "session.info": 1,
+          "session.auto_mode_resolved": 1
+        },
+        "unhandled": {
+          "session.usage_record": 665,
+          "assistant.fusion_phase_completed": 16,
+          "session.fusion_resolved": 8,
+          "session.fusion_commit_started": 8,
+          "session.fusion_completed": 8,
+          "session.fusion_change_checkpoint": 7,
+          "session.fusion_handoff": 2
+        },
+        "unrecognizedToolData": {},
+        "representationCounts": {}
+      },
+      "leftOut": {
+        "hook records": 3444,
+        "permission prompts": 26,
+        "usage and cache checkpoints (running totals; the last one is shown in the Cost section)": 74,
+        "model request/response copies": 33,
+        "external-tool duplicates": 22
+      },
+      "fenceRepairs": {
+        "early": 0,
+        "earlyByKind": {},
+        "turnEnd": 0,
+        "htmlEscaped": 0,
+        "htmlEscapedByKind": {}
+      },
+      "layerD": {
+        "target": "file",
+        "checked": 3250,
+        "totals": {
+          "prompt": {
+            "present": 73,
+            "partial": 0,
+            "absent": 0
+          },
+          "reasoning": {
+            "present": 336,
+            "partial": 0,
+            "absent": 0
+          },
+          "assistant-text": {
+            "present": 224,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-intent": {
+            "present": 732,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-input": {
+            "present": 742,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-output": {
+            "present": 743,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-detail": {
+            "present": 356,
+            "partial": 0,
+            "absent": 0
+          },
+          "compaction-summary": {
+            "present": 10,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-error": {
+            "present": 11,
+            "partial": 0,
+            "absent": 0
+          },
+          "system-prompt": {
+            "present": 21,
+            "partial": 0,
+            "absent": 0
+          },
+          "skill-file": {
+            "present": 2,
+            "partial": 0,
+            "absent": 0
+          }
+        },
+        "unaccounted": {},
+        "order": {
+          "checked": 1365,
+          "outOfOrder": 0
+        },
+        "multiplicity": {
+          "checked": 56,
+          "missing": 0
+        },
+        "failed": false
+      },
+      "images": {
+        "unique": 0,
+        "found": 0,
+        "missing": 0,
+        "referenceOnly": 0,
+        "unresolved": 0,
+        "excludedNotSubmitted": 0,
+        "hashes": [],
+        "foundHashes": [],
+        "missingHashes": [],
+        "failed": false
+      },
+      "parser": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors outside code",
+            "ok": true,
+            "detail": "anchors=74, turns=74"
+          },
+          {
+            "name": "request headings outside code",
+            "ok": true,
+            "detail": "headings=74, turns=74"
+          },
+          {
+            "name": "assistant headings parse as headings",
+            "ok": true,
+            "detail": "headings=74, turns=74"
+          },
+          {
+            "name": "section headings parse as headings",
+            "ok": true,
+            "detail": "sections=9"
+          },
+          {
+            "name": "unknown blocks hold exactly one json code block",
+            "ok": true,
+            "detail": "blocks=0, linked=0"
+          }
+        ],
+        "failed": false,
+        "counts": {
+          "turnAnchors": 74,
+          "requestHeadings": 74,
+          "assistantHeadings": 74,
+          "sectionHeadings": 9,
+          "unknownBlocks": 0,
+          "linkedUnknownBlocks": 0
+        },
+        "ms": 77
+      }
+    },
+    "sourceAfter": {
+      "bytes": 29610189,
+      "mtime": "2026-11-13T01:28:40.823Z"
+    },
+    "sourceChangedDuringExport": false,
+    "sourceMatchesSurveyAfterExport": true
+  },
+  {
+    "label": "S017",
+    "purpose": "Flawed SDK sparse/Fusion verification stress case requested by the brief.",
+    "stress": true,
+    "id": "S017",
+    "family": "sdk",
+    "intendedOutput": "exports\\261113-sdk-S017-stress.md",
+    "sourceMatchesSurveyBeforeExport": true,
+    "sourceBefore": {
+      "bytes": 11369264,
+      "mtime": "2026-11-13T01:28:40.797Z"
+    },
+    "formatting": "Current CLI export defaults. --keep-source changes capture retention, not rendering. No LOD or --detailed flag.",
+    "export": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "S017",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-sdk-S017-stress.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code",
+        "--keep-source"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:42.697Z",
+      "durationMs": 2863,
+      "exitCode": 2,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S017-export.stdout.log",
+      "stderr": "logs\\S017-export.stderr.log"
+    },
+    "artifacts": [
+      {
+        "path": "exports\\261113-sdk-S017-stress.verify-failed.md",
+        "bytes": 1693109,
+        "sha256": "5c386bfb1a48f7b68aebad60e5d974b47fa5cb016218dc697318bbda02057366",
+        "failedArchive": true
+      }
+    ],
+    "savedFileVerify": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "--verify",
+        "--json",
+        "S017",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-sdk-S017-stress.verify-failed.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:45.564Z",
+      "durationMs": 1350,
+      "exitCode": 2,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S017-verify.stdout.log",
+      "stderr": "logs\\S017-verify.stderr.log"
+    },
+    "verificationReport": {
+      "version": 3,
+      "path": "sdk",
+      "strict": false,
+      "exitCode": 2,
+      "failureReasons": [
+        "layer-d"
+      ],
+      "census": {
+        "seen": {
+          "session.start": 1,
+          "hook.start": 737,
+          "hook.end": 737,
+          "session.fusion_resolved": 4,
+          "user.message": 9,
+          "system.message": 4,
+          "session.usage_record": 222,
+          "permission.requested": 4,
+          "permission.completed": 4,
+          "session.permissions_changed": 1,
+          "external_tool.requested": 11,
+          "external_tool.completed": 11,
+          "assistant.fusion_phase_completed": 7,
+          "session.fusion_commit_started": 4,
+          "assistant.turn_start": 94,
+          "assistant.message": 126,
+          "tool.execution_start": 245,
+          "tool.execution_complete": 245,
+          "skill.invoked": 4,
+          "skill.context_delivered_ref": 4,
+          "assistant.turn_end": 94,
+          "session.fusion_change_checkpoint": 3,
+          "session.fusion_completed": 4,
+          "session.usage_checkpoint": 9,
+          "session.model_change": 5,
+          "session.auto_mode_resolved": 4,
+          "system.notification": 3,
+          "session.fusion_handoff": 1,
+          "session.compaction_start": 1,
+          "model.turn_started": 1,
+          "model.model_call_started": 1,
+          "model.captured_assignment_context": 1,
+          "model.model_call_success": 1,
+          "model.message": 1,
+          "model.response": 1,
+          "model.turn_ended": 1,
+          "model.messages_snapshot": 1,
+          "session.compaction_complete": 1,
+          "skill.invoked_ref": 1,
+          "session.shutdown": 1
+        },
+        "unhandled": {
+          "session.usage_record": 222,
+          "assistant.fusion_phase_completed": 7,
+          "session.fusion_resolved": 4,
+          "session.fusion_commit_started": 4,
+          "session.fusion_completed": 4,
+          "session.fusion_change_checkpoint": 3,
+          "session.fusion_handoff": 1
+        },
+        "unrecognizedToolData": {},
+        "representationCounts": {}
+      },
+      "leftOut": {
+        "hook records": 1474,
+        "permission prompts": 9,
+        "external-tool duplicates": 22,
+        "usage and cache checkpoints (running totals; the last one is shown in the Cost section)": 9,
+        "model request/response copies": 5,
+        "sub-agent events without a verified delegation": 95
+      },
+      "fenceRepairs": {
+        "early": 0,
+        "earlyByKind": {},
+        "turnEnd": 0,
+        "htmlEscaped": 0,
+        "htmlEscapedByKind": {}
+      },
+      "layerD": {
+        "target": "file",
+        "checked": 1063,
+        "totals": {
+          "prompt": {
+            "present": 9,
+            "partial": 0,
+            "absent": 3
+          },
+          "tool-intent": {
+            "present": 225,
+            "partial": 0,
+            "absent": 32
+          },
+          "tool-input": {
+            "present": 237,
+            "partial": 5,
+            "absent": 27
+          },
+          "tool-output": {
+            "present": 243,
+            "partial": 10,
+            "absent": 22
+          },
+          "reasoning": {
+            "present": 37,
+            "partial": 0,
+            "absent": 4
+          },
+          "assistant-text": {
+            "present": 26,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-detail": {
+            "present": 150,
+            "partial": 21,
+            "absent": 0
+          },
+          "tool-error": {
+            "present": 2,
+            "partial": 0,
+            "absent": 0
+          },
+          "compaction-summary": {
+            "present": 1,
+            "partial": 0,
+            "absent": 0
+          },
+          "system-prompt": {
+            "present": 4,
+            "partial": 0,
+            "absent": 1
+          },
+          "skill-file": {
+            "present": 4,
+            "partial": 0,
+            "absent": 0
+          }
+        },
+        "unaccounted": {
+          "prompt": {
+            "partial": 0,
+            "absent": 3
+          },
+          "tool-intent": {
+            "partial": 0,
+            "absent": 32
+          },
+          "tool-input": {
+            "partial": 5,
+            "absent": 27
+          },
+          "tool-output": {
+            "partial": 10,
+            "absent": 22
+          },
+          "tool-detail": {
+            "partial": 21,
+            "absent": 0
+          },
+          "reasoning": {
+            "partial": 0,
+            "absent": 4
+          },
+          "system-prompt": {
+            "partial": 0,
+            "absent": 1
+          }
+        },
+        "order": {
+          "checked": 297,
+          "outOfOrder": 0
+        },
+        "multiplicity": {
+          "checked": 31,
+          "missing": 0
+        },
+        "failed": true
+      },
+      "images": {
+        "unique": 0,
+        "found": 0,
+        "missing": 0,
+        "referenceOnly": 0,
+        "unresolved": 0,
+        "excludedNotSubmitted": 0,
+        "hashes": [],
+        "foundHashes": [],
+        "missingHashes": [],
+        "failed": false
+      },
+      "parser": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors outside code",
+            "ok": true,
+            "detail": "anchors=9, turns=9"
+          },
+          {
+            "name": "request headings outside code",
+            "ok": true,
+            "detail": "headings=9, turns=9"
+          },
+          {
+            "name": "assistant headings parse as headings",
+            "ok": true,
+            "detail": "headings=9, turns=9"
+          },
+          {
+            "name": "section headings parse as headings",
+            "ok": true,
+            "detail": "sections=9"
+          },
+          {
+            "name": "unknown blocks hold exactly one json code block",
+            "ok": true,
+            "detail": "blocks=0, linked=0"
+          }
+        ],
+        "failed": false,
+        "counts": {
+          "turnAnchors": 9,
+          "requestHeadings": 9,
+          "assistantHeadings": 9,
+          "sectionHeadings": 9,
+          "unknownBlocks": 0,
+          "linkedUnknownBlocks": 0
+        },
+        "ms": 34
+      }
+    },
+    "sourceAfter": {
+      "bytes": 11369264,
+      "mtime": "2026-11-13T01:28:40.797Z"
+    },
+    "sourceChangedDuringExport": false,
+    "sourceMatchesSurveyAfterExport": true
+  },
+  {
+    "label": "S002",
+    "purpose": "Largest surveyed Local journal, varied tools, MCP, question carousels, image variants and edits.",
+    "stress": false,
+    "id": "S002",
+    "family": "local",
+    "intendedOutput": "exports\\261113-local-S002.md",
+    "sourceMatchesSurveyBeforeExport": true,
+    "sourceBefore": {
+      "bytes": 57056127,
+      "mtime": "2026-09-11T17:26:00.785Z"
+    },
+    "formatting": "Current CLI export defaults. --keep-source changes capture retention, not rendering. No LOD or --detailed flag.",
+    "export": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\S002.jsonl",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-local-S002.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code",
+        "--keep-source"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:46.968Z",
+      "durationMs": 3087,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S002-export.stdout.log",
+      "stderr": "logs\\S002-export.stderr.log"
+    },
+    "artifacts": [
+      {
+        "path": "exports\\261113-local-S002.md",
+        "bytes": 2336113,
+        "sha256": "902c3c6b14bf3632f5c2a0e7d75ade1f078044d9e78a92fe12eabc8d6802de70",
+        "failedArchive": false
+      }
+    ],
+    "savedFileVerify": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "--verify",
+        "--json",
+        "<user-home>\\AppData\\Roaming\\Code\\User\\workspaceStorage\\4aca7696a634aaf1b09b08c78e276834\\chatSessions\\S002.jsonl",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-local-S002.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:50.068Z",
+      "durationMs": 1992,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S002-verify.stdout.log",
+      "stderr": "logs\\S002-verify.stderr.log"
+    },
+    "verificationReport": {
+      "version": 3,
+      "path": "local",
+      "strict": false,
+      "exitCode": 0,
+      "failureReasons": [],
+      "layerB": {
+        "rawRequests": 62,
+        "parsedTurns": 62,
+        "missingTurns": 0,
+        "extraTurns": 0,
+        "crossTurnDuplicateToolIds": 1,
+        "mismatchesByKind": {}
+      },
+      "census": {
+        "seen": {
+          "(implicit text)": 1022,
+          "toolInvocationSerialized": 985,
+          "thinking": 868,
+          "textEditGroup": 198,
+          "inlineReference": 320,
+          "undoStop": 185,
+          "codeblockUri": 185,
+          "progressTaskSerialized": 4,
+          "questionCarousel": 2,
+          "autoModeResolution": 1,
+          "confirmation": 1
+        },
+        "unhandled": {},
+        "unrecognizedToolData": {},
+        "representationCounts": {
+          "tool-no-content": 14
+        }
+      },
+      "layerA": {
+        "rawToolIds": 981,
+        "parsedToolIds": 981,
+        "rawThinking": 882,
+        "dropped": 0,
+        "invented": 0
+      },
+      "layerC": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors == turns",
+            "ok": true
+          },
+          {
+            "name": "turn anchors sequential 1..N",
+            "ok": true
+          },
+          {
+            "name": "no duplicate turn anchors",
+            "ok": true
+          },
+          {
+            "name": "TOC entries == turns",
+            "ok": true
+          },
+          {
+            "name": "request headers == turns",
+            "ok": true
+          },
+          {
+            "name": "assistant sections == turns",
+            "ok": true
+          },
+          {
+            "name": "tool badges == tool nodes",
+            "ok": true
+          },
+          {
+            "name": "<details> balanced (scaffold-only)",
+            "ok": true
+          },
+          {
+            "name": "compact confirmation under its /compact turn",
+            "ok": true
+          },
+          {
+            "name": "unknown-response JSON round-trips",
+            "ok": true
+          }
+        ],
+        "failed": false
+      },
+      "fenceRepairs": {
+        "early": 0,
+        "earlyByKind": {},
+        "turnEnd": 0,
+        "htmlEscaped": 0,
+        "htmlEscapedByKind": {}
+      },
+      "layerD": {
+        "target": "file",
+        "checked": 1750,
+        "totals": {
+          "prompt": {
+            "present": 61,
+            "partial": 0,
+            "absent": 0
+          },
+          "assistant-text": {
+            "present": 680,
+            "partial": 0,
+            "absent": 0
+          },
+          "subagent-prompt": {
+            "present": 13,
+            "partial": 0,
+            "absent": 0
+          },
+          "subagent-result": {
+            "present": 13,
+            "partial": 0,
+            "absent": 0
+          },
+          "reasoning": {
+            "present": 206,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-input": {
+            "present": 266,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-output": {
+            "present": 110,
+            "partial": 0,
+            "absent": 0
+          },
+          "terminal-output": {
+            "present": 161,
+            "partial": 0,
+            "absent": 0
+          },
+          "inline-reference": {
+            "present": 213,
+            "partial": 0,
+            "absent": 0
+          },
+          "other:questionCarousel": {
+            "present": 25,
+            "partial": 0,
+            "absent": 0
+          },
+          "other:confirmation": {
+            "present": 2,
+            "partial": 0,
+            "absent": 0
+          }
+        },
+        "unaccounted": {},
+        "order": {
+          "checked": 741,
+          "outOfOrder": 0
+        },
+        "multiplicity": {
+          "checked": 1,
+          "missing": 0
+        },
+        "failed": false
+      },
+      "images": {
+        "unique": 44,
+        "found": 44,
+        "missing": 0,
+        "referenceOnly": 0,
+        "unresolved": 0,
+        "excludedNotSubmitted": 2,
+        "hashes": [
+          "0779a808151de5c0572f170daeecd9b69eeba411dedc3e7d114ac778ebbbc971",
+          "0987db487e1cbba1685200f45f690309bf58d22ebbd0dffbf3586cb578659609",
+          "18abb25ea9570db9be60c5f595a6e5bed7615c360025d626b575693b7c44a4bb",
+          "1bea42a14144e8f507b4c412302b58009354efe3c75833af3ca6ac58cc27de4c",
+          "2874e11ccea12a54471787e7d99c84af28581ae7c8ad4e2c0849be530dcea4ad",
+          "2d3a1c55b9e576d502d3bbf4a3982ff454f10a584629d41a244b94caaf76c19a",
+          "30444120f23b4a874ea9125bb5d024ffba16ce47cc725c544384a54dc2330a15",
+          "342d922740e038edc216e4d900d673cd536513681bb6eb0c0bad45a9fe5cf7b1",
+          "38037bcf18c7f9b950da2e1a2d8800d38fb27637ccda293d38368a3704b67f18",
+          "3878570f4a62a0d65f57cf1754e0269e56ec797f4e36e26b44c172eb6e800401",
+          "38ad6203e7e1c6a06db20eab8566347e945a44b63bc5a7dca8a94fd1e552636c",
+          "39636a76b809dc7bf889a26b7f65c030702e71f7c99f873b927e0ee0709da3fb",
+          "4219779eafb24f34c1cea2dcb72f7c91881a9bb47e43a705109de1373f8130c8",
+          "5395b30175072c1e49f3d63632f096dc1b8f63186014dee6502f812e98d6dd3a",
+          "56edaca8410b8b135619d35dfe29cdd90413f4699b053d4d9337604f5a32ae26",
+          "5890521daf6d47f96994ba32eba1ff21900ad91fb6afd766435112cace92c0c5",
+          "5cf30ae5a8d8a014eef30331e8bcd3a00ddaa41731d2739d919817312e54d0b2",
+          "5e0d8c8fb9e12797d0dcf60cc6bbf24747784237194c1e2a6f8a783ac4d00ab4",
+          "65c844e141d7648990fc7882df02182a260a0303565defce15f88c94dee1eb9e",
+          "6ba994f05c5cf18e22d9b6bef9898fbdec6ad4d4d77f5187d0609cb42d72d01e",
+          "702c2800b37dec9bf58f97e29e34f83cbc03bb6aa26963bcfcb1d1b4e0bc5002",
+          "76264fa02160e813a9b28331a5895723587440ffc3b565340b968f7ff0165e4b",
+          "795c8b00758ccb64dc2d492430f97ce00de3096104986022cd2f1685f905cbfb",
+          "7c2253db682a0778cb4833e87f8fbd3d29a3315388376b16ee7be6f0e523c5be",
+          "80690c40babac7c6ba4dd54ba67ccf330c5c49192409ddb4d1224903ec27f436",
+          "8330e723383093647c6718599712672b9153626c9fa2052aa07b893f2383f1d8",
+          "8bab24d033755132784d5f93086a0e1cb63525073e2084f374e8e382920cc8d0",
+          "95a916f6323ab0c2f3607811f244266ae3c404c6a10adb96af8a50e712f8bf2f",
+          "a4ee39ffa1168e6a49e281f36ba1e50e712faa893bae347a5c54ffb45fae0d25",
+          "b848169fc9c08e54cff06000db76913259fd85fe487e967482478c1181708000",
+          "be73efae2a872fb82d99cb214bfd0bd797b4dbdfc4a2d6a5d403b1f103598e4e",
+          "c6fe2ccc52c82974d2463d6bfe810c9b7b8d2ef823ac0d326ab3efa2f530de07",
+          "ced53ac76071d98615baa045cd149e03714a0e7fd238aca4a838db7e0a611d0b",
+          "cf43147ba155dff5b93536b18d0e91ff8b6f492299b58b5d8f6ba9972ba7da83",
+          "d84fa22f4bf8afce328b8a40bcb78dc43d16dfa5f33b5b91eb7ca0b51b7708bb",
+          "dcfd1d1d5da7534228cc03fccf0f508596479e3dcab941110ff3dce9cd6bc9fb",
+          "dd9d31c8ce0cfb6ebb3b3d6b26c81d64dabf9325008fb656cb4fbe2a45bb06f3",
+          "e13d973d355d99822b2d730a91816e74b453807fbca42bd3fd339fc0af8127c7",
+          "e783fd42a68bd9ddffe48df590f653f15bf79f17173b13f5fd9c5d8a6d4226b1",
+          "e787b82612671c7fe2e236c37d78099836787d510539733dd28b6444fa45faa6",
+          "eeb227208171baae66becdc2c0f72d3d7bf1620fb6d406be3e3229178dc120ce",
+          "f0ced64e05685a497e349245a7af80c74a09408f2f23c16638e7159c2ca5d1f2",
+          "f24d85cf41bf0f2fcc485472fa1bc61d9af57dc8cc00dec73fed77f494a1be6a",
+          "ffc3be08c3c711eed201f5252485b8b5de1daccccbf71f93c5ad43c67e63da80"
+        ],
+        "foundHashes": [
+          "0779a808151de5c0572f170daeecd9b69eeba411dedc3e7d114ac778ebbbc971",
+          "0987db487e1cbba1685200f45f690309bf58d22ebbd0dffbf3586cb578659609",
+          "18abb25ea9570db9be60c5f595a6e5bed7615c360025d626b575693b7c44a4bb",
+          "1bea42a14144e8f507b4c412302b58009354efe3c75833af3ca6ac58cc27de4c",
+          "2874e11ccea12a54471787e7d99c84af28581ae7c8ad4e2c0849be530dcea4ad",
+          "2d3a1c55b9e576d502d3bbf4a3982ff454f10a584629d41a244b94caaf76c19a",
+          "30444120f23b4a874ea9125bb5d024ffba16ce47cc725c544384a54dc2330a15",
+          "342d922740e038edc216e4d900d673cd536513681bb6eb0c0bad45a9fe5cf7b1",
+          "38037bcf18c7f9b950da2e1a2d8800d38fb27637ccda293d38368a3704b67f18",
+          "3878570f4a62a0d65f57cf1754e0269e56ec797f4e36e26b44c172eb6e800401",
+          "38ad6203e7e1c6a06db20eab8566347e945a44b63bc5a7dca8a94fd1e552636c",
+          "39636a76b809dc7bf889a26b7f65c030702e71f7c99f873b927e0ee0709da3fb",
+          "4219779eafb24f34c1cea2dcb72f7c91881a9bb47e43a705109de1373f8130c8",
+          "5395b30175072c1e49f3d63632f096dc1b8f63186014dee6502f812e98d6dd3a",
+          "56edaca8410b8b135619d35dfe29cdd90413f4699b053d4d9337604f5a32ae26",
+          "5890521daf6d47f96994ba32eba1ff21900ad91fb6afd766435112cace92c0c5",
+          "5cf30ae5a8d8a014eef30331e8bcd3a00ddaa41731d2739d919817312e54d0b2",
+          "5e0d8c8fb9e12797d0dcf60cc6bbf24747784237194c1e2a6f8a783ac4d00ab4",
+          "65c844e141d7648990fc7882df02182a260a0303565defce15f88c94dee1eb9e",
+          "6ba994f05c5cf18e22d9b6bef9898fbdec6ad4d4d77f5187d0609cb42d72d01e",
+          "702c2800b37dec9bf58f97e29e34f83cbc03bb6aa26963bcfcb1d1b4e0bc5002",
+          "76264fa02160e813a9b28331a5895723587440ffc3b565340b968f7ff0165e4b",
+          "795c8b00758ccb64dc2d492430f97ce00de3096104986022cd2f1685f905cbfb",
+          "7c2253db682a0778cb4833e87f8fbd3d29a3315388376b16ee7be6f0e523c5be",
+          "80690c40babac7c6ba4dd54ba67ccf330c5c49192409ddb4d1224903ec27f436",
+          "8330e723383093647c6718599712672b9153626c9fa2052aa07b893f2383f1d8",
+          "8bab24d033755132784d5f93086a0e1cb63525073e2084f374e8e382920cc8d0",
+          "95a916f6323ab0c2f3607811f244266ae3c404c6a10adb96af8a50e712f8bf2f",
+          "a4ee39ffa1168e6a49e281f36ba1e50e712faa893bae347a5c54ffb45fae0d25",
+          "b848169fc9c08e54cff06000db76913259fd85fe487e967482478c1181708000",
+          "be73efae2a872fb82d99cb214bfd0bd797b4dbdfc4a2d6a5d403b1f103598e4e",
+          "c6fe2ccc52c82974d2463d6bfe810c9b7b8d2ef823ac0d326ab3efa2f530de07",
+          "ced53ac76071d98615baa045cd149e03714a0e7fd238aca4a838db7e0a611d0b",
+          "cf43147ba155dff5b93536b18d0e91ff8b6f492299b58b5d8f6ba9972ba7da83",
+          "d84fa22f4bf8afce328b8a40bcb78dc43d16dfa5f33b5b91eb7ca0b51b7708bb",
+          "dcfd1d1d5da7534228cc03fccf0f508596479e3dcab941110ff3dce9cd6bc9fb",
+          "dd9d31c8ce0cfb6ebb3b3d6b26c81d64dabf9325008fb656cb4fbe2a45bb06f3",
+          "e13d973d355d99822b2d730a91816e74b453807fbca42bd3fd339fc0af8127c7",
+          "e783fd42a68bd9ddffe48df590f653f15bf79f17173b13f5fd9c5d8a6d4226b1",
+          "e787b82612671c7fe2e236c37d78099836787d510539733dd28b6444fa45faa6",
+          "eeb227208171baae66becdc2c0f72d3d7bf1620fb6d406be3e3229178dc120ce",
+          "f0ced64e05685a497e349245a7af80c74a09408f2f23c16638e7159c2ca5d1f2",
+          "f24d85cf41bf0f2fcc485472fa1bc61d9af57dc8cc00dec73fed77f494a1be6a",
+          "ffc3be08c3c711eed201f5252485b8b5de1daccccbf71f93c5ad43c67e63da80"
+        ],
+        "missingHashes": [],
+        "failed": false
+      },
+      "parser": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors outside code",
+            "ok": true,
+            "detail": "anchors=62, turns=62"
+          },
+          {
+            "name": "request headings outside code",
+            "ok": true,
+            "detail": "headings=62, turns=62"
+          },
+          {
+            "name": "assistant headings parse as headings",
+            "ok": true,
+            "detail": "headings=62, turns=62"
+          },
+          {
+            "name": "section headings parse as headings",
+            "ok": true,
+            "detail": "sections=9"
+          },
+          {
+            "name": "unknown blocks hold exactly one json code block",
+            "ok": true,
+            "detail": "blocks=0, linked=0"
+          }
+        ],
+        "failed": false,
+        "counts": {
+          "turnAnchors": 62,
+          "requestHeadings": 62,
+          "assistantHeadings": 62,
+          "sectionHeadings": 9,
+          "unknownBlocks": 0,
+          "linkedUnknownBlocks": 0
+        },
+        "ms": 67
+      }
+    },
+    "sourceAfter": {
+      "bytes": 57056127,
+      "mtime": "2026-09-11T17:26:00.785Z"
+    },
+    "sourceChangedDuringExport": false,
+    "sourceMatchesSurveyAfterExport": true
+  },
+  {
+    "label": "S019",
+    "purpose": "Long SDK conversation across many prompts, questions, MCP, skills, delegation and tool/error outcomes.",
+    "stress": false,
+    "id": "S019",
+    "family": "sdk",
+    "intendedOutput": "exports\\261113-sdk-S019.md",
+    "sourceMatchesSurveyBeforeExport": true,
+    "sourceBefore": {
+      "bytes": 53016742,
+      "mtime": "2026-09-30T23:54:41.681Z"
+    },
+    "formatting": "Current CLI export defaults. --keep-source changes capture retention, not rendering. No LOD or --detailed flag.",
+    "export": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "S019",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-sdk-S019.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code",
+        "--keep-source"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:22:52.121Z",
+      "durationMs": 10771,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S019-export.stdout.log",
+      "stderr": "logs\\S019-export.stderr.log"
+    },
+    "artifacts": [
+      {
+        "path": "exports\\261113-sdk-S019.md",
+        "bytes": 17651612,
+        "sha256": "92fbac9ab48ef550e011ce6b578e9d2f989b4ff8776b34999ef5d071015b4ce6",
+        "failedArchive": false
+      }
+    ],
+    "savedFileVerify": {
+      "executable": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "src\\cli.ts",
+        "--verify",
+        "--json",
+        "S019",
+        "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\exports\\261113-sdk-S019.md",
+        "--user-data-root",
+        "<user-home>\\AppData\\Roaming\\Code"
+      ],
+      "cwd": "C:\\_DEV\\copilot-chat-exporter",
+      "environmentOverrides": {
+        "CCE_CACHE_DIR": "C:\\_DEV\\copilot-chat-exporter\\temp-tool-output\\261113-121310-lod-research\\corpus\\cache"
+      },
+      "started": "2026-11-13T17:23:02.913Z",
+      "durationMs": 9320,
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": "logs\\S019-verify.stdout.log",
+      "stderr": "logs\\S019-verify.stderr.log"
+    },
+    "verificationReport": {
+      "version": 3,
+      "path": "sdk",
+      "strict": false,
+      "exitCode": 0,
+      "failureReasons": [],
+      "census": {
+        "seen": {
+          "session.start": 1,
+          "session.mode_changed": 3,
+          "session.auto_mode_resolved": 13,
+          "hook.start": 908,
+          "hook.end": 908,
+          "user.message": 71,
+          "system.message": 38,
+          "assistant.turn_start": 1356,
+          "assistant.message": 1403,
+          "tool.execution_start": 2272,
+          "permission.requested": 435,
+          "permission.completed": 435,
+          "tool.execution_complete": 2272,
+          "assistant.turn_end": 1356,
+          "session.task_complete": 2,
+          "session.usage_checkpoint": 55,
+          "session.model_change": 34,
+          "subagent.deselected": 50,
+          "external_tool.requested": 75,
+          "external_tool.completed": 61,
+          "session.compaction_start": 16,
+          "session.compaction_complete": 16,
+          "skill.invoked": 5,
+          "session.permissions_changed": 9,
+          "session.resume": 13,
+          "session.shutdown": 13,
+          "abort": 1,
+          "model.turn_started": 4,
+          "model.model_call_started": 4,
+          "model.captured_assignment_context": 4,
+          "model.model_call_success": 4,
+          "model.message": 4,
+          "model.response": 4,
+          "model.turn_ended": 4,
+          "model.messages_snapshot": 4,
+          "system.notification": 11,
+          "session.info": 1,
+          "session.truncation": 1,
+          "subagent.started": 12,
+          "subagent.configured": 12,
+          "subagent.completed": 12
+        },
+        "unhandled": {},
+        "unrecognizedToolData": {},
+        "representationCounts": {}
+      },
+      "leftOut": {
+        "hook records": 1816,
+        "permission prompts": 879,
+        "usage and cache checkpoints (running totals; the last one is shown in the Cost section)": 55,
+        "external-tool duplicates": 136,
+        "model request/response copies": 20
+      },
+      "fenceRepairs": {
+        "early": 0,
+        "earlyByKind": {},
+        "turnEnd": 0,
+        "htmlEscaped": 0,
+        "htmlEscapedByKind": {}
+      },
+      "layerD": {
+        "target": "file",
+        "checked": 8322,
+        "totals": {
+          "prompt": {
+            "present": 70,
+            "partial": 0,
+            "absent": 0
+          },
+          "assistant-text": {
+            "present": 417,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-intent": {
+            "present": 1875,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-input": {
+            "present": 1967,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-output": {
+            "present": 2229,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-detail": {
+            "present": 1327,
+            "partial": 0,
+            "absent": 0
+          },
+          "tool-error": {
+            "present": 43,
+            "partial": 0,
+            "absent": 0
+          },
+          "task-summary": {
+            "present": 2,
+            "partial": 0,
+            "absent": 0
+          },
+          "compaction-summary": {
+            "present": 11,
+            "partial": 0,
+            "absent": 0
+          },
+          "reasoning": {
+            "present": 362,
+            "partial": 0,
+            "absent": 0
+          },
+          "system-prompt": {
+            "present": 17,
+            "partial": 0,
+            "absent": 0
+          },
+          "skill-file": {
+            "present": 2,
+            "partial": 0,
+            "absent": 0
+          }
+        },
+        "unaccounted": {},
+        "order": {
+          "checked": 2724,
+          "outOfOrder": 0
+        },
+        "multiplicity": {
+          "checked": 192,
+          "missing": 0
+        },
+        "failed": false
+      },
+      "images": {
+        "unique": 0,
+        "found": 0,
+        "missing": 0,
+        "referenceOnly": 0,
+        "unresolved": 0,
+        "excludedNotSubmitted": 0,
+        "hashes": [],
+        "foundHashes": [],
+        "missingHashes": [],
+        "failed": false
+      },
+      "parser": {
+        "skipped": null,
+        "checks": [
+          {
+            "name": "turn anchors outside code",
+            "ok": true,
+            "detail": "anchors=47, turns=47"
+          },
+          {
+            "name": "request headings outside code",
+            "ok": true,
+            "detail": "headings=47, turns=47"
+          },
+          {
+            "name": "assistant headings parse as headings",
+            "ok": true,
+            "detail": "headings=47, turns=47"
+          },
+          {
+            "name": "section headings parse as headings",
+            "ok": true,
+            "detail": "sections=9"
+          },
+          {
+            "name": "unknown blocks hold exactly one json code block",
+            "ok": true,
+            "detail": "blocks=0, linked=0"
+          }
+        ],
+        "failed": false,
+        "counts": {
+          "turnAnchors": 47,
+          "requestHeadings": 47,
+          "assistantHeadings": 47,
+          "sectionHeadings": 9,
+          "unknownBlocks": 0,
+          "linkedUnknownBlocks": 0
+        },
+        "ms": 253
+      }
+    },
+    "sourceAfter": {
+      "bytes": 53016742,
+      "mtime": "2026-09-30T23:54:41.681Z"
+    },
+    "sourceChangedDuringExport": false,
+    "sourceMatchesSurveyAfterExport": true
+  }
+]

@@ -1,0 +1,904 @@
+{
+  "checkedLocal": "261113 -5",
+  "evidence": "Public-source findings saved from WI-052 research. No fresh online check was made during preservation.",
+  "limitations": "Entries include full definitions, partial reads and names only. lodIdea/controls are proposals, not exporter support or approved policy. Newer upstream docs may not describe historical logs.",
+  "sources": [
+    {
+      "id": "S1",
+      "version": "protocol revision 2025-06-18",
+      "date": "2026-11-13",
+      "evidence": "Defines tools/list, tools/call, Tool Result content item types: text, image, audio, resource_link, embedded resource (type:resource), structuredContent (with outputSchema), and error reporting via isError:true vs protocol-level JSON-RPC errors.",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+      "title": "MCP Spec 2025-06-18 - Server: Tools"
+    },
+    {
+      "id": "S2",
+      "version": "protocol revision 2025-06-18",
+      "date": "2026-11-13",
+      "evidence": "notifications/progress carries progressToken, progress (monotonic), optional total, optional message; receivers MAY omit notifications.",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress",
+      "title": "MCP Spec 2025-06-18 - Progress"
+    },
+    {
+      "id": "S3",
+      "version": "protocol revision 2025-06-18",
+      "date": "2026-11-13",
+      "evidence": "elicitation/create lets a server request structured user input via a flat JSON-Schema subset (string/number/boolean/enum); response action is accept/decline/cancel. Flagged as newly introduced, design may evolve.",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation",
+      "title": "MCP Spec 2025-06-18 - Elicitation"
+    },
+    {
+      "id": "S4",
+      "version": "pinned commit 52a9a2e5fbb169879b43a716c5b39e789c370ae0",
+      "date": "2026-11-13",
+      "evidence": "Confirms built-in VS Code GitHub Copilot extension is bundled in-repo (not a separate checkout); describes autonomous agents handling end-to-end tasks.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/extensions/copilot/README.md",
+      "title": "vscode extensions/copilot/README.md"
+    },
+    {
+      "id": "S5",
+      "version": "copilot-chat 0.75.0 @ 52a9a2e5fbb169879b43a716c5b39e789c370ae0",
+      "date": "2026-11-13",
+      "evidence": "package name 'copilot-chat', displayName 'GitHub Copilot', version 0.75.0 -- the historically separate vscode-copilot-chat extension is vendored inside microsoft/vscode at this path.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/extensions/copilot/package.json",
+      "title": "vscode extensions/copilot/package.json"
+    },
+    {
+      "id": "S6",
+      "version": "pinned commit 52a9a2e5fbb169879b43a716c5b39e789c370ae0",
+      "date": "2026-11-13",
+      "evidence": "Component-governance manifest entry: lists a git-type component for openai/codex at commit acc4acc81eea0339ad46d1c6f8459f58eaee6211. This is a dependency/license inventory record only -- it does not by itself establish which runtime executes Copilot turns, nor the full successor history of the extension. Treat as a declared dependency exists, not Codex powers Copilot.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/extensions/copilot/cgmanifest.json",
+      "title": "vscode extensions/copilot/cgmanifest.json"
+    },
+    {
+      "id": "S7",
+      "version": "blob sha 93b46c3889b9c241b38f173471ecd40dac7752de @ 52a9a2e5fbb169879b43a716c5b39e789c370ae0",
+      "date": "2026-11-13",
+      "evidence": "Re-export module enumerating every Chat*/LanguageModel* symbol the bundled extension imports from vscode -- authoritative current name inventory (subset saved verbatim to vscodeTypes-export-list.txt in this folder).",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/extensions/copilot/src/vscodeTypes.ts",
+      "title": "vscode extensions/copilot/src/vscodeTypes.ts"
+    },
+    {
+      "id": "S8",
+      "version": "blob sha ee47eda348864d63755c34a92bc595a14f128915; verified identical at HEAD 52a9a2e5fbb169879b43a716c5b39e789c370ae0 and index ref 944d79c5b914eea991cc9a92c5e08053e565f983",
+      "date": "2026-11-13",
+      "evidence": "Defines ChatHookType union (SessionStart, SessionEnd, UserPromptSubmit, UserPromptTransformed, PreToolUse, PostToolUse, PreCompact, SubagentStart, SubagentStop, Stop, ErrorOccurred), ChatHookCommand, ChatRequestHooks, ChatHookResultKind (success/error/warning), ChatHookResult, ChatRequest.hooks, ChatResponseHookPart, ChatResponseStream.hookProgress().",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/src/vscode-dts/vscode.proposed.chatHooks.d.ts",
+      "title": "vscode.proposed.chatHooks.d.ts"
+    },
+    {
+      "id": "S9",
+      "version": "blob sha 3c246500c9b2b744818c5492b39b9eefdc0a14e2 @ ref 944d79c5b914eea991cc9a92c5e08053e565f983",
+      "date": "2026-11-13",
+      "evidence": "Defines LanguageModelThinkingPart {value:string|string[], id?, metadata?}, and LanguageModelChatRequestOptions.includeEncryptedThinking boolean described as opaque reasoning state for replay. Widens LanguageModelChatResponse.stream and LanguageModelChatMessage2.content.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/src/vscode-dts/vscode.proposed.languageModelThinkingPart.d.ts",
+      "title": "vscode.proposed.languageModelThinkingPart.d.ts"
+    },
+    {
+      "id": "S10",
+      "version": "blob sha 2217833d54aed0cfc33266e2c8b2b5f51fec1e61 @ ref 944d79c5b914eea991cc9a92c5e08053e565f983",
+      "date": "2026-11-13",
+      "evidence": "67KB proposal surface; confirmed read: ChatQuestion/Type/Option, ChatResponseQuestionCarouselPart, ChatResponseCodeCitationPart(value:Uri,license,snippet), ChatToolInvocationStreamData(partialInput), ChatSubagentToolInvocationData(description,agentName,prompt,result,modelName), ChatResponseAutoModeResolutionPart(resolvedModel), ChatAutoModeTier('efficiency'|'balance'|'intelligence'|'fast'), ChatResponseStream.thinkingProgress(), ChatResponseTextEditPart, ChatResponseMarkdownWithVulnerabilitiesPart, ChatResponseCodeblockUriPart. Only a subset of the file was read.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/src/vscode-dts/vscode.proposed.chatParticipantAdditions.d.ts",
+      "title": "vscode.proposed.chatParticipantAdditions.d.ts"
+    },
+    {
+      "id": "S11",
+      "version": "blob sha 02d7fb91dcd78e73e8c7f2208a0658f018235c39 @ ref 944d79c5b914eea991cc9a92c5e08053e565f983",
+      "date": "2026-11-13",
+      "evidence": "Confirmed: ChatRequest.id/attempt/subAgentInvocationId/subAgentName/parentRequestId; a tool auto-approval field with values incl. autoApprove/autopilot (truncated); ChatResponseVoiceProgressPart; ChatRequestTurn2/ChatResponseTurn2 (response excludes metadata-only parts); LanguageModelToolInvocationOptions<T>(chatRequestId,chatSessionResource,chatInteractionId,terminalCommand,workingDirectory,subAgentInvocationId). 34.5KB file, subset read.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/src/vscode-dts/vscode.proposed.chatParticipantPrivate.d.ts",
+      "title": "vscode.proposed.chatParticipantPrivate.d.ts"
+    },
+    {
+      "id": "S12",
+      "version": "blob sha b0903e0aeb533c410c344a63fe70808ed067cbfa",
+      "date": "2026-11-13",
+      "evidence": "Runtime class ChatResponseConfirmationPart {title:string, message:string|MarkdownString, data:any, ...} backing the confirmation(approve/reject) UI part.",
+      "url": "https://github.com/microsoft/vscode/blob/52a9a2e5fbb169879b43a716c5b39e789c370ae0/src/vs/workbench/api/common/extHostTypes.ts",
+      "title": "extHostTypes.ts (ChatResponseConfirmationPart)"
+    },
+    {
+      "id": "S13",
+      "version": "queried via GitHub repository search API",
+      "date": "2026-11-13",
+      "evidence": "GitHub search_repositories shows archived:true, 9938 stars, 2031 forks. Historically the standalone Copilot Chat extension; functional successor now vendored at extensions/copilot inside microsoft/vscode (S4-S7). File tree of the archived repo was not re-opened.",
+      "url": "https://github.com/microsoft/vscode-copilot-chat",
+      "title": "vscode-copilot-chat repo metadata"
+    },
+    {
+      "id": "S14",
+      "version": "doc footer dated 11/11/2026",
+      "date": "2026-11-13",
+      "evidence": "'Chat participants are deprecated and are not supported in the Copilot harness ... remains available for Local harness compatibility.' Directs authors to agent plugins (skills+MCP+MCP Apps+custom agents).",
+      "url": "https://code.visualstudio.com/api/extension-guides/ai/chat",
+      "title": "VS Code docs - Chat participants (deprecated)"
+    },
+    {
+      "id": "S15",
+      "version": "current page, redirected from /docs/copilot/customization/mcp-servers",
+      "date": "2026-11-13",
+      "evidence": "Session Target selector incl. 'Copilot'; Copilot connectors; Customization Marketplace/GitHub Feed; native mcp.json/Copilot Global config shared across compatible Copilot experiences incl. Copilot CLI.",
+      "url": "https://code.visualstudio.com/docs/agent-customization/mcp-servers",
+      "title": "VS Code docs - Add and use MCP servers"
+    },
+    {
+      "id": "S16",
+      "version": "current page",
+      "date": "2026-11-13",
+      "evidence": "Lists building blocks: custom instructions, agent skills, custom agents, Copilot connectors/MCP servers, hooks; unified Agent Customizations editor scoped per selected harness.",
+      "url": "https://code.visualstudio.com/docs/agent-customization/overview",
+      "title": "VS Code docs - Customize agents overview"
+    },
+    {
+      "id": "S17",
+      "version": "current page",
+      "date": "2026-11-13",
+      "evidence": "'The Copilot harness uses the Copilot SDK, the shared agent runtime used by VS Code, GitHub Copilot CLI, and the GitHub Copilot app.' Support table: Tools full; Sampling deprecated-in-MCP but supported w/ per-server approval; Elicitation host-rendered; MCP Apps Experimental; Authorization OAuth; Resources read-only for MCP Apps; Roots deprecated; Prompts partial.",
+      "url": "https://code.visualstudio.com/api/extension-guides/ai/mcp",
+      "title": "VS Code docs - Integrate MCP servers with Copilot"
+    },
+    {
+      "id": "S18",
+      "version": "current page",
+      "date": "2026-11-13",
+      "evidence": "Documents open 'Agent Plugins 1.0' standard (agent-plugins.org): portable Skills (SKILL.md) and MCP servers (mcp.json); Copilot-specific non-portable components under com.github.copilot/ (agents/, commands/, rules/, hooks/hooks.json). 4 plugin formats: Agent Plugins 1.0, Copilot, Claude, Legacy OpenPlugin.",
+      "url": "https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference",
+      "title": "VS Code docs - Agent plugin authoring reference"
+    },
+    {
+      "id": "S19",
+      "version": "current page",
+      "date": "2026-11-13",
+      "evidence": "Hooks are harness-specific: Copilot harness hooks follow GitHub's Copilot hooks reference (shared with GitHub Copilot app/CLI); Claude/Codex session targets use their own hook docs; Local harness has a separate deprecated hooks reference. File-location sharing does not imply event/payload compatibility.",
+      "url": "https://code.visualstudio.com/docs/agent-customization/hooks",
+      "title": "VS Code docs - Configure agent hooks"
+    },
+    {
+      "id": "S20",
+      "version": "current page",
+      "date": "2026-11-13",
+      "evidence": "Canonical Copilot CLI/cloud hook schema; load order policy->repo .github/hooks/*.json->user ~/.copilot/hooks/->inline settings.json(.local.json) incl. cross-tool .claude/settings.json->plugin hooks.json; confirms event names (PostToolUse, SubagentStop/agentStop) and agent-scoped hooks via custom-agent YAML frontmatter.",
+      "url": "https://docs.github.com/en/copilot/reference/hooks-reference",
+      "title": "GitHub Docs - Copilot hooks reference"
+    },
+    {
+      "id": "S21",
+      "version": "fetched 2026-11-13 (public preview feature)",
+      "date": "2026-11-13",
+      "evidence": "Official feature docs: GitHub Copilot Memory stores two types -- repository-level facts (coding conventions, architectural decisions, build commands) and user-level personal preferences. Facts are cited back to supporting code; preferences may be cited with direct quotes of what the user said. Unused entries auto-expire after 28 days unless revalidated. Explicitly distinct from the separate per-project Memory setting in the GitHub Copilot app. Labeled public preview, subject to change.",
+      "url": "https://docs.github.com/en/copilot/concepts/prompting-and-context/copilot-memory",
+      "title": "About GitHub Copilot Memory - GitHub Docs"
+    },
+    {
+      "id": "S22",
+      "version": "blob sha e8242e075ce380179d99bca31b0c37ec4c5b7cc2; repo commit ed814e4134fdba86e2e88b82dcac85b1c125ed8a (main, 2026-11-13T02:22:29Z, auto-generated \"Update SDK snapshot for Copilot CLI 1.0.111-0\")",
+      "date": "2026-11-13",
+      "evidence": "Official github/copilot-sdk field-level event reference. Defines the session-event envelope (id, timestamp, parentId, agentId?, ephemeral?, type, data) and documents ephemeral-vs-persisted as the SDK's own explicit LOD flag. Covers assistant.* (turn_start/intent/reasoning/reasoning_delta/message/message_delta/turn_end/usage/streaming_delta), tool.* (execution_start/execution_partial_result[deprecated]/shell_output/execution_progress/execution_complete/user_requested), session.* (idle/compaction_start/compaction_complete/title_changed/context_changed/usage_info/session_limits_changed/usage_checkpoint/task_complete/shutdown), permission.requested/completed (discriminated union incl. kind:\"memory\"), user_input.requested/completed, elicitation.requested/completed, subagent.started/completed/failed/selected/deselected, skill.invoked, abort, user.message, system.message, external_tool.requested/completed. Doc explicitly states it is a hand-written reference and does NOT cover every event type -- the generated per-language SessionEvent union (not opened in this pass) is the authoritative exhaustive list.",
+      "url": "https://github.com/github/copilot-sdk/blob/main/docs/features/streaming-events.md",
+      "title": "copilot-sdk: Streaming session events"
+    },
+    {
+      "id": "S23",
+      "version": "blob sha c38cfc03910bc3ee15eb082b78733ce098fa8228; fetched via refs/heads/main",
+      "date": "2026-11-13",
+      "evidence": "Internal (non-exported) workbench type. Line 2227: export type SerializedChatResponsePart = IMarkdownString | IChatResponseProgressFileTreeData | IChatContentInlineReference | IChatAgentMarkdownContentWithVulnerability | IChatThinkingPart | IChatProgressResponseContentSerialized | IChatQuestionCarousel | IChatPlanReview | IChatDisabledClaudeHooksPart. This is the on-disk/persisted-history part union, narrower than the live ChatResponseStream part union exposed via vscode.d.ts -- i.e. a documented content-vs-persisted-history LOD narrowing point. INFERRED INTERNAL SOURCE, not public API (not an exported extension-facing type).",
+      "url": "https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/model/chatModel.ts#L2227",
+      "title": "vscode src/vs/workbench/contrib/chat/common/model/chatModel.ts (SerializedChatResponsePart)"
+    },
+    {
+      "id": "S24",
+      "version": "blob sha ebbe93af9fd7d72119c5360971dd3c981d145bce; fetched via refs/heads/main",
+      "date": "2026-11-13",
+      "evidence": "Internal (non-exported) workbench type. Lines ~183-230: IToolInvocation (callId, toolId, parameters, tokenBudget, context, subAgentInvocationId, toolSpecificData discriminated union, preToolUseResult, preApproved:ConfirmedReason, traceparent/tracestate W3C trace-context forwarded to MCP tools as _meta.traceparent per MCP SEP-414). Lines ~294-370: IToolResult.content is (IToolResultPromptTsxPart|IToolResultTextPart|IToolResultDataPart)[] keyed by kind:promptTsx|text|data, each with optional audience?/title?; plus toolResultMessage, toolResultDetails (IToolResultInputOutputDetails carrying raw mcpOutput for MCP App UI rendering, or IToolResultOutputDetails raw VSBuffer), toolResultError, confirmResults. This internal 3-kind content union is narrower than, and a different shape from, the public MCP 5-type content union (text/image/audio/resource/resource_link) -- image/audio/binary are folded into kind:data with a mimeType. INFERRED INTERNAL SOURCE, not public API.",
+      "url": "https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/tools/languageModelToolsService.ts#L183-L370",
+      "title": "vscode src/vs/workbench/contrib/chat/common/tools/languageModelToolsService.ts (IToolInvocation/IToolResult)"
+    }
+  ],
+  "types": [
+    {
+      "id": "T1",
+      "name": "MCP tool result content: text",
+      "lodIdea": "Base unstructured content item; always-on minimum LOD for a tool result.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "{type:'text', text:string, annotations?}",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T2",
+      "name": "MCP tool result content: image",
+      "lodIdea": "Opt-in richer content; clients may choose not to render/store base64 blobs at low LOD.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "{type:'image', data:base64, mimeType, annotations?}",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T3",
+      "name": "MCP tool result content: audio",
+      "lodIdea": "Same opt-in binary-content treatment as image.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "{type:'audio', data:base64, mimeType}",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T4",
+      "name": "MCP tool result content: resource_link",
+      "lodIdea": "Lightweight LOD: a pointer/reference instead of embedding full resource content.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "{type:'resource_link', uri, name?, description?, mimeType?, annotations?}",
+      "caveat": "Public MCP spec API; not guaranteed to appear in resources/list."
+    },
+    {
+      "id": "T5",
+      "name": "MCP tool result content: resource (embedded)",
+      "lodIdea": "Full LOD: resource content embedded inline rather than linked.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "{type:'resource', resource:{uri, mimeType?, text? or blob?}, annotations?}",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T6",
+      "name": "MCP tool result: structuredContent",
+      "lodIdea": "Structured/typed LOD layer distinct from free-text content.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "result.structuredContent: JSON object validated against tool outputSchema; also serialized into a text block for back-compat",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T7",
+      "name": "MCP tool result: isError",
+      "lodIdea": "Error-channel LOD flag layered onto a normal content array.",
+      "sourceIds": [
+        "S1"
+      ],
+      "family": "tools-mcp",
+      "structure": "result.isError: boolean (tool execution error, distinct from JSON-RPC protocol error)",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T8",
+      "name": "MCP progress notification",
+      "lodIdea": "Coarse (value only) to fine (value+total+message) progress LOD; sender controls frequency/granularity.",
+      "sourceIds": [
+        "S2"
+      ],
+      "family": "progress",
+      "structure": "notifications/progress: {progressToken, progress(monotonic), total?, message?}",
+      "caveat": "Public MCP spec API."
+    },
+    {
+      "id": "T9",
+      "name": "MCP elicitation (question/user answer)",
+      "lodIdea": "Structured-answer LOD constrained to flat primitive schema (no nesting).",
+      "sourceIds": [
+        "S3"
+      ],
+      "family": "question-answer",
+      "structure": "elicitation/create {message, requestedSchema: flat object of string/number/boolean/enum}; response {action: accept|decline|cancel, content?}",
+      "caveat": "Public MCP spec API; spec flags feature as new/evolving."
+    },
+    {
+      "id": "T10",
+      "name": "ChatHookType (hook lifecycle events)",
+      "lodIdea": "Event-type tag is the coarse LOD axis for hook visibility.",
+      "sourceIds": [
+        "S8",
+        "S20"
+      ],
+      "family": "hooks",
+      "structure": "'SessionStart'|'SessionEnd'|'UserPromptSubmit'|'UserPromptTransformed'|'PreToolUse'|'PostToolUse'|'PreCompact'|'SubagentStart'|'SubagentStop'|'Stop'|'ErrorOccurred'",
+      "caveat": "VS Code proposed (unstable) API. Event names corroborated by GitHub Copilot hooks reference (S20)."
+    },
+    {
+      "id": "T11",
+      "name": "ChatResponseHookPart",
+      "lodIdea": "Per-hook-execution part; stopReason signals a blocking hook.",
+      "sourceIds": [
+        "S8"
+      ],
+      "family": "hooks",
+      "structure": "{hookType:ChatHookType, stopReason?, systemMessage?, metadata?} via ChatResponseStream.hookProgress(...)",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T12",
+      "name": "ChatHookResult / ChatHookResultKind",
+      "lodIdea": "Three-tier severity LOD for a hook invocation outcome.",
+      "sourceIds": [
+        "S8"
+      ],
+      "family": "hooks",
+      "structure": "resultKind:'success'|'error'|'warning'; stopReason?; warningMessage?; output:unknown",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T13",
+      "name": "ChatRequest.hooks (resolved hook commands)",
+      "lodIdea": "Exposes resolved shell commands per hook type on the inbound request; redaction of command/env/cwd would be a lower-LOD option.",
+      "sourceIds": [
+        "S8"
+      ],
+      "family": "hooks",
+      "structure": "ChatRequestHooks:{[hookType]:ChatHookCommand[]}; ChatHookCommand:{command,cwd?,env?,timeout?}",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T14",
+      "name": "LanguageModelThinkingPart (reasoning)",
+      "lodIdea": "Visible reasoning/thinking text LOD, distinct from final answer text.",
+      "sourceIds": [
+        "S9"
+      ],
+      "family": "reasoning",
+      "structure": "{value:string|string[], id?, metadata?}",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T15",
+      "name": "includeEncryptedThinking (opaque reasoning)",
+      "lodIdea": "Explicit opaque/encrypted-vs-visible LOD switch for reasoning state replay.",
+      "sourceIds": [
+        "S9"
+      ],
+      "family": "reasoning",
+      "structure": "LanguageModelChatRequestOptions.includeEncryptedThinking?: boolean",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T16",
+      "name": "ChatResponseThinkingProgressPart / thinkingProgress()",
+      "lodIdea": "Streaming delta LOD for reasoning display, separate from batch LanguageModelThinkingPart.",
+      "sourceIds": [
+        "S7",
+        "S10"
+      ],
+      "family": "reasoning",
+      "structure": "ChatResponseStream.thinkingProgress(thinkingDelta:ThinkingDelta); class re-exported in vscodeTypes.ts",
+      "caveat": "Symbol confirmed; full ThinkingDelta shape/class body NOT read -- PARTIAL."
+    },
+    {
+      "id": "T17",
+      "name": "ChatQuestion / ChatQuestionType / ChatQuestionOption",
+      "lodIdea": "Structured in-chat question LOD vs free text.",
+      "sourceIds": [
+        "S10"
+      ],
+      "family": "question-answer",
+      "structure": "ChatQuestion{id, type:ChatQuestionType('Text'|'SingleSelect'|'MultiSelect'), title, message?, options?, default}",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T18",
+      "name": "ChatResponseQuestionCarouselPart",
+      "lodIdea": "Batches questions; allowSkip is forced-vs-optional answer LOD.",
+      "sourceIds": [
+        "S10"
+      ],
+      "family": "question-answer",
+      "structure": "{questions:ChatQuestion[], allowSkip:boolean}",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T19",
+      "name": "ChatResponseConfirmationPart",
+      "lodIdea": "Human-in-the-loop approve/deny gate LOD.",
+      "sourceIds": [
+        "S12"
+      ],
+      "family": "confirmation",
+      "structure": "runtime class {title:string, message:string|MarkdownString, data:any, ...}",
+      "caveat": "Only first 3 fields confirmed via text-match; full class body NOT read -- PARTIAL."
+    },
+    {
+      "id": "T20",
+      "name": "Tool auto-approval permission level",
+      "lodIdea": "Confirmation-bypass LOD spectrum, per-call confirm up to autonomous.",
+      "sourceIds": [
+        "S11"
+      ],
+      "family": "confirmation",
+      "structure": "ChatRequest field with values incl. 'autoApprove'(auto-approve+retry on error) and 'autopilot'(autoApprove+continue until done); full enum not captured",
+      "caveat": "PARTIAL enum, VS Code proposed API."
+    },
+    {
+      "id": "T21",
+      "name": "ChatResponseCodeCitationPart (citations)",
+      "lodIdea": "Minimal citation LOD: source + license + snippet, no span/offset metadata observed.",
+      "sourceIds": [
+        "S10"
+      ],
+      "family": "citations",
+      "structure": "{value:Uri, license:string, snippet:string}",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T22",
+      "name": "ChatResponseReferencePart / ChatResponseReferencePart2",
+      "lodIdea": "Generic reference/anchor LOD distinct from code-citation.",
+      "sourceIds": [
+        "S7",
+        "S10"
+      ],
+      "family": "citations",
+      "structure": "Reference part class(es); '2' variant doc-commented as 'reference target', full fields not captured",
+      "caveat": "NAME-ONLY/PARTIAL, not fully verified."
+    },
+    {
+      "id": "T23",
+      "name": "ChatSubagentToolInvocationData",
+      "lodIdea": "Rich subagent-invocation LOD: purpose, prompt sent, result text, model used.",
+      "sourceIds": [
+        "S10"
+      ],
+      "family": "subagents",
+      "structure": "{description?, agentName?, prompt?, result?, modelName?, ...more fields not captured}",
+      "caveat": "PARTIAL field list; file only partly read."
+    },
+    {
+      "id": "T24",
+      "name": "ChatRequest subagent linkage fields",
+      "lodIdea": "Correlation IDs to reconstruct parent/child subagent request trees.",
+      "sourceIds": [
+        "S11"
+      ],
+      "family": "subagents",
+      "structure": "subAgentInvocationId?, subAgentName?, parentRequestId?",
+      "caveat": "VS Code proposed API."
+    },
+    {
+      "id": "T25",
+      "name": "ChatHookType SubagentStart/SubagentStop",
+      "lodIdea": "Lifecycle-boundary LOD for subagent execution via the hooks channel.",
+      "sourceIds": [
+        "S8",
+        "S20"
+      ],
+      "family": "subagents",
+      "structure": "enum members of ChatHookType (T10); GitHub docs separately describe agentStop/SubagentStop for a custom agent scoped Stop hook",
+      "caveat": "INFERRED naming equivalence across two sources, payload shape not verified identical."
+    },
+    {
+      "id": "T26",
+      "name": "ChatToolInvocationPart / ChatMcpToolInvocationData / McpToolInvocationContentData",
+      "lodIdea": "VS Code wrapper around an MCP/built-in tool call+result; partial-input LOD for interim UI.",
+      "sourceIds": [
+        "S7",
+        "S10"
+      ],
+      "family": "tools-mcp",
+      "structure": "Re-exported names only; sibling ChatToolInvocationStreamData.partialInput:unknown confirmed for streaming partial/unvalidated tool args",
+      "caveat": "Mostly NAME-ONLY/UNVERIFIED structure."
+    },
+    {
+      "id": "T27",
+      "name": "LanguageModelToolMCPSource / LanguageModelToolExtensionSource",
+      "lodIdea": "Presumed provenance tags: MCP-provided vs extension-provided tool.",
+      "sourceIds": [
+        "S7"
+      ],
+      "family": "tools-mcp",
+      "structure": "Re-exported symbol names only",
+      "caveat": "NAME-ONLY: structure UNKNOWN/UNVERIFIED."
+    },
+    {
+      "id": "T28",
+      "name": "ChatResponseAutoModeResolutionPart / ChatAutoModeTier (model fusion/auto-routing)",
+      "lodIdea": "Closest public analogue to model-fusion/auto-routing LOD: per-turn model-selection events with a coarse tier tag.",
+      "sourceIds": [
+        "S10"
+      ],
+      "family": "models-fusion",
+      "structure": "class {resolvedModel:{id,name}|undefined}; type ChatAutoModeTier='efficiency'|'balance'|'intelligence'|'fast'; doc: 'Auto may route several times in a turn; each route gets its own row.'",
+      "caveat": "No broader multi-model ensembling/fusion concept found anywhere -- gap, not confirmed absent."
+    },
+    {
+      "id": "T29",
+      "name": "ChatResponseVoiceProgressPart",
+      "lodIdea": "Narration/voice-mode progress LOD, separate from text progress and hookProgress.",
+      "sourceIds": [
+        "S11"
+      ],
+      "family": "progress",
+      "structure": "{id:ChatResponseVoiceProgressStage, value:string}",
+      "caveat": "Stage enum values not read -- PARTIAL."
+    },
+    {
+      "id": "T30",
+      "name": "ChatResponseProgressPart / ChatResponseProgressPart2",
+      "lodIdea": "Generic progress text, optionally resolved via a task Thenable; '2' suffix suggests newer variant.",
+      "sourceIds": [
+        "S7",
+        "S10"
+      ],
+      "family": "progress",
+      "structure": "Re-exported names; ChatResponseStream.progress(value:string, task?:(p:Progress<ChatResponseWarningPart|ChatResponseReferencePart>)=>Thenable<string|void>)",
+      "caveat": "Class body of Part2 NOT read -- PARTIAL."
+    },
+    {
+      "id": "T31",
+      "name": "ChatResponseWarningPart / ChatResponseInfoPart / ChatErrorLevel",
+      "lodIdea": "Separate warning/info severity classes plus an error-level enum.",
+      "sourceIds": [
+        "S7"
+      ],
+      "family": "warnings",
+      "structure": "Re-exported symbol names only; used as Progress<> payload type",
+      "caveat": "NAME-ONLY: bodies/enum members not read -- UNVERIFIED."
+    },
+    {
+      "id": "T32",
+      "name": "Edits: TextEdit/NotebookEdit/WorkspaceEdit/ExternalEdit parts",
+      "lodIdea": "Auto-mode tier (T28) is cross-cut into edit attribution, not isolated to one part type.",
+      "sourceIds": [
+        "S10",
+        "S7"
+      ],
+      "family": "edits",
+      "structure": "ChatResponseTextEditPart{uri:Uri, edits:TextEdit[], isDone?, + an auto-routing-tier attribution field per a doc comment}",
+      "caveat": "Only TextEditPart opening fields read in full; others NAME-ONLY."
+    },
+    {
+      "id": "T33",
+      "name": "ChatRequestTurn2 / ChatResponseTurn2 (history LOD)",
+      "lodIdea": "Explicit content-vs-metadata LOD split when persisting/replaying a turn.",
+      "sourceIds": [
+        "S11"
+      ],
+      "family": "turns-history",
+      "structure": "ChatResponseTurn2.response: ReadonlyArray<Markdown|FileTree|Anchor|CommandButton|ExtendedChatResponsePart|ChatToolInvocationPart>; doc: only content-bearing stream parts (not metadata) are represented",
+      "caveat": "Verified directly from source comment and type union."
+    },
+    {
+      "id": "T34",
+      "name": "Hooks config/location model (CLI/cloud)",
+      "lodIdea": "Multi-source hook aggregation is a provenance/LOD question: trust/override semantics differ by source.",
+      "sourceIds": [
+        "S20"
+      ],
+      "family": "hooks",
+      "structure": "Load order: policy dir -> repo .github/hooks/*.json -> user ~/.copilot/hooks/ -> inline settings.json(.local.json) incl. cross-tool .claude/settings.json -> plugin hooks.json",
+      "caveat": "Describes Copilot CLI/cloud specifically, documented as distinct from VS Code proposed-API hooks of T10-T13 (S19)."
+    },
+    {
+      "id": "T35",
+      "name": "Agent-scoped hooks via custom-agent frontmatter",
+      "lodIdea": "Ties hook LOD scope to a specific custom agent/subagent persona.",
+      "sourceIds": [
+        "S20"
+      ],
+      "family": "hooks-subagents",
+      "structure": "YAML 'hooks:' map on a custom agent def, e.g. hooks:{PostToolUse:[{type:command, command, windows?}]}; a subagent's scoped Stop hook runs at SubagentStop/agentStop",
+      "caveat": "Copilot CLI only per source; link to VS Code SubagentStop enum (T10) is inferred naming equivalence."
+    },
+    {
+      "id": "T36",
+      "name": "Skills (SKILL.md, agent plugins)",
+      "lodIdea": "On-demand/lazy-loaded instruction LOD vs always-on instructions.",
+      "sourceIds": [
+        "S18",
+        "S16"
+      ],
+      "family": "skills",
+      "structure": "Portable Skills component per Agent Plugins 1.0 standard (agent-plugins.org); packaged under skills/<name>/SKILL.md + scripts; 'instructions, scripts, and resources that load on-demand'",
+      "caveat": "SKILL.md frontmatter schema itself NOT fetched from agent-plugins.org -- GAP."
+    },
+    {
+      "id": "T37",
+      "name": "Custom agents / subagents (persona)",
+      "lodIdea": "Role-scoped LOD narrowing tools/instructions for a persona; can be a subagent invocation target (T23/T24).",
+      "sourceIds": [
+        "S18",
+        "S16"
+      ],
+      "family": "subagents",
+      "structure": "Client-specific component under com.github.copilot/agents/<name>.agent.md; 'specialized personas and tool configurations'",
+      "caveat": ".agent.md frontmatter schema not fetched -- GAP."
+    },
+    {
+      "id": "T38",
+      "name": "Custom instructions (always-on)",
+      "lodIdea": "Baseline/always-on instruction LOD tier, opposite Skills on-demand tier.",
+      "sourceIds": [
+        "S16"
+      ],
+      "family": "instructions",
+      "structure": "Referenced page /docs/agent-customization/custom-instructions for project-level always-applied guidance, contrasted with on-demand Skills",
+      "caveat": "Page itself NOT fetched -- GAP, title/URL only."
+    },
+    {
+      "id": "T39",
+      "name": "Memory",
+      "lodIdea": "n/a",
+      "sourceIds": [],
+      "family": "memory",
+      "structure": "No dedicated public VS Code or MCP memory type/API found in sources checked",
+      "caveat": "GAP: not located. Custom instructions (T38) and ChatRequestHooks metadata are adjacent but not named memory features in sources read. Recommend follow-up search before concluding undocumented."
+    },
+    {
+      "id": "T40",
+      "name": "Model/usage accounting",
+      "lodIdea": "Token-count request LOD exists at API-call level; a response usage object was not located.",
+      "sourceIds": [
+        "S9"
+      ],
+      "family": "models-usage",
+      "structure": "LanguageModelChat.countTokens(...) confirmed (S9); no per-response token-usage/cost object read in this pass",
+      "caveat": "GAP: ChatResult referenced (S11) but its own declaration not opened."
+    },
+    {
+      "id": "T41",
+      "name": "Harness distinction: Local vs Copilot (and Codex/Claude session targets)",
+      "lodIdea": "Top-level LOD/compatibility axis matching the user's 'VS Code Local Copilot and Agent Host/CLI' phrasing: one editor UI now multiplexes several distinct backend runtimes.",
+      "sourceIds": [
+        "S14",
+        "S15",
+        "S17",
+        "S19"
+      ],
+      "family": "hosts",
+      "structure": "VS Code Session Target selects a harness: 'Local'(deprecated ChatParticipant model, own hooks ref), 'Copilot'(Copilot SDK, shared w/ GitHub Copilot CLI + app), plus 'Claude' and 'Codex' targets w/ own hook/doc refs",
+      "caveat": "Current (checked 2026-11-13) docs; recent reorganization vs a prior single monolithic GitHub Copilot Chat extension -- flagged as current-vs-prior mismatch."
+    },
+    {
+      "id": "T42",
+      "name": "MCP sampling and roots (deprecated-in-MCP capabilities)",
+      "lodIdea": "VS Code/Copilot support matrix explicitly diverges from MCP spec's own deprecations -- documented current-vs-spec mismatch.",
+      "sourceIds": [
+        "S17"
+      ],
+      "family": "models-usage",
+      "structure": "Per S17: Sampling 'Deprecated in MCP. Supported on compatible connections during an active turn, with per-server approval.'; Roots 'Deprecated in MCP. Existing integrations must check the runtime negotiated capability and returned roots.'",
+      "caveat": "MCP spec pages for sampling/roots not separately fetched to quote verbatim -- one-sided citation GAP."
+    },
+    {
+      "id": "T43",
+      "name": "Session event envelope (ephemeral vs persisted)",
+      "lodIdea": "The single most direct LOD control found in any source this session: every copilot-sdk event carries ephemeral:true (or absent=false). Ephemeral events (deltas, progress, session.idle, elicitation/user_input/permission... see per-event notes) stream live but are never written to the session log and are NOT replayed on resume; persisted events are durable and replayable. parentId chains only persisted events together.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "sdk-protocol",
+      "structure": "{id:string(uuid), timestamp:string(iso8601), parentId:string|null, agentId?:string, ephemeral?:boolean, type:string, data:object}",
+      "caveat": "Public API (official copilot-sdk docs page). Per-event ephemeral/persisted status given in the per-event notes below is as documented on this page; not cross-checked against generated SDK source."
+    },
+    {
+      "id": "T44",
+      "name": "user.message",
+      "lodIdea": "Records the raw user input plus a separate transformedContent (post-preprocessing) field and typed attachments -- a two-tier raw-vs-processed LOD for user turns.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "turns-history",
+      "structure": "data:{content, transformedContent?, attachments?:Attachment[], source?, agentMode?:'interactive'|'plan'|'autopilot'|'shell', interactionId?}",
+      "caveat": "Public API. Attachment[] item shape not itself detailed on this page (name-only: file/directory/selection/blob/GitHub-reference)."
+    },
+    {
+      "id": "T45",
+      "name": "assistant.message (+ turn_start/turn_end/message_delta) and reasoning-vs-opaque fields",
+      "lodIdea": "assistant.message carries content plus three parallel, provider-specific opaque/plain reasoning fields on the SAME message: reasoningOpaque (Anthropic encrypted thinking), encryptedContent (OpenAI encrypted reasoning), reasoningText (readable reasoning text), plus phase('thinking'|'response'). This is the CLI/SDK-side analogue to VS Code's includeEncryptedThinking flag (T9) -- confirms the opaque-vs-readable reasoning split is a cross-harness, cross-provider concept, not VS Code-specific.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "reasoning",
+      "structure": "data:{messageId, content, toolRequests?:ToolRequest[], reasoningOpaque?, reasoningText?, encryptedContent?, phase?, outputTokens?, interactionId?, parentToolCallId?(deprecated, use envelope agentId)}",
+      "caveat": "Public API. toolRequests[] item: {toolCallId, name, arguments?, type?:'function'|'custom'}."
+    },
+    {
+      "id": "T46",
+      "name": "assistant.reasoning / assistant.reasoning_delta",
+      "lodIdea": "Separate persisted-complete-block vs ephemeral-delta pair for extended thinking, matching the same complete/delta pattern used for assistant.message/assistant.message_delta -- a general streaming-LOD pattern applied consistently across content kinds.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "reasoning",
+      "structure": "assistant.reasoning data:{reasoningId, content}; assistant.reasoning_delta (ephemeral) data:{reasoningId, deltaContent}",
+      "caveat": "Public API."
+    },
+    {
+      "id": "T47",
+      "name": "tool.execution_start/progress/shell_output/execution_complete and 3-tier result content",
+      "lodIdea": "tool.execution_complete.result has three explicit LOD tiers at once: content (concise, may be truncated for token efficiency, sent to the LLM), detailedContent (full, preserves complete diffs etc., for display), and contents (ContentBlock[] structured text/terminal/image/audio/resource). tool.shell_output is a 4th, ephemeral, append-only live-terminal channel explicitly NOT persisted/replayed, superseding the deprecated tool.execution_partial_result bounded-snapshot channel.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "tools-mcp",
+      "structure": "tool.execution_start data:{toolCallId, toolName, arguments?, mcpServerName?, mcpServerDisplayName?, mcpToolName?}; tool.execution_complete data:{toolCallId, success, result?:{content, detailedContent?, contents?:ContentBlock[]}, error?:{message,code?}, toolTelemetry?, isUserRequested?}",
+      "caveat": "Public API. MCP identity resolved as mcpConfigServerName ?? mcpServerName (legacy-compatible) per doc note; ContentBlock[] item shape not itself detailed on this page."
+    },
+    {
+      "id": "T48",
+      "name": "subagent.started/completed/failed/selected/deselected",
+      "lodIdea": "A fuller subagent lifecycle schema than VS Code's name-only ChatSubagentToolInvocationData (T-gap): started carries agentName/agentDisplayName/agentDescription/model; completed/failed add durationMs/totalTokens/totalToolCalls; selected is an inferred-routing event (no toolCallId) with a tools:string[]|null scope (null = all tools); deselected has an explicitly empty {} payload.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "subagents",
+      "structure": "subagent.started:{toolCallId,agentName,agentDisplayName,agentDescription,model?}; subagent.completed:{toolCallId,agentName,agentDisplayName,model?,durationMs?,totalTokens?,totalToolCalls?}; subagent.failed: same + error; subagent.selected:{agentName,agentDisplayName,tools:string[]|null}; subagent.deselected:{}",
+      "caveat": "Public API. Envelope-level agentId (T43) is the correlation mechanism for routing sub-agent assistant/tool events to a separate UI lane; parentToolCallId on assistant/tool events is explicitly marked deprecated in favor of agentId."
+    },
+    {
+      "id": "T49",
+      "name": "skill.invoked",
+      "lodIdea": "Confirms Skills (SKILL.md, T36/T38 gap) are delivered to the model as fully-injected content, not a reference/pointer: content holds the full skill text. allowedTools documents the skill's requested auto-approval scope but the doc is explicit that the SDK does not auto-approve them -- the host's permission handler still decides (CLI auto-approves while active; other hosts may not).",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "skills",
+      "structure": "data:{name, path, content, allowedTools?:string[], pluginName?, pluginVersion?}",
+      "caveat": "Public API. Resolves part of the earlier SKILL.md gap (event-level shape now known); the SKILL.md frontmatter schema itself is still not directly verified."
+    },
+    {
+      "id": "T50",
+      "name": "permission.requested/completed (incl. kind:\"memory\")",
+      "lodIdea": "CORRECTS prior gap framing: GitHub Copilot Memory IS a publicly documented feature (S21), and the SDK's own schema for the write-side of a memory action is this permission kind: {subject, fact, citations}, matching the docs' statement that facts/preferences are cited back to supporting code or quotes. No separate dedicated memory.* event family (e.g. memory.created/memory.retired) was found in this pass -- the approval-flow event is the only memory-adjacent schema documented here. Other kinds (shell/write/read/mcp/url/custom-tool) are the general tool/file/network approval LOD gate; result.kind has 5 named outcomes incl. distinct denied-by-rules vs denied-interactively-by-user vs denied-by-content-exclusion-policy.",
+      "sourceIds": [
+        "S22",
+        "S21"
+      ],
+      "family": "confirmation",
+      "structure": "permission.requested data:{requestId, permissionRequest:{kind:'shell'|'write'|'read'|'mcp'|'url'|'memory'|'custom-tool', ...kind-specific fields, toolCallId?}}; permission.completed data:{requestId, result.kind:'approved'|'denied-by-rules'|'denied-interactively-by-user'|'denied-no-approval-rule-and-could-not-request-from-user'|'denied-by-content-exclusion-policy'}",
+      "caveat": "Public API for the event schema (S22). Whether these events are flagged ephemeral was not explicitly stated on the page (no 'Ephemeral.' marker was present for this section, unlike sibling user_input/elicitation events) -- inferred as persisted by the doc's own convention, not an explicit claim; flag as INFERRED for that specific point."
+    },
+    {
+      "id": "T51",
+      "name": "user_input.requested/completed and elicitation.requested/completed",
+      "lodIdea": "Two parallel ephemeral ask/answer event pairs: user_input.* for free-text/choice questions the agent itself originates, elicitation.* specifically for MCP's elicitation/create protocol (mode:'form') plus a non-MCP mode:'url' (open a browser URL) -- i.e. the CLI/SDK host renders both agent-native questions and MCP elicitation requests through a related-but-separate event-family, unlike VS Code's single ChatQuestion/ChatResponseQuestionCarouselPart (T-existing) which does not distinguish an MCP origin.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "question-answer",
+      "structure": "user_input.requested:{requestId,question,choices?,allowFreeform?,toolCallId?}; user_input.completed:{requestId,answer?,wasFreeform?}; elicitation.requested:{requestId,message,mode?:'form'|'url',requestedSchema?,url?,elicitationSource?,elicitationSourceDisplayName?,toolCallId?}; elicitation.completed:{requestId,action?:'accept'|'decline'|'cancel',content?}",
+      "caveat": "Public API, both marked Ephemeral. in the source doc."
+    },
+    {
+      "id": "T52",
+      "name": "Session lifecycle: idle/compaction/usage_info vs usage_checkpoint/shutdown",
+      "lodIdea": "session.usage_info (ephemeral, per-snapshot context-window utilization: tokenLimit/currentTokens/systemTokens/conversationTokens/toolDefinitionsTokens) is explicitly a DIFFERENT, lower-durability tier than session.usage_checkpoint (NOT marked ephemeral; described as a 'Durable aggregate usage checkpoint used to reconstruct accounting when a session is resumed' -- totalNanoAiu, totalPremiumRequests). session.compaction_start/complete brackets context-compaction with a rich result (preCompactionTokens/postCompactionTokens/messagesRemoved/summaryContent/checkpointNumber/checkpointPath). session.shutdown aggregates whole-session metrics (modelMetrics per model, codeChanges linesAdded/linesRemoved/filesModified, totalApiDurationMs).",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "progress",
+      "structure": "session.idle(ephemeral):{aborted?,mode?}; session.compaction_start(ephemeral):{}; session.compaction_complete:{success,error?,preCompactionTokens?,postCompactionTokens?,preCompactionMessagesLength?,messagesRemoved?,tokensRemoved?,summaryContent?,checkpointNumber?,checkpointPath?,compactionTokensUsed?,requestId?}; session.usage_info(ephemeral):{tokenLimit,currentTokens,messagesLength,systemTokens?,conversationTokens?,toolDefinitionsTokens?,isInitial?}; session.usage_checkpoint:{totalNanoAiu,totalPremiumRequests?}; session.shutdown:{shutdownType:'routine'|'error',errorReason?,totalPremiumRequests?,totalApiDurationMs,sessionStartTime,codeChanges,modelMetrics,currentModel?}",
+      "caveat": "Public API. Directly answers the task's progress + compaction + usage-persisted-vs-ephemeral questions at the CLI/SDK layer."
+    },
+    {
+      "id": "T53",
+      "name": "assistant.usage (per-API-call usage/cost, ephemeral)",
+      "lodIdea": "Rich, fully field-level public usage schema distinct from, and more granular than, the session-aggregate T52 events: per-call inputTokens/outputTokens/reasoningTokens (subset of outputTokens)/cacheReadTokens/cacheWriteTokens, cost (billing multiplier), duration, timeToFirstTokenMs/interTokenLatencyMs (streaming perf), reasoningEffort, apiEndpoint (incl. distinguishing /chat/completions vs /v1/messages vs /responses vs ws:/responses vs /interactions), quotaSnapshots and copilotUsage (itemized provider cost breakdown), contentFilterTriggered/finishReason.",
+      "sourceIds": [
+        "S22"
+      ],
+      "family": "models-usage",
+      "structure": "data:{model,inputTokens?,outputTokens?,reasoningTokens?,cacheReadTokens?,cacheWriteTokens?,cacheExpiresAt?,contentFilterTriggered?,finishReason?,cost?,duration?,timeToFirstTokenMs?,interTokenLatencyMs?,reasoningEffort?,initiator?,apiCallId?,serviceRequestId?,apiEndpoint?,providerCallId?,quotaSnapshots?,copilotUsage?}",
+      "caveat": "Public API. Marked Ephemeral.; resolves prior T40 gap (per-call usage fields) at the CLI/SDK layer -- VS Code's own ChatResult usage shape remains separately unverified."
+    },
+    {
+      "id": "T54",
+      "name": "SerializedChatResponsePart (VS Code internal persisted-history union)",
+      "lodIdea": "The actual on-disk/history-serialization part union is narrower than the live ChatResponseStream part union (vscodeTypes.ts, T-existing): only 9 named members (markdown, file-tree, inline-reference, markdown-with-vulnerability, thinking, a generic serialized-progress-content wrapper, question-carousel, plan-review, disabled-Claude-hooks). This is a concrete, line-cited content-vs-persisted-history LOD narrowing point -- many live-stream part types (confirmation, warning, command-button, etc.) are evidently NOT part of this persisted union by name, implying they are either excluded from history or folded into the generic IChatProgressResponseContentSerialized wrapper (wrapper internals not opened).",
+      "sourceIds": [
+        "S23"
+      ],
+      "family": "turns-history",
+      "structure": "type SerializedChatResponsePart = IMarkdownString | IChatResponseProgressFileTreeData | IChatContentInlineReference | IChatAgentMarkdownContentWithVulnerability | IChatThinkingPart | IChatProgressResponseContentSerialized | IChatQuestionCarousel | IChatPlanReview | IChatDisabledClaudeHooksPart",
+      "caveat": "INFERRED INTERNAL SOURCE -- workbench-internal (chatModel.ts), not an exported vscode.d.ts public API. Member interfaces themselves (e.g. IChatProgressResponseContentSerialized) not individually opened."
+    },
+    {
+      "id": "T55",
+      "name": "IToolInvocation / IToolInvocationContext (VS Code internal tool-call request shape)",
+      "lodIdea": "Internal request-side tool-call record carries subAgentInvocationId (subagent UI attribution, explicitly called a stop-gap pending unification with thinking/tool-call-group rendering), preToolUseResult (hook integration point, ties directly to the ChatHookType.PreToolUse hook from the earlier pass), preApproved:ConfirmedReason (lets a host/server-side decision skip the WaitingForConfirmation UI state entirely -- a direct confirmation-LOD bypass), and traceparent/tracestate W3C trace-context fields explicitly forwarded to MCP tool calls as _meta.traceparent per MCP SEP-414 (a concrete, named MCP-spec cross-reference not previously found).",
+      "sourceIds": [
+        "S24"
+      ],
+      "family": "tools-mcp",
+      "structure": "IToolInvocation:{callId,toolId,toolSessionResource?,originatingChatResource?,parameters,tokenBudget?,context,chatRequestId?,chatInteractionId?,chatStreamToolCallId?,subAgentInvocationId?,toolSpecificData?,modelId?,userSelectedTools?,selectedCustomButton?,preToolUseResult?,preApproved?,traceparent?,tracestate?}; IToolInvocationContext:{sandboxNetworkRestrictions?,sessionResource,requestId?,workingDirectory?}",
+      "caveat": "INFERRED INTERNAL SOURCE -- workbench-internal, not public API. toolSpecificData member interfaces (IChatTerminalToolInvocationData, IChatSessionTargetData, IChatAutomationConfigurationData, etc.) confirmed to exist by name in this union only, not individually opened (consistent with existing NAME-ONLY caveats elsewhere)."
+    },
+    {
+      "id": "T56",
+      "name": "IToolResult (VS Code internal 3-kind content union)",
+      "lodIdea": "Internal result-side content union has only 3 kinds -- promptTsx (opaque prompt-element JSON, re-stringified for accessibility), text (value:string, optional audience?/title?), data (mimeType+VSBuffer, optional audience?/title?) -- narrower than and differently shaped from the public MCP 5-type content union (text/image/audio/resource/resource_link, S1): image/audio/binary are all folded into kind:data generically by mimeType rather than given distinct kinds. Separately, toolResultDetails.mcpOutput is explicitly 'Raw MCP tool result for MCP App UI rendering' -- i.e. the raw upstream MCP CallToolResult is preserved verbatim alongside the lossier internal 3-kind summary, a documented full-fidelity escape hatch.",
+      "sourceIds": [
+        "S24"
+      ],
+      "family": "tools-mcp",
+      "structure": "IToolResult:{content:(IToolResultPromptTsxPart|IToolResultTextPart|IToolResultDataPart)[],toolSpecificData?,toolResultMessage?,toolResultDetails?:IToolResultInputOutputDetails|IToolResultOutputDetails,toolResultError?,toolMetadata?,confirmResults?}; IToolResultTextPart:{kind:'text',value,audience?,title?}; IToolResultDataPart:{kind:'data',value:{mimeType,data:VSBuffer},audience?,title?}; IToolResultInputOutputDetails:{input,inputLanguage?,output,isError?,mcpOutput?}",
+      "caveat": "INFERRED INTERNAL SOURCE -- workbench-internal, not public API. LanguageModelPartAudience (the audience? type) was previously NAME-ONLY (T-gap); its referenced use here is additional but still not a full definition read."
+    }
+  ],
+  "controls": [
+    "MCP: outputSchema/structuredContent presence is itself an LOD switch -- a tool can offer both a terse text block and a full structured object (S1).",
+    "MCP: progress 'total' and 'message' are optional per-notification, a fine/coarse LOD choice per update (S2).",
+    "MCP: elicitation requestedSchema is restricted to flat primitives -- a protocol-level LOD ceiling, not a client choice (S3).",
+    "VS Code hooks: ChatHookResultKind success/error/warning is a 3-level severity LOD per hook call; stopReason vs systemMessage vs silent success are distinct UI-visibility levels (S8).",
+    "VS Code hooks: ChatRequestHooks exposes resolved shell commands (cwd/env/timeout) on the request -- a high-sensitivity LOD axis with no documented redaction opt-out found (GAP).",
+    "VS Code reasoning: includeEncryptedThinking is an explicit binary LOD switch (opaque/encrypted vs plain) for carrying reasoning state across requests (S9).",
+    "VS Code reasoning: LanguageModelThinkingPart (batch, LM-API side) vs thinkingProgress()/ChatResponseThinkingProgressPart (streaming delta, chat-response side) appear to be two separate LOD channels for the same concept -- existence confirmed, exact relationship not (S7,S9,S10).",
+    "VS Code tool auto-approval: documented autoApprove/autopilot spectrum controls confirmation UI (T19) volume per tool call; full enum not captured (GAP).",
+    "VS Code auto-routing (fusion-adjacent): ChatAutoModeTier (efficiency/balance/intelligence/fast) + ChatResponseAutoModeResolutionPart give a documented 4-level LOD for which-model-was-picked transparency, repeatable per turn (S10).",
+    "VS Code history LOD: ChatResponseTurn2.response explicitly excludes metadata-only stream parts, a documented content/metadata split for persisted history (S11).",
+    "Hooks are explicitly NOT portable across harnesses (Local vs Copilot vs Claude vs Codex each have distinct hook schema/location) despite shared file-naming conventions -- an LOD/compatibility trap called out directly in docs (S19).",
+    "Agent Plugins 1.0 draws an explicit standard-vs-client-specific line: Skills and MCP servers are portable; Agents, Hooks, Automation templates, Slash commands are client-specific under com.github.copilot -- a documented LOD/portability boundary (S18).",
+    "copilot-sdk event envelope: the ephemeral boolean flag (T43) is the SDK's single clearest, explicit LOD control -- it is the documented switch between live-only/non-replayable detail and durable/replayable detail, applied consistently across assistant/tool/session/permission/elicitation event families (S22).",
+    "copilot-sdk tool results: a documented 3-tier LOD per tool call -- content (concise, token-efficient, LLM-facing, may be truncated) vs detailedContent (full, display-facing) vs contents (structured ContentBlock[]) -- gives an explicit, named precedent for a text/detailed/structured LOD split (S22, T47).",
+    "copilot-sdk usage: two separate durability tiers for cost/usage data -- session.usage_info (ephemeral, per-snapshot context-window view) vs session.usage_checkpoint (durable, resume-reconstructable aggregate) vs assistant.usage (ephemeral, full per-call billing/perf detail) -- a 3-way usage LOD split, more granular than anything found on the VS Code extension-API side (S22, T52, T53).",
+    "copilot-sdk permission.completed.result.kind enumerates 5 distinct approval/denial outcomes (approved, denied-by-rules, denied-interactively-by-user, denied-no-approval-rule-and-could-not-request-from-user, denied-by-content-exclusion-policy) -- a finer confirmation-outcome LOD than the 3-tier ChatHookResultKind found earlier (S22, T50).",
+    "VS Code internal: preApproved:ConfirmedReason on IToolInvocation is a documented mechanism for skipping the confirmation UI state entirely when a decision was already resolved out-of-band (e.g. agent-host server-side auto-approval) -- a concrete confirmation-LOD bypass distinct from the public autoApprove/autopilot spectrum (S24, T55).",
+    "VS Code internal: toolResultDetails.mcpOutput explicitly preserves the raw upstream MCP CallToolResult verbatim alongside the lossier internal 3-kind IToolResult.content summary -- a documented full-fidelity escape hatch co-existing with a lower-LOD default summary (S24, T56)."
+  ],
+  "gaps": [
+    "Memory (UPDATED): GitHub Copilot Memory IS a publicly documented feature (S21: repository-level facts + user-level preferences, cited, 28-day auto-expiry) and the copilot-sdk documents an event-level schema for the write/approval side (S22, T50: permission.requested kind:\"memory\" = {subject,fact,citations}). Remaining gap: no dedicated persisted memory.* event family (e.g. memory.created/retired) was found distinct from the approval flow, and the underlying storage/retrieval/similarity-matching mechanism is not documented at a schema level in any source read.",
+    "Custom instructions page and SKILL.md frontmatter schema (agent-plugins.org) were referenced but not fetched -- exact field-level LOD controls unknown (T36,T38).",
+    "ChatResult's own field list was not opened; any usage/telemetry/cost fields on a chat result are unverified (T40).",
+    "ChatToolInvocationPart, ChatMcpToolInvocationData, McpToolInvocationContentData, LanguageModelToolMCPSource, LanguageModelToolExtensionSource, ChatResponseReferencePart/2, ChatResponseWarningPart, ChatResponseInfoPart, ChatErrorLevel, ChatResponseProgressPart2, ChatResponseVoiceProgressStage, Notebook/Workspace/ExternalEditPart class bodies confirmed to exist by name only -- NAME-ONLY/PARTIAL, not verified API shape.",
+    "microsoft/vscode-copilot-chat is archived (S13); its historical file tree was not re-opened to diff pre-archival public API vs current extensions/copilot-in-monorepo surface.",
+    "The openai/codex git component pinned in cgmanifest.json (S6) is a dependency/license-inventory record only (corrected framing) -- it does not establish which runtime executes Copilot turns or the extension's full successor history; its functional role in the running extension was not explored further and remains UNKNOWN, not merely INFERRED.",
+    "MCP spec pages for Sampling, Roots, Prompts, Resources (beyond fragments on the Tools page) were not individually fetched; S17 claims about MCP deprecating Sampling/Roots not cross-verified against MCP's own wording.",
+    "Follow-up: github/copilot-sdk docs/features/streaming-events.md (S22) was fetched directly as a primary source and is now cited extensively (T43-T53). This is a hand-maintained reference page, not the generated SessionEvent union/type source itself -- the page explicitly states it does not cover every event type and that the generated per-language union is the authoritative exhaustive list; that generated schema file was not opened in this bounded follow-up.",
+    "ChatResponseAutoModeResolutionPart/ChatAutoModeTier (T28) is the closest analogue found to model-fusion; no multi-model ensembling/voting/fusion mechanism was found documented anywhere checked -- may not exist publicly, or exists under different terminology not yet located.",
+    "VS Code internal chatModel.ts/languageModelToolsService.ts citations (S23,S24; T54-T56) are INFERRED INTERNAL SOURCE, not public extension API -- useful for understanding current persisted-history/tool-result shape, but these types are not part of vscode.d.ts and may change without any public API deprecation notice."
+  ],
+  "interpretationNotes": [
+    {
+      "finding": "Input, result and attachment detail need separate controls",
+      "evidence": "SDK documentation describes result.content, detailedContent and contents, while MCP supports text/image/audio/resource/resource_link plus structuredContent.",
+      "implication": "A tool's concise model-facing text is not necessarily its full display result. A no-results choice must also govern newly generated result companions.",
+      "source": "https://github.com/github/copilot-sdk/blob/ed814e4134fdba86e2e88b82dcac85b1c125ed8a/docs/features/streaming-events.md"
+    },
+    {
+      "finding": "Ephemeral is an availability boundary, not a way to restore past output",
+      "evidence": "The SDK reference marks live-only event families, including user-input/elicitation and shell-output channels.",
+      "implication": "An offline export can select only what was recorded. Do not promise complete historical questions, live deltas or per-call usage merely because the live API defines them.",
+      "source": "https://github.com/github/copilot-sdk/blob/ed814e4134fdba86e2e88b82dcac85b1c125ed8a/docs/features/streaming-events.md"
+    },
+    {
+      "finding": "Question/answer output deserves a semantic category",
+      "evidence": "Local questionCarousel state, agent-native user_input events, MCP elicitation and tool-based ask_user use different records. The Local stress example has an unmatched recorded answer string despite a general verification pass.",
+      "implication": "Short form should keep title plus recorded outcome. Show skipped/cancelled/unavailable separately. A string nonmatch is a warning, not conclusive proof of why content is missing.",
+      "source": "observed-inventory.json"
+    },
+    {
+      "finding": "Memory is a documented feature, but not one export format",
+      "evidence": "GitHub documents repository memories and user preferences. The SDK reference separately describes memory-related permission data.",
+      "implication": "Distinguish a memory operation from loaded instructions, graph queries and compaction. Historical content must come from recorded evidence, not today's memory state.",
+      "source": "https://docs.github.com/en/copilot/concepts/prompting-and-context/copilot-memory"
+    },
+    {
+      "finding": "A top-level type union does not prove which content is absent",
+      "evidence": "The checked VS Code SerializedChatResponsePart union includes a generic serialized-progress wrapper whose member definitions were not all opened.",
+      "implication": "The nine top-level members are not nine total persisted kinds. Do not infer that tools, confirmations or warnings cannot persist. The Local survey directly encounters multiple such kinds.",
+      "source": "source-research.json"
+    },
+    {
+      "finding": "Public documentation and sampled private events have different coverage",
+      "evidence": "The survey sees Fusion, usage_record, skill reference, model snapshot and hook events beyond the verified public event subset. Public Auto routing is not evidence that Fusion is model ensembling.",
+      "implication": "Keep unfamiliar event reporting independent of content filters. The report inventories observed names without inventing undocumented semantics.",
+      "source": "observed-inventory.json"
+    },
+    {
+      "finding": "Dependency inventories do not establish which runtime executed a chat",
+      "evidence": "The online pass records a Codex component entry and a changing VS Code extension layout.",
+      "implication": "These are background source observations. They neither broaden this exporter's provider scope nor establish Copilot runtime behavior. Claude/Codex sessions remain out of scope.",
+      "source": "source-research.json"
+    }
+  ]
+}
