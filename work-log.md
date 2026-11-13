@@ -12,7 +12,7 @@ Updated 261112. New here? Read the [handbook](work-items/README.md) first. Produ
 
 **Inbox:** see [Inbox](#inbox).
 
-**In flight:** [WI-050](work-items/WI-050-portable-work-tracking-kit.md) Decisions 30/31 accepted. Next: the real codebase-context pilot, with the scope and import checklist in the topic's [pilot plan](work-items/WI-050-portable-work-tracking-kit.md#pilot-plan-261112).
+**In flight:** [WI-050](work-items/WI-050-portable-work-tracking-kit.md) The real codebase-context pilot ran 261112 and produced a usable tracker. See the [pilot results and evidence limits](work-items/WI-050-portable-work-tracking-kit.md#real-codebase-context-pilot-261112). Next: about 2 weeks of normal use. A stronger private-source publication check (K1) is proposed, not approved.
 
 ## Overview
 
@@ -87,7 +87,7 @@ Updated 261112. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-026"></a>[WI-026 pnpm migration](work-items/WI-026-pnpm-migration.md) | Development commands and CI examples use pinned pnpm with a local install guard. Local validation passes, but remote CI hasn't been run. | ✅ Done | [build] | - | - | - | [Setup](README.md#install), [guard](scripts/require-pnpm.mjs), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-027](#wi-027) |
 | <a name="wi-027"></a>↳ **WI-027** Browser CSP assertions | Part of WI-026. Handler-case tests allow browser CSP reporting differences while keeping rejection, execution and insertion checks. | ✅ Done | [build] | - | - | - | [Test](test/compressed-listing-browser.test.ts), [findings](work-items/WI-026-pnpm-migration.md#findings), [receipts](work-items/WI-026-pnpm-migration.md#notes), [WI-008](#wi-008) |
 | <a name="wi-046"></a>**WI-046** Focused test guidance | Added `pnpm test <file...>` as the default and kept a file URL fallback with the wrapper's cache checks. Accepted 261104. | ✅ Done | [build] | - | - | - | [Commands](AGENTS.md#commands) |
-| <a name="wi-050"></a>[WI-050 Portable work-tracking kit](work-items/WI-050-portable-work-tracking-kit.md) | Build and pilot a copy-in kit. Templates, workflows and checker implemented. Decisions 30/31 accepted 261110; no more sandbox tests. Next: the real codebase-context pilot, scope and import checklist decided 261112. | 🔨 Active · Medium | [build] | both | L | - | [WI-040](#wi-040); [Kit topic](../work-tracking-system/work-tracking/items/WI-001-portable-kit.md) |
+| <a name="wi-050"></a>[WI-050 Portable work-tracking kit](work-items/WI-050-portable-work-tracking-kit.md) | Build and pilot a copy-in kit. Real install/import ran 261112: 20 WI rows and 12 Inbox entries filed. Results, findings K1-K5 and evidence limits are in the topic. Next: about 2 weeks of normal use, then acceptance review. | 🔨 Active · Medium | [build] | both | L | - | [WI-040](#wi-040); [Kit topic](../work-tracking-system/work-tracking/items/WI-001-portable-kit.md) |
 | <a name="wi-051"></a>[WI-051 Prompt-to-skill migration](work-items/WI-051-prompt-to-skill-migration.md) | Migrated `exporter-status` and `exporter-critique-prompt` to manual skills. Generic repo prompts, packaged export and installer unchanged. Static checks and verify passed. Waits for fresh Local/Copilot command checks and your acceptance. | ⏳ Waiting · Medium | [build] | you | S | - | [Status](.github/skills/exporter-status/SKILL.md), [Critique](.github/skills/exporter-critique-prompt/SKILL.md), [Backups](docs/notes/) |
 
 ## Inbox
@@ -109,6 +109,8 @@ Format: `YYMMDD [tag] text (from: you|agent)`. Append only. Reread before adding
 - 261104 [question] (due when WI-047 resumes) [WI-047](work-items/WI-016-offline-listings.md#child-project-attribution): should child project attribution use the child's own project, the parent's project, or both? (from: agent)
 - 261104 [question] (due when WI-044 resumes) [WI-044](work-items/WI-015-discovery-and-selection.md#cross-provider-selector-collisions): when a selector matches both a Local and an SDK chat, should the CLI error, prefer one, or require a qualified key? The dev decides before any build. (from: agent)
 - 261110 [build] Local export drops the dev's answers to `vscode_askQuestions`. It shows the questions and "Analyzing your answers..." but not the choices. The journal stores them in the tool result as `{"answers":{"<title>":{"selected":[...],"freeText":...,"skipped":...}}}`. Seen in 1109 chat `e47df75c` (from: agent)
+- 261112 [research] In `2c407ad4`, ordinary main-conversation message and tool-execution records are absent around 261112-1651 to 1750 -5. Hooks preserve questions and some answers, but other answers are elided. Investigate why the stated canonical records aren't present and whether the exporter should warn. A host write failure isn't established. See [WI-050 evidence limits](work-items/WI-050-portable-work-tracking-kit.md#real-codebase-context-pilot-261112) (from: agent)
+- 261112 [build] Export of `2c407ad4` failed Layer D with 125 reported gaps and 7 unhandled event types: `session.usage_record` (222) and 6 fusion types (see [WI-042](#wi-042)). Diagnose the verification failure and event handling separately from the sparse conversation records above; a shared cause isn't established. [Saved failure](temp-tool-output/261112-1935-codebase-context-pilot/failed-2c407ad4-23ca-4409-a544-68f8cbdfc28f-261112_193453.log) (from: agent)
 
 ## Closed lookup
 

@@ -6,10 +6,10 @@
 - **Owner:** [the exporter dashboard](../work-log.md#wi-050) owns this item's status, priority and next action.
 - **Implementation:** the sister repository [work-tracking-system](../../work-tracking-system/README.md) owns the kit. Its [WI-001](../../work-tracking-system/work-tracking/items/WI-001-portable-kit.md) holds the full decision registry.
 - **Evidence through 261110:** templates, installation guidance, five skills, four procedures and a minimal checker exist. Sandbox install/import and Local status/triage runs were reviewed in this chat.
-- **Latest source checked here:** the kit checkout is clean at `6dc9f5a`. Its own priority rules are confirmed.
-- **Safety boundary:** the real codebase-context pilot hasn't run. Sandbox results don't count as real-project acceptance.
+- **Latest source checked here:** the kit checkout is clean at `63bda59`, checked 261112. Its own priority rules are confirmed.
+- **Real pilot 261112:** install and import ran on codebase-context, and the commits were pushed. The resulting tracker is usable. The review records changed test conditions, a publication-check gap and findings K1-K5 with their evidence limits. See [Real codebase-context pilot](#real-codebase-context-pilot-261112).
 - **Accepted 261110:** the dev accepted decisions 30 and 31, including their behavior, and stopped further sandbox testing. The kit handoff is committed at `63bda59`, checked 261112.
-- **Next:** the real codebase-context pilot in fresh chats in the target project. Scope and import-quality checklist are under [Pilot plan](#pilot-plan-261112).
+- **Next:** about 2 weeks of normal use in codebase-context, per the [pilot plan](#pilot-plan-261112). A stronger publication check for private-source imports (K1) is proposed, not approved.
 - **Separate exporter work:** [WI-051](WI-051-prompt-to-skill-migration.md) owns this repo's review/status skill migration. Missing structured question answers remain in the exporter's [Inbox](../work-log.md#inbox).
 
 ## Original goal
@@ -165,6 +165,53 @@ Commit hashes above refer to the kit's local Git history. They were checked for 
 
 The 14-to-12 change isn't lost work. Filing C07 and dropping C08 removed two lines. Retained C04 plus eleven unanswered lines made twelve. The later Keep approvals reviewed all twelve without shrinking the Inbox.
 
+### Real codebase-context pilot (261112)
+
+Reviewed 261112 from Copilot SDK/CLI session `2c407ad4-23ca-4409-a544-68f8cbdfc28f` (Agent Host ID `0cfb6154-dfb1-4311-a250-24d100cca0b2`), session checkpoints and the target repo at `42247e9`. Install and import ran in one chat. Three commits exist, and the remote-tracking reflog records an update by push at 261112-175237 -5. **Result: install and import produced a usable tracker, with limits on approval evidence and test coverage.**
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Install safety | ✅ Clean tree checked first. 17 new files, no overwrites, `.gitignore` gained `temp-tool-output/`. One question at a time: mode, areas, hook, priority rules, then the file plan. The agent restated the free-text area answer before using it | Session events; commit `ed66150` |
+| Install stamp and checker | ✅ Handbook stamp `63bda59 on 261112`. Priority rules confirmed 261112. `check-tracking.mjs` passes on the dashboard and 2 topics | Target `handbook.md` L3, L55; checker run 261112 |
+| Install handoff | ✅ The agent said to fully quit VS Code and run `/wt-import` in a fresh chat on a strong model | `events.jsonl` line 424 |
+| Import size | 36 candidates: 20 WI rows, 12 Inbox, 3 rejected, 1 left for later. 24 more findings screened out with evidence | Import report Summary |
+| Vendor and completed-work filtering | ✅ 2 quoted Esri TODOs rejected as third-party. Done items and cpe-exb app work screened out. This isn't a completeness audit of all source chats | Report D1-D2 and Screened out |
+| Context to resume | Rows carry descriptions, priority, dependencies and import links. The two Next rows state their next action. Not every backlog row has a separate next-action sentence | Target dashboard |
+| Duplicates merged | ✅ Merges noted in candidate rows, for example A8, B2 and B7. All 25 sandbox candidates mapped to this import (R1-R9) | Report L67, L78, L83, L203 |
+| Source link per item | ⚠️ WI rows link the report file, not the candidate row. Inbox lines have no source link | Target dashboard |
+| Retire with separate approval | A separate proposal is recorded, and the report/checkpoints say it was approved. Its answer text is elided in the surviving hook record. Three banners were added, leaving the old lists unchanged. README and `docs/temp` lists stayed as reference | Hook at `events.jsonl` L1337; report Outcomes; commit `42247e9` |
+| Commits | ✅ Three commits with no coauthor trailers. Hook results confirm the three-commit choice and the date-correction/rebuild approval. Checkpoint 4 records the fixup and autosquash | Hooks at L1530 and L1724; Git history; checkpoint 4 |
+| Priority question and Priority column | ✅ Install asked for priority rules. The report's WI table has a Priority column | Install events; report L124 |
+| Review under 30 minutes | ❓ User review time wasn't measured. The initial approval question covered 30 candidates; six were added later. The import interaction lasted about 75 minutes, including scanning, questions, investigation and commits | Hook at L1133; report; event timestamps |
+| Normal use after import | ✅ The same chat later planned WI-021 with a tracking-fields question. The dev changed its priority to High | Target dashboard L46 |
+
+Differences from the [pilot plan](#pilot-plan-261112). The broader source scan was chosen by the dev. The missing per-item publication flag is a review gap, not an assumed approval to skip it.
+
+| Plan | What happened | Effect |
+| --- | --- | --- |
+| Fresh chat after install and a VS Code restart | `/wt-import` ran in the install chat 4 minutes later. No skill content was attached, so the agent read `SKILL.md` and `import.md` itself | Fresh-chat slash-command loading is still untested on a real project. The fallback worked with full context |
+| Strong model, not Auto | Fusion routing named `claude-opus-5.5` as primary, with a review/repair route. Three research subagents resolved to `gpt-5.6-luna` | Not a single-model trial. This result doesn't guarantee future Auto choices |
+| Pass 1 without chat history | The dev included ignored `docs/temp/` and related chats. The report says 49 chats were filtered to 12, plus 3 transcripts read by 3 subagents. Extracts were clipped to work-marker lines | Offering chat mining afterward and repeat-import merging weren't exercised. This was a bounded scan, not full reading of every conversation |
+| Privacy flag per item from ignored sources before commit | The report says chats are paraphrased and cited by date. It has no per-item publication flag | A scan of the 11 committed tracking files at `42247e9` found no Windows absolute-path or email-pattern matches. This doesn't certify privacy, licensing or absence of other confidential details |
+
+Kit findings and proposals. Recording them doesn't approve implementation. K3 and K5 aren't confirmed defects.
+
+| # | Gap | Why it matters | Possible fix |
+| --- | --- | --- | --- |
+| K1 | No per-candidate publication check for imports from ignored files or private chats | `import.md` already requires access approval when needed and forbids quoting secrets, credentials or personal data. Those rules don't make every private-source detail suitable for publication | Extend the existing rule: label private-source candidates and review their proposed public text before commit/push. Access approval isn't publication approval |
+| K2 | No bounded chat-extraction procedure | This run wrote a journal extractor and clipped the inputs. Another agent needs to know what was scanned or skipped | Add bounded-read and omission-reporting guidance. Consider existing tools before writing another extractor, without requiring this exporter |
+| K3 | Verification resumed after compaction | Checkpoint 4 describes `/wt-import` as invoked again. The available main conversation records don't establish whether this was a fresh request or replayed context | Watch during normal use. Don't diagnose a compaction bug from the checkpoint wording alone |
+| K4 | Report links point to the file, not the candidate | Readers must search the report for C2 or A8 | Low. Anchor each candidate row, or leave as is |
+| K5 | WI-021 is High and depends on Medium WI-018 and WI-019 | The dev chose High. The handbook doesn't require dependencies to inherit priority, and Do after records the order | No confirmed rule violation. Revisit only if work ordering becomes confusing |
+
+Cost, from cumulative usage checkpoints (observed here): install and hook Q&A 247.47 credits, import 1,108.39, and later activity 479.98. Total 1,835.84 credits and 33 recorded premium requests through 261112-193257 -5. Credits are nano-AIU divided by 1e9. Phase costs are differences between checkpoints at `events.jsonl` L574, L1888 and L2833, not sums of cumulative totals. The later phase includes WI-021 discussion and session-info requests.
+
+**Evidence limit:** Between about 261112-1651 and 261112-1750 -5, the file lacks ordinary main-conversation message and tool-execution records. Hooks, usage, fusion and system records remain. Hooks include question text and some answers: the field approval at L1229, reconciliation at L1432 and date-rebuild approval at L1724. Other answers, including the initial batch and retirement choice, are replaced with elision markers. Their exact choices can't be independently checked from those hook results. This is partial evidence, not proof that every question was lost or that the host failed to write them.
+
+**Exporter check:** The saved export failed Layer D with 125 reported gaps and seven unhandled event types. That doesn't establish why the conversation records are sparse or prove 125 source events were lost. Both questions are in the exporter's Inbox.
+
+**Git boundary for this review:** The extraction and pilot plan were committed as `da37fbc` at 261112-193649 -5 while review was underway. At recheck, the shared dashboard snapshot, index and that commit had the same dashboard blob (`8a536766`). The topic index blob also matched that commit (`143e10fa`). The pilot findings were unstaged additions on top. No index modification or history rewrite was needed.
+
 ### Corrections and evidence gaps
 
 - The kit's own decision-29 follow-up is no longer uncommitted. `6dc9f5a` records it.
@@ -178,13 +225,13 @@ The 14-to-12 change isn't lost work. Filing C07 and dropping C08 removed two lin
 
 Read the kit's current [dashboard](../../work-tracking-system/work-tracking/dashboard.md) and [topic](../../work-tracking-system/work-tracking/items/WI-001-portable-kit.md#resume-point) before issuing another implementation prompt. Check its Git state again because other sessions work there.
 
-Stopped 261112 before the pilot. The kit is clean at `63bda59`. The uncommitted `package.json` change is in codebase-context, not the kit. Next: run install in a fresh target chat, then a docs/code import. Offer optional chat mining afterward. This chat reviews the import against the [pilot checklist](#pilot-plan-261112).
+The real pilot ran 261112 and is reviewed under [Real codebase-context pilot](#real-codebase-context-pilot-261112). codebase-context is at `42247e9`, pushed. Its WI-021 planning edits are uncommitted there. The kit is still clean at `63bda59`. Next: about 2 weeks of normal use, logging friction in the target's Inbox. The proposed K1 publication check needs separate approval.
 
 | Remaining work or decision | Boundary |
 | --- | --- |
-| Real codebase-context pilot | Approved 261112 with the scope above. Install and import edits still need approval inside the target chat. Retiring source lists needs separate approval |
-| Chat-history mining | Optional second `/wt-import` run, now or later. Compare findings with current tracking and pass-1 reports. Propose context additions, duplicates and conflicts before approved merges. Bounded scanning and kit procedure changes remain unimplemented |
-| Approve the rest, pause, incomplete reporting, overrides, install priority question, import Priority column | Not tested end to end. The dev chose 261110 not to run more sandbox tests. Watch for them during real use |
+| Real codebase-context pilot | Install and import produced the recorded tracker. Normal use and the dev's acceptance remain. K1-K4 are possible follow-ups; K5 isn't a confirmed defect |
+| Chat-history mining | Ran in pass 1 by the dev's choice. A later repeat `/wt-import` can still test merging into existing items. Bounded scanning guidance (K2) isn't in the kit |
+| Approve the rest, pause, incomplete reporting, overrides | Not tested end to end. The install priority question and import Priority column were exercised 261112. Watch for the rest during real use |
 | Later vsc-chat-tool and proj-ent-cfg-test pilots | Keep the real sister projects read-only outside approved pilot scope. A frozen-old-log test on a copy remains an option |
 | Fuller checker | Planned after the pilot: statuses, Closed lookup and pinned line-link checks. The minimal checker isn't that implementation |
 | Weak-model fallback test | Deferred unless its expected value justifies another run or the stray load recurs |
@@ -192,6 +239,9 @@ Stopped 261112 before the pilot. The kit is clean at `63bda59`. The uncommitted 
 
 ## References
 
+- Real pilot SDK/CLI session `2c407ad4-23ca-4409-a544-68f8cbdfc28f`, distinct from Agent Host ID `0cfb6154-dfb1-4311-a250-24d100cca0b2`. Source: its local `events.jsonl` and checkpoints 001 and 004.
+- [Real pilot import report](../../codebase-context/work-tracking/notes/261112-1653-import/import-report.md), [target dashboard](../../codebase-context/work-tracking/dashboard.md) and [target handbook](../../codebase-context/work-tracking/handbook.md). Git checks use `42247e9`, not the later uncommitted WI-021 additions.
+- [Saved export verification failure](../temp-tool-output/261112-1935-codebase-context-pilot/failed-2c407ad4-23ca-4409-a544-68f8cbdfc28f-261112_193453.log). The export is incomplete and isn't a substitute for checking the event records.
 - [Kit README](../../work-tracking-system/README.md), [INSTALL](../../work-tracking-system/INSTALL.md), [dashboard](../../work-tracking-system/work-tracking/dashboard.md) and [WI-001](../../work-tracking-system/work-tracking/items/WI-001-portable-kit.md).
 - [Kit decision source](../../work-tracking-system/work-tracking/notes/decisions-source.md) and [original inventory and alternatives](../../work-tracking-system/work-tracking/notes/inventory-and-options.md).
 - [Checker source](../../work-tracking-system/template/work-tracking/check-tracking.mjs) and [checker tests](../../work-tracking-system/test/check-tracking.test.mjs).
