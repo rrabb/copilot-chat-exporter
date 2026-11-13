@@ -9,12 +9,14 @@ This is the single project instruction file for all agents and harnesses. `.gith
 
 Read in this order: the [handbook](work-items/README.md) (statuses, tags, rules), the **Start here** section of the [work-log.md](work-log.md) dashboard, then the topic in `work-items/` for the item you work on. Skip `work-log-archive.md` unless a link sends you there.
 
+The [work-tracking-system repository](https://github.com/rrabb/work-tracking-system) owns the reusable kit and its decisions. The [local handbook](work-items/README.md) governs this project's tracking. Kit updates need separate approval before copying here. See [WI-050](work-items/WI-050-portable-work-tracking-kit.md) for ownership and project-specific differences.
+
 You may read past chat sessions for context. Name each one you used in the Evidence line. Summarize what you learned; never paste chat text into a tracked file.
 
 For this project the dashboard's Do now table is the handoff for a new chat. Don't add a kickoff prompt to it; put 'what next' notes in your reply.
 
 - **Inbox:** put each new idea, bug, question or research topic in the dashboard Inbox as one line: `YYMMDD [tag] text (from: you|agent)`. Tags: `[idea]` `[research]` `[build]` `[question]`. Append only, and reread before you add. At session start, say what to do with each line: make a row, drop it, or keep it.
-- **Capture check:** after a prompt that produced something worth keeping (an idea, finding, decision or status change), update the Inbox, the dashboard row or the topic. Skip the update for plain Q&A. End every reply, including plain Q&A, with `Tracking: updated WI-NNN (what)` or `Tracking: no change`, just above the `Evidence:` line. The line also shows that this file loaded.
+- **Capture check:** after a prompt that produced something worth keeping (an idea, finding, decision or status change), update the Inbox, the dashboard row or the topic. Skip the update for plain Q&A. End every reply, including plain Q&A, with a Tracking line. Use `Tracking: updated WI-NNN (what)` for an item's tracking, `Tracking: updated <file> (what)` for tracking edits no WI owns, or `Tracking: no change`. Name every WI and file you updated, separated by `; `. Put it just above the `Evidence:` line. The line also shows that this file loaded.
 - **Completion check:** before reporting completion, run the handbook's [Completion check](work-items/README.md#completion-check). Tracking is part of finishing the task. If tracking can't be updated, report the task as incomplete and explain why.
 - Closing an item needs the dev's confirmation. See the handbook. Finishing the work you were asked to do is not closing. Set it Waiting for the dev's acceptance, say what to check, and ask.
 - **Rabbit holes:** new work found while working on an item becomes a child WI with exactly one `Part of` parent and its `Do after` items. Add it to the parent's Work tree and refresh the tree's progress line.

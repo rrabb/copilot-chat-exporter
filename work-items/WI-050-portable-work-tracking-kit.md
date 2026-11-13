@@ -6,9 +6,9 @@
 - **Owner:** [the exporter dashboard](../work-log.md#wi-050) owns this item's status, priority and next action.
 - **Implementation:** the sister repository [work-tracking-system](../../work-tracking-system/README.md) owns the kit. Its [WI-001](../../work-tracking-system/work-tracking/items/WI-001-portable-kit.md) holds the full decision registry.
 - **Evidence through 261110:** templates, installation guidance, five skills, four procedures and a minimal checker exist. Sandbox install/import and Local status/triage runs were reviewed in this chat.
-- **Latest source checked here:** the kit checkout is clean at `63bda59`, checked 261112. Its own priority rules are confirmed.
+- **Latest kit evidence checked 261112:** `1e09312` records the README quick start, commands, FAQ and pilot outcome. Its priority rules remain project-specific.
 - **Real pilot 261112:** install and import ran on codebase-context, and the commits were pushed. The resulting tracker is usable. The review records changed test conditions, a publication-check gap and findings K1-K5 with their evidence limits. See [Real codebase-context pilot](#real-codebase-context-pilot-261112).
-- **Accepted 261110:** the dev accepted decisions 30 and 31, including their behavior, and stopped further sandbox testing. The kit handoff is committed at `63bda59`, checked 261112.
+- **Accepted 261110:** the dev accepted decisions 30 and 31, including their behavior, and stopped further sandbox testing. The accepted handoff is recorded at `63bda59`.
 - **Next:** about 2 weeks of normal use in codebase-context, per the [pilot plan](#pilot-plan-261112). A stronger publication check for private-source imports (K1) is proposed, not approved.
 - **Separate exporter work:** [WI-051](WI-051-prompt-to-skill-migration.md) owns this repo's review/status skill migration. Missing structured question answers remain in the exporter's [Inbox](../work-log.md#inbox).
 
@@ -280,7 +280,11 @@ Ways to cut cost, not yet tested or approved:
 
 Read the kit's current [dashboard](../../work-tracking-system/work-tracking/dashboard.md) and [topic](../../work-tracking-system/work-tracking/items/WI-001-portable-kit.md#resume-point) before issuing another implementation prompt. Check its Git state again because other sessions work there.
 
-The real pilot ran 261112 and is reviewed under [Real codebase-context pilot](#real-codebase-context-pilot-261112). codebase-context is at `42247e9`, pushed. Its WI-021 planning edits are uncommitted there. The kit's HEAD is still `63bda59`. On 261112, unstaged kit edits (dev-approved option A) added a README 60-second tour, Quick start, command table, model and cost guidance and an FAQ. The same edits moved kit WI-001 to Active with a post-pilot Resume point. This puts a short user-facing version of K6 in the README. Procedure changes for K1, K2 and K6 aren't made. Next: about 2 weeks of normal use, logging friction in the target's Inbox. The proposed K1 publication check and K6 cost guidance need separate approval. For the next import or heavy session, pick one model instead of Auto/Fusion-max (see [Credit use](#credit-use-in-the-real-pilot)).
+The real pilot ran 261112 and is reviewed under [Real codebase-context pilot](#real-codebase-context-pilot-261112). The recorded target install/import evidence is `42247e9`. Kit evidence `1e09312` records the README 60-second tour, Quick start, command table, model and cost guidance, FAQ and post-pilot handoff. README cost guidance addresses part of K6. Procedure changes for K1, K2 and K6 remain proposed, not approved. Next: about 2 weeks of normal use, logging friction in the target's Inbox. Before another import or heavy session, choose a model and effort level using the [recorded credit-use findings](#credit-use-in-the-real-pilot).
+
+On 261112, the dev approved copying the file-based Tracking-line rule, post-commit reconciliation and commit-evidence rule into the exporter handbook, with matching Tracking wording in AGENTS.md. These edits were applied. The answer-interpretation rule was excluded. The exporter layout, priority rules, skills, procedures and checker stay unchanged. Review and acceptance of these exporter edits remain.
+
+On 261112, the dev also approved adding kit-ownership pointers to AGENTS.md and the local handbook. The pointers distinguish the reusable kit's authority from the local rules and require approval before copying updates. Both pointers were added.
 
 | Remaining work or decision | Boundary |
 | --- | --- |
