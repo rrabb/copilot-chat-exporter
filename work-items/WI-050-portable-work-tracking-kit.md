@@ -203,8 +203,63 @@ Kit findings and proposals. Recording them doesn't approve implementation. K3 an
 | K3 | Verification resumed after compaction | Checkpoint 4 describes `/wt-import` as invoked again. The available main conversation records don't establish whether this was a fresh request or replayed context | Watch during normal use. Don't diagnose a compaction bug from the checkpoint wording alone |
 | K4 | Report links point to the file, not the candidate | Readers must search the report for C2 or A8 | Low. Anchor each candidate row, or leave as is |
 | K5 | WI-021 is High and depends on Medium WI-018 and WI-019 | The dev chose High. The handbook doesn't require dependencies to inherit priority, and Do after records the order | No confirmed rule violation. Revisit only if work ordering becomes confusing |
+| K6 | Install and import cost about 1,356 credits. The kit gives no cost guidance | The dev asked for cheaper subagents, and they were used. Their recorded calls cost about 0.2% of recorded per-call credits. Primary and repair calls account for most recorded costs | See [Credit use](#credit-use-in-the-real-pilot). Possible: name one model or use a lower Fusion effort, run import in a fresh chat, and have subagents return compact candidate tables |
+
+#### Credit use in the real pilot
 
 Cost, from cumulative usage checkpoints (observed here): install and hook Q&A 247.47 credits, import 1,108.39, and later activity 479.98. Total 1,835.84 credits and 33 recorded premium requests through 261112-193257 -5. Credits are nano-AIU divided by 1e9. Phase costs are differences between checkpoints at `events.jsonl` L574, L1888 and L2833, not sums of cumulative totals. The later phase includes WI-021 discussion and session-info requests.
+
+**Why it cost this much (observed here, 261112).** Per-call `session.usage_record` entries, grouped by phase and model. Phases split at the same checkpoint lines. Probe scripts: `temp-tool-output/261112-2005-credit-probe/`.
+
+| Phase | Model (role) | Effort | Calls | Credits | Largest input (tokens) |
+| --- | --- | --- | --- | --- | --- |
+| Install | `gpt-6-astra` (main, Auto/Fusion) | max | 24 | 246.3 | 75,133 |
+| Install | `gpt-6-luna` (main, light steps) | medium | 10 | 1.1 | 67,392 |
+| Import | `claude-opus-5.5` (main, Fusion primary) | xhigh | 119 | **774.0** | 187,998 |
+| Import | `gpt-6-astra` (Fusion repair solver) | xhigh | 13 | **237.2** | 116,528 |
+| Import | `gpt-6-sol` (Fusion judge) | high | 4 | 3.5 | 14,947 |
+| Import | `gpt-5.6-luna` (3 explore subagents) | low | 11 | **2.9** | 43,360 |
+| Later | `gpt-6-astra` (main) | varies | 17 | 336.2 | 147,942 |
+| Later | `gpt-6.1-sol` (main) | medium | 30 | 77.5 | 157,406 |
+| Later | `gpt-6-luna` (main) | medium | 5 | 0.2 | 14,084 |
+
+Per-call records add up to ~1,678.9 credits. The checkpoints total 1,835.8. The ~157-credit gap is **unknown**. It may be calls without usage records, for example during the sparse interval below. Don't treat the per-model split as complete.
+
+Price per million tokens, in credits, from the same records:
+
+| Model | Input | Cache read | Cache write | Output |
+| --- | --- | --- | --- | --- |
+| `gpt-6-astra` (max) | 700 | 70 | 875 | 3,500 |
+| `claude-opus-5.5` (xhigh) | 280 | 14 | 350 | 1,400 |
+| `gpt-6-sol` / `gpt-6.1-sol` | 140 | 14 / 7 | 175 | 700 |
+| `gpt-5.6-luna` | 20 | 2 | 25 | 120 |
+| `gpt-6-luna` | 7 | 0.7 | 8.75 | 35 |
+
+What drove the spend:
+
+| # | Driver | Evidence | Share |
+| --- | --- | --- | --- |
+| 1 | **Fusion selected `gpt-6-astra` for primary and repair work.** Its recorded input and output prices are 2.5x Opus; cache reads are 5x | 41 primary calls cost ~582.5 credits. 13 import repair calls cost ~237.2. The import judge was `gpt-6-sol`, not Astra | ~819.7 credits, ~49% of recorded per-call credits |
+| 2 | **The Opus main agent did the import itself**: 119 calls, each re-reading a context that grew to ~188K tokens | 12.2M cache-read tokens (~171 credits), 873K cache-write (~306), 184K output incl. 98K reasoning (~257) | ~774 credits, ~46% |
+| 3 | **Cache writes**: Opus cache writes cost 25x cache reads in these records | 873K Opus cache-write tokens. Growth, model switches and expiry can affect caching, but the cause of each write wasn't checked | Part of driver 2 |
+| 4 | **Install and import in one chat**, so the install context carried into the import | Plan asked for a fresh import chat. The run didn't do that | Not measured separately |
+| 5 | Subagents | 3 `explore` agents on `gpt-5.6-luna` low. `subagent.completed` at L959 and L969 shows ~44-50K tokens each | ~2.9 credits, ~0.2% |
+
+**Correction:** An earlier review attributed all Astra costs to Fusion review/repair at max effort. That was wrong. The install used Astra as the primary solver, and the import used it for repair at xhigh effort. The import judge used `gpt-6-sol`. See `events.jsonl` L4, L214, L575, L1651 and L1767. Recorded judge calls cost ~3.5 credits. Avoiding review could also avoid repair, but its cost and quality value cannot be predicted from this one run.
+
+**Conclusion.** The cheaper subagents worked as asked. Their recorded costs were a small share. Astra primary and repair calls and the Opus primary calls account for most recorded per-call credits. The missing ~157 credits limit the breakdown.
+
+Ways to cut cost, not yet tested or approved:
+
+| Option | Expected effect | Risk |
+| --- | --- | --- |
+| Pick one model (for example Opus 5.5 or `gpt-6.1-sol`) instead of Fusion | Avoids Fusion's automatic judge and repair phases for the main request | The chosen model must still do the work. Savings and quality weren't measured |
+| Try Fusion Standard instead of Max | May reduce cost while keeping automatic model selection | Savings and quality weren't measured. GitHub describes Standard as one model per task, but this session recorded a Standard cascade at L1899 |
+| Run import in a fresh chat, as the plan said | Smaller context on every call | Needs the dev to follow the two-chat flow |
+| Have subagents read sources and return compact candidate tables. The main agent only merges, asks and files | Fewer, shorter main-agent calls | Cheap models may miss or misread candidates. Needs a spot check |
+| Lower main-agent reasoning effort (xhigh to high) for filing steps | Fewer reasoning tokens | Lower judgment quality on merges |
+| Keep related steps close together when practical | May avoid cache expiry and repeated cache writes | Cache lifetime and actual savings vary. Hard to control in spare-time sessions |
+| Pre-extract chat history with a script before import | Agent reads less raw text | Overlaps K2. Adds a tool step |
 
 **Evidence limit:** Between about 261112-1651 and 261112-1750 -5, the file lacks ordinary main-conversation message and tool-execution records. Hooks, usage, fusion and system records remain. Hooks include question text and some answers: the field approval at L1229, reconciliation at L1432 and date-rebuild approval at L1724. Other answers, including the initial batch and retirement choice, are replaced with elision markers. Their exact choices can't be independently checked from those hook results. This is partial evidence, not proof that every question was lost or that the host failed to write them.
 
@@ -225,11 +280,11 @@ Cost, from cumulative usage checkpoints (observed here): install and hook Q&A 24
 
 Read the kit's current [dashboard](../../work-tracking-system/work-tracking/dashboard.md) and [topic](../../work-tracking-system/work-tracking/items/WI-001-portable-kit.md#resume-point) before issuing another implementation prompt. Check its Git state again because other sessions work there.
 
-The real pilot ran 261112 and is reviewed under [Real codebase-context pilot](#real-codebase-context-pilot-261112). codebase-context is at `42247e9`, pushed. Its WI-021 planning edits are uncommitted there. The kit is still clean at `63bda59`. Next: about 2 weeks of normal use, logging friction in the target's Inbox. The proposed K1 publication check needs separate approval.
+The real pilot ran 261112 and is reviewed under [Real codebase-context pilot](#real-codebase-context-pilot-261112). codebase-context is at `42247e9`, pushed. Its WI-021 planning edits are uncommitted there. The kit's HEAD is still `63bda59`. On 261112, unstaged kit edits (dev-approved option A) added a README 60-second tour, Quick start, command table, model and cost guidance and an FAQ. The same edits moved kit WI-001 to Active with a post-pilot Resume point. This puts a short user-facing version of K6 in the README. Procedure changes for K1, K2 and K6 aren't made. Next: about 2 weeks of normal use, logging friction in the target's Inbox. The proposed K1 publication check and K6 cost guidance need separate approval. For the next import or heavy session, pick one model instead of Auto/Fusion-max (see [Credit use](#credit-use-in-the-real-pilot)).
 
 | Remaining work or decision | Boundary |
 | --- | --- |
-| Real codebase-context pilot | Install and import produced the recorded tracker. Normal use and the dev's acceptance remain. K1-K4 are possible follow-ups; K5 isn't a confirmed defect |
+| Real codebase-context pilot | Install and import produced the recorded tracker. Normal use and the dev's acceptance remain. K1-K4 and K6 are possible follow-ups; K5 isn't a confirmed defect |
 | Chat-history mining | Ran in pass 1 by the dev's choice. A later repeat `/wt-import` can still test merging into existing items. Bounded scanning guidance (K2) isn't in the kit |
 | Approve the rest, pause, incomplete reporting, overrides | Not tested end to end. The install priority question and import Priority column were exercised 261112. Watch for the rest during real use |
 | Later vsc-chat-tool and proj-ent-cfg-test pilots | Keep the real sister projects read-only outside approved pilot scope. A frozen-old-log test on a copy remains an option |
