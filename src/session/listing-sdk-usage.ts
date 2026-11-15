@@ -3,38 +3,26 @@
 // The attribution is the same code the Markdown export uses (`sdk-usage.ts`), on the listing's
 // own turn list. Credits are AI credits: recorded nano-AIU / 1,000,000,000.
 
-import type { UsageFigures } from '../types.ts';
+import type { SessionUsage, UsageSelection } from '../types.ts';
 import type { ListingEvidence, ListingTurnEvidence } from './listing-evidence-types.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import type { SdkEventSource } from './sources.ts';
 import {
-  NANO_PER_CREDIT, addCall, attributeCalls, copilotHomeOf, emptyFigures, loggedTotal, perCallComplete, readUsageLedger,
-  totalsPerTurn, usageFromEvents,
+  NANO_PER_CREDIT, attributeCalls, copilotHomeOf, loggedTotal, readUsageLedger,
+  selectUsage, totalsPerTurn, usageComplete, usageForScope, usageScopeEvents,
 } from './sdk-usage.ts';
 import type { TurnStart, UsageCall } from './sdk-usage.ts';
+import { sumUsageFigures } from './usage-figures.ts';
 
 /** Per-call usage of one log: the CLI store first, else the log's own usage events. Read once per log. */
-export interface LogUsage { calls: UsageCall[]; source: 'session-store' | 'event-log' | 'none' }
+export interface LogUsage { calls: UsageCall[]; source: SessionUsage['source']; selection?: UsageSelection }
 
 export function readLogUsage (all: readonly SdkEvent[], source: SdkEventSource): LogUsage {
   const stored = readUsageLedger(copilotHomeOf(source.path), source.sessionId).calls;
-  if (stored.length)
-    return { calls: stored, source: 'session-store' };
-  const fromLog = usageFromEvents(all);
-  return fromLog.length ? { calls: fromLog, source: 'event-log' } : { calls: [], source: 'none' };
+  return selectUsage(all, stored);
 }
 
-const credits = (nano: number) => nano / NANO_PER_CREDIT;
-
-/** A turn's own calls plus those of the agents it delegated to. */
-function combined (left: UsageFigures, right: UsageFigures): UsageFigures {
-  return {
-    calls: left.calls + right.calls, inputTokens: left.inputTokens + right.inputTokens,
-    cacheReadTokens: left.cacheReadTokens + right.cacheReadTokens, cacheWriteTokens: left.cacheWriteTokens + right.cacheWriteTokens,
-    outputTokens: left.outputTokens + right.outputTokens, reasoningTokens: left.reasoningTokens + right.reasoningTokens,
-    nanoAiu: left.nanoAiu + right.nanoAiu, durationMs: left.durationMs + right.durationMs,
-  };
-}
+const credits = (nano: number | null) => nano === null ? null : nano / NANO_PER_CREDIT;
 
 /** Sets chat-level usage and, for a main conversation, credits and tokens on each turn. Never throws for missing data. */
 export function attachSdkListingUsage (
@@ -44,24 +32,18 @@ export function attachSdkListingUsage (
   source: SdkEventSource,
   usage: LogUsage,
 ): void {
-  const logged = loggedTotal(all);
-  if (!usage.calls.length && !logged)
+  const rootAgentId = source.scope.kind === 'subagent' ? source.scope.agentId : null;
+  const relevant = usageScopeEvents(all, rootAgentId);
+  const selected = usageForScope(all, usage, rootAgentId);
+  const calls = selected.calls;
+  const logged = rootAgentId === null ? loggedTotal(all) : null;
+  if (!calls.length && !logged && !selected.selection?.selectedForWholeLog && !selected.selection?.receiptRecords)
     return;
-  const replies = all.filter((event) => event.type === 'assistant.message').length;
+  const replies = relevant.filter((event) => event.type === 'assistant.message').length;
   const base = {
     source: usage.source, replies, loggedCredits: logged ? credits(logged.nanoAiu) : null, loggedEvent: logged?.event ?? null,
     shutdowns: logged?.shutdowns ?? 0, beforeFirstTurnCredits: 0, unmatchedCredits: 0, byModel: [],
   };
-  if (source.scope.kind === 'subagent') {
-    const agentId = source.scope.agentId;
-    const own = usage.calls.filter((call) => call.agentId === agentId);
-    const figures = own.reduce((sum, call) => addCall(sum, call), emptyFigures());
-    evidence.usage = {
-      ...base, scope: 'subagent', perCallRows: usage.calls.length, complete: perCallComplete(usage.calls.length, replies),
-      ...(own.length ? { agent: { calls: figures.calls, credits: credits(figures.nanoAiu), inputTokens: figures.inputTokens, cacheReadTokens: figures.cacheReadTokens, cacheWriteTokens: figures.cacheWriteTokens, outputTokens: figures.outputTokens } } : {}),
-    };
-    return;
-  }
   const indexes: number[] = [];
   const starts: TurnStart[] = [];
   evidence.turns.forEach((turn, index) => {
@@ -71,14 +53,14 @@ export function attachSdkListingUsage (
     }
   });
   const stamps = scoped.map((event) => Date.parse(event.timestamp ?? '')).filter(Number.isFinite);
-  const attribution = attributeCalls(all, starts, usage.calls, stamps.length ? Math.max(...stamps) + 5000 : -Infinity);
-  const totals = totalsPerTurn(all, starts);
-  const complete = perCallComplete(attribution.recorded.calls + attribution.unattributed.calls, replies);
+  const attribution = attributeCalls(relevant, starts, calls, stamps.length ? Math.max(...stamps) + 5000 : -Infinity, rootAgentId);
+  const totals = totalsPerTurn(rootAgentId === null ? all : [], starts);
+  const complete = usageComplete(calls, replies, selected.selection);
   indexes.forEach((turnIndex, slot) => {
     const turn: ListingTurnEvidence = evidence.turns[turnIndex]!;
     const figures = attribution.turns[slot];
     const running = totals.turns[slot];
-    const perCall = figures ? combined(figures.own, figures.agents) : null;
+    const perCall = figures ? sumUsageFigures(figures.own, figures.agents) : null;
     if (figures && perCall) {
       turn.promptTokens = perCall.inputTokens;
       turn.completionTokens = perCall.outputTokens;
@@ -90,14 +72,18 @@ export function attachSdkListingUsage (
       turn.credits = credits(running.nanoAiu);
       turn.usage = {
         basis: 'running-total', span: running.fromTurn < running.toTurn ? { from: running.fromTurn, to: running.toTurn } : null,
-        calls: perCall?.calls ?? 0, cacheReadTokens: perCall?.cacheReadTokens ?? 0, cacheWriteTokens: perCall?.cacheWriteTokens ?? 0,
+        calls: perCall?.calls ?? 0, cacheReadTokens: perCall ? perCall.cacheReadTokens : null, cacheWriteTokens: perCall ? perCall.cacheWriteTokens : null,
         perCallCredits: perCall ? credits(perCall.nanoAiu) : null,
       };
     }
   });
+  const ownAgent = rootAgentId === null ? undefined : attribution.byAgent.get(rootAgentId);
   evidence.usage = {
-    ...base, scope: 'main', perCallRows: attribution.recorded.calls + attribution.unattributed.calls, complete,
-    beforeFirstTurnCredits: credits(totals.before), unmatchedCredits: credits(attribution.unattributed.nanoAiu),
+    ...base, scope: rootAgentId === null ? 'main' : 'subagent', perCallRows: calls.length, complete,
+    beforeFirstTurnCredits: totals.before / NANO_PER_CREDIT, unmatchedCredits: credits(attribution.unattributed.nanoAiu),
+    unmatchedCalls: attribution.unattributed.calls,
+    ...(selected.selection ? { selection: selected.selection } : {}),
+    ...(ownAgent ? { agent: { calls: ownAgent.calls, credits: credits(ownAgent.nanoAiu), inputTokens: ownAgent.inputTokens, cacheReadTokens: ownAgent.cacheReadTokens, cacheWriteTokens: ownAgent.cacheWriteTokens, outputTokens: ownAgent.outputTokens } } : {}),
     byModel: attribution.byModel.map(([model, figures]) => ({
       model, calls: figures.calls, credits: credits(figures.nanoAiu), inputTokens: figures.inputTokens,
       cacheReadTokens: figures.cacheReadTokens, cacheWriteTokens: figures.cacheWriteTokens, outputTokens: figures.outputTokens,

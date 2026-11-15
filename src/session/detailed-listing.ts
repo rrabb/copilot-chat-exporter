@@ -16,6 +16,7 @@ import { detailedListingController } from './detailed-listing-controller.ts';
 import { listingFileIdentity } from './listing-edits.ts';
 import { detailedChatType, detailedTypeOf, detailedTitle, detailedTitles, detailedWorkspace, detailedProjects, detailedHeaderId, detailedMetrics } from './detailed-listing-presentation.ts';
 import { compactTokenCount, listingUsage } from './listing-usage.ts';
+import { sumKnown } from './usage-figures.ts';
 import type { ListingUsageMetric } from './listing-usage.ts';
 import { detailedSearchAttribute, detailedTitleAttribute } from './detailed-search.ts';
 
@@ -100,12 +101,14 @@ function hasUsage (usage: ReturnType<typeof listingUsage>): boolean {
 }
 const usageUnavailableTag = () => tag('Usage unavailable', 'No supported recorded credit/token counters for these counted turns.', 'neutral');
 /** Credits with enough digits for a cheap turn: whole numbers from 100, one decimal from 10, two below. */
-function creditText (value: number): string {
+function creditText (value: number | null): string {
+  if (value === null)
+    return 'unknown';
   return value >= 100 ? Math.round(value).toLocaleString('en-US')
     : value >= 10 ? value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
       : value.toFixed(2);
 }
-const tokenText = (value: number) => value.toLocaleString('en-US');
+const tokenText = (value: number | null) => value === null ? 'unknown' : value.toLocaleString('en-US');
 
 /** What a turn's credits are, for agent chats: the basis, and the turns one checkpoint covers. */
 function sdkTurnUsageTags (turn: ListingTurnEvidence): string {
@@ -128,7 +131,7 @@ function sdkUsageDisclosure (usage: ListingSessionUsage, shown: ReturnType<typeo
   if (usage.scope === 'subagent') {
     rows.push(usage.agent
       ? ['This agent\'s own recorded calls', `${creditText(usage.agent.credits)} credits`, `${usage.agent.calls.toLocaleString('en-US')} calls matched by agent ID. Agents it started itself are not included.`]
-      : ['This agent\'s own recorded calls', 'not recorded', 'No per-call rows carry this agent\'s ID. The log\'s running total below covers every conversation in the log.']);
+      : ['This agent\'s own recorded calls', 'not recorded', 'No per-call rows carry this agent\'s ID. Whole-log running totals aren\'t attributed to this child.']);
   } else {
     rows.push(['Credits shown (sum of the turns)', shown.credits.total === null ? '?' : `${shown.credits.recorded < shown.credits.turns ? '~' : ''}${creditText(shown.credits.total)}`,
       `${usageCoverage(shown.credits)}. Per turn: the per-call rows where they cover about every reply, otherwise the difference between running totals.`]);
@@ -137,10 +140,17 @@ function sdkUsageDisclosure (usage: ListingSessionUsage, shown: ReturnType<typeo
   usage.loggedCredits !== null && rows.push(['Last logged total (whole log)', `${creditText(usage.loggedCredits)} credits`,
     `<code>${safe(usage.loggedEvent ?? '')}</code>; a running total for the whole event log, ${usage.shutdowns.toLocaleString('en-US')} shutdown record${usage.shutdowns === 1 ? '' : 's'}. Never added across resumes.`]);
   usage.source !== 'none' && rows.push(['Per-call rows', `${usage.perCallRows.toLocaleString('en-US')} of ${usage.replies.toLocaleString('en-US')} replies${usage.complete ? '' : ' (partial)'}`,
-    usage.source === 'session-store' ? 'The Copilot CLI session store, <code>assistant_usage_events</code>' : '<code>model.model_call_success</code> events in the log']);
-  usage.unmatchedCredits > 0 && rows.push(['Not matched to a turn or agent', `${creditText(usage.unmatchedCredits)} credits`, 'Per-call rows that fit no turn of this conversation.']);
-  const tokens = usage.scope === 'main' ? usage.byModel.reduce((sum, item) => ({
-    input: sum.input + item.inputTokens, read: sum.read + item.cacheReadTokens, write: sum.write + item.cacheWriteTokens, output: sum.output + item.outputTokens,
+    usage.source === 'session-store' ? 'The Copilot CLI session store, <code>assistant_usage_events</code>'
+      : usage.source === 'usage-record' ? '<code>session.usage_record</code> receipts in the log' : '<code>model.model_call_success</code> events in the log']);
+  ((usage.unmatchedCalls ?? 0) > 0 || (usage.unmatchedCredits !== null && usage.unmatchedCredits > 0))
+    && rows.push(['Not matched to a turn in this conversation', `${creditText(usage.unmatchedCredits)} credits`, 'Per-call rows that fit no turn of this conversation, including children without a verified parent call.']);
+  usage.selection && rows.push(['Separate source availability', `${usage.selection.available.ledger} ledger / ${usage.selection.available.receipts} receipts / ${usage.selection.available.legacy} legacy`,
+    `Only the selected source is counted. Alternatives aren't merged, even when the ledger is partial.${usage.selection.selectedForWholeLog ? ' Source selection happened for the whole log before filtering to this conversation.' : ''}`]);
+  usage.selection?.receiptRecords && rows.push(['Receipt identity checks', `${usage.selection.duplicateReceipts} identical / ${usage.selection.conflictingReceipts} conflicting repeats`,
+    `${usage.selection.unsupportedReceipts} unsupported records. Repeated accounting identities count once. Conflicting counters stay unknown.`]);
+  usage.source === 'usage-record' && rows.push(['Receipt durations', 'milliseconds (inferred)', 'The official SDK defines milliseconds. Applying that unit to this persisted wrapper isn\'t independently ledger-matched.']);
+  const tokens = usage.scope === 'main' ? usage.byModel.reduce<{ input: number | null; read: number | null; write: number | null; output: number | null }>((sum, item) => ({
+    input: sumKnown(sum.input, item.inputTokens), read: sumKnown(sum.read, item.cacheReadTokens), write: sumKnown(sum.write, item.cacheWriteTokens), output: sumKnown(sum.output, item.outputTokens),
   }), { input: 0, read: 0, write: 0, output: 0 }) : usage.agent ? { input: usage.agent.inputTokens, read: usage.agent.cacheReadTokens, write: usage.agent.cacheWriteTokens, output: usage.agent.outputTokens } : null;
   const partial = usage.complete ? '' : ' Partial: only the calls recorded.';
   tokens && usage.source !== 'none' && rows.push(

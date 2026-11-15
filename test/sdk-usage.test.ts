@@ -144,7 +144,8 @@ test('the CLI usage store is read for one backing session without being changed'
   const before = await fs.readFile(file);
   const { calls, problem } = readUsageLedger(home, 'mine');
   assert.equal(problem, null);
-  assert.equal(calls.length, 2, 'a row with no recorded nano-AIU is skipped, not counted as zero');
+  assert.equal(calls.length, 3, 'a row with no recorded nano-AIU stays visible with unknown billing');
+  assert.equal(calls[2]!.nanoAiu, null);
   assert.equal(calls[1]!.agentId, 'agent-1');
   assert.equal(calls[1]!.at, Date.parse('2026-10-14T10:00:04.000Z'), 'a zone-less time is read as UTC');
   assert.deepEqual(await fs.readFile(file), before);

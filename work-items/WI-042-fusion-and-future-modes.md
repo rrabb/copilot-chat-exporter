@@ -17,7 +17,7 @@ Canonical entry: [WI-042](../work-log.md#wi-042).
 - Don't infer Fusion from model switches or multiple answering models.
 - Research first. Agree on labels and filters after identifying the recorded evidence.
 - Initial research estimate: 2-4 hours, with implementation effort unknown until the fields are understood.
-- Next: review WI-053's export plan first. Keep broad label/filter research separate and do not infer mode effort from a synthetic model ID.
+- Next: the developer reviews WI-053's completed implementation and documented limits. All four phases are independently reviewed. The unchanged pre-existing privacy check still blocks a green full verification result. Keep broad label/filter research separate and do not infer mode effort from a synthetic model ID.
 
 ## Original goal
 
@@ -36,11 +36,11 @@ Find how Copilot Fusion records selection mode, models and effort. Propose accur
 
 ### Work tree
 
-Progress as of 261113: 0 of 1 child items done. WI-053 has a diagnosis and implementation proposal for developer review.
+Progress as of 261113: 0 of 1 child items done. WI-053's four implementation phases are independently reviewed and await developer acceptance. It isn't closed. Frozen-source, usage, golden, build and built-CLI checks pass. The unchanged pre-existing privacy failure remains visible.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
-| 1 | [WI-053 Agent Host Fusion export compatibility](WI-053-agent-host-fusion-export-compatibility.md) | [research] | S | - |
+| 1 | [WI-053 Agent Host Fusion export compatibility](WI-053-agent-host-fusion-export-compatibility.md) | [build] | L | - |
 
 The developer approved this focused High-priority child on 261113. It owns the retained failure evidence and diagnosis. Broad listing labels, filters and future-mode behavior remain here.
 
@@ -50,7 +50,7 @@ The developer approved this focused High-priority child on 261113. It owns the r
 
 The proposal extends the current SDK path. It does not create a Fusion provider, infer mode from model switches, or approve new listing filters. Treat the selected synthetic model ID and per-phase model effort as separate recorded facts. A separate mode-effort field remains unverified.
 
-The developer chose a labelled separate section for identifiable child conversations whose parent calls are missing. WI-053 records the choice. Implementation still needs approval.
+The developer chose a labelled separate section for identifiable child conversations whose parent calls are missing. All four WI-053 implementation phases are approved. Worker configuration must be verified before launch, and neither item is closed.
 
 ### Initial source review
 

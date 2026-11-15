@@ -345,7 +345,9 @@ export function fmtCredits (value: unknown) {
 }
 
 /** AI credits from recorded nano-AIU (1 credit = 1,000,000,000 nano-AIU): two decimals from 1 up, four below, so a cheap call is not shown as 0.00. */
-export function fmtAiCredits (nanoAiu: number) {
+export function fmtAiCredits (nanoAiu: number | null) {
+  if (nanoAiu === null || !Number.isFinite(nanoAiu) || nanoAiu < 0)
+    return 'unknown';
   const credits = nanoAiu / 1_000_000_000;
   return credits >= 1
     ? credits.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

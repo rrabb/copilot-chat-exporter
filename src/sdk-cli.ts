@@ -203,13 +203,9 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
   }
 }
 
-function companionText (result: SdkExport): string {
-  return result.companions.filter((item) => item.mediaType.startsWith('text/')).map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n');
-}
-
 async function verifyReport (preview: SdkExport, strict: boolean, json: boolean, savedArchive: boolean,
   onReport?: (report: ReturnType<typeof buildSdkVerifyJson>, account: ReturnType<typeof buildSdkLossAccount>) => void): Promise<number> {
-  const account = buildSdkLossAccount(preview.events, preview.markdown, companionText(preview));
+  const account = buildSdkLossAccount(preview.events, preview.markdown, preview.companions);
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
   const drift = preview.session.census.unhandled;

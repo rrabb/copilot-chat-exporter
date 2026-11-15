@@ -6,9 +6,9 @@ Updated 261113. New here? Read the [handbook](work-items/README.md) first. Produ
 
 ## Start here
 
-**Do now:** Nothing is Next. WI-053 waits for your review of the Fusion export plan; a separate section for children with missing parent calls is chosen, but no implementation is approved. WI-052 waits for your review of the preserved LOD notes; private Markdown examples remain optional local artifacts. WI-049 waits for your review. WI-051 waits for fresh-chat checks and your acceptance.
+**Do now:** Nothing is Next. WI-053's four implementation phases are independently reviewed and wait for your acceptance. Review the frozen Fusion export, detached-child placement, usage figures and documented limits. Build, golden and strict built-CLI checks pass. Full verification still fails on the unchanged pre-existing privacy check. WI-052 waits for your review of the preserved LOD notes; private Markdown examples remain optional local artifacts. WI-049 waits for your review. WI-051 waits for fresh-chat checks and your acceptance.
 
-**Decisions you owe:** review [WI-053's implementation plan](work-items/WI-053-agent-host-fusion-export-compatibility.md#implementation-plan---proposed-not-approved) before starting Phase 1. Also see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then.
+**Decisions you owe:** see the `[question]` lines in the [Inbox](#inbox). Lines marked "due when ..." can wait until then. WI-053 needs your review and acceptance, not another implementation or model-selection decision.
 
 **Inbox:** see [Inbox](#inbox).
 
@@ -68,7 +68,7 @@ Updated 261113. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-018"></a>[WI-018 Compressed reports](work-items/WI-018-compressed-reports.md) | Optional gzip and Brotli reuse detailed HTML, keep the overview/TOC static, validate evidence before insertion and report failures. Historical savings aren't speed guarantees. | ✅ Done | [build] | - | - | - | |
 | <a name="wi-041"></a>[WI-041 Listing labels and dates](work-items/WI-041-listing-labels.md) | Listing labels, compact local timestamps and the terminal-only run separator were accepted 261103. | ✅ Done | [build] | - | - | - | [WI-003](#wi-003) |
 | <a name="wi-042"></a>[WI-042 Fusion and future modes](work-items/WI-042-fusion-and-future-modes.md) | Research recorded selection modes, per-turn models and effort, then propose filters and export labels that handle future modes. | 📋 Backlog · Medium | [research] | both | S | - | [WI-041](#wi-041) |
-| <a name="wi-053"></a>↳ [WI-053 Agent Host Fusion export compatibility](work-items/WI-053-agent-host-fusion-export-compatibility.md) | Part of WI-042. Frozen-input diagnosis and phased export plan recorded 261113. Separate child section chosen. Waits for your review; implementation needs separate approval. | ⏳ Waiting · High | [research] | you | S | - | [Plan](work-items/WI-053-agent-host-fusion-export-compatibility.md#implementation-plan---proposed-not-approved); [WI-052 evidence](#wi-052) |
+| <a name="wi-053"></a>↳ [WI-053 Agent Host Fusion export compatibility](work-items/WI-053-agent-host-fusion-export-compatibility.md) | Part of WI-042. All four implementation phases independently reviewed 261113. Frozen export, usage, golden, build and built-CLI loss probes pass. Full verification still fails on the unchanged pre-existing privacy check. Waits for your acceptance of the export and documented limits. | ⏳ Waiting · High | [build] | agent | L | - | [Review and next action](work-items/WI-053-agent-host-fusion-export-compatibility.md#resume-point); [Plan](work-items/WI-053-agent-host-fusion-export-compatibility.md#implementation-plan); [WI-052 evidence](#wi-052) |
 
 ### Capture and failure handling
 

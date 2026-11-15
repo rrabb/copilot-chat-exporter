@@ -28,7 +28,7 @@ SDK prompt/model intervals use `eventsInScope`, with main settings sampled at pr
 
 Child title evidence also retains `description`/`name` from the unique `tool.execution_start` whose recorded tool-call ID matches the verified child scope, plus matching `subagent.started.agentDisplayName`. The detailed renderer considers real titles across all grouped references before these recorded task labels; synthetic UUID labels do not override a real title. This does not modify inventory identity or console headings. Optional Local usage evidence reads numeric finite nonnegative request `copilotCredits` and nonnegative safe-integer `promptTokens`/`completionTokens`. No string coercion or token-to-credit conversion occurs. Each session metric sums counted requests once, with independent coverage and labelled partial totals; missing counters remain unknown.
 
-Observed in the sampled SDK log: `model.model_call_success.responseChunk.usage` token counters, agent-scoped `subagent.completed.totalTokens`, cumulative `session.usage_checkpoint` quota fields and `session.shutdown.modelMetrics` usage. These have different aggregation and identity semantics. Their correlation to report turns is deferred; the report explicitly shows unsupported/missing usage rather than assigning parent totals to children or treating cumulative checkpoints as increments.
+**Observed here:** SDK logs contain persisted `session.usage_record.data.usage` receipts as well as legacy `model.model_call_success.responseChunk.usage`, agent-scoped `subagent.completed.totalTokens`, cumulative `session.usage_checkpoint` fields and `session.shutdown.modelMetrics`. These aren't interchangeable usage streams. Export and listing usage share source selection and recorded call attribution. Summary fields don't become extra per-call rows. See [the usage rules](SPEC.md#agent-usage-and-credits-approved-october-14).
 
 Tool file changes describe submitted patches/text changes, not current file diffs. Uncovered text-edit markers and bounded large-text diff approximations are labelled estimates. Windows serialized URI and tool paths share a comparison identity; POSIX case is preserved. Unsupported editing arguments make totals partial, not falsely zero. Missing/pruned editing histories and removed file content stay unknown.
 
@@ -36,7 +36,7 @@ Tool file changes describe submitted patches/text changes, not current file diff
 
 ### Provider-backed SDK sources
 
-The inventory now distinguishes Local content version 3, chat index version 1 and SDK event version 1 as independent formats. Agent Host and Copilot CLI backings are verified for listing and scope selection; SDK Markdown rendering and semantic fidelity verification are not yet implemented.
+The inventory distinguishes Local content version 3, chat index version 1 and SDK event version 1 as independent formats. Agent Host and Copilot CLI backings are verified for listing and scope selection. Their Markdown exports and independent content checks use the SDK event path, not Local journal replay. Identity verification alone doesn't establish content fidelity.
 
 | Source | Evidence used for identity | Missing/ambiguous behavior |
 | --- | --- | --- |
@@ -47,6 +47,39 @@ The inventory now distinguishes Local content version 3, chat index version 1 an
 **Inferred from pinned source:** [agentPeerChats.ts](https://github.com/microsoft/vscode/blob/07f806f999227108933c2e30515b26eecc1fda74/src/vs/platform/agentHost/node/agentPeerChats.ts) encodes provider backings with `sdkSessionId`; [agentHostPeerChatStore.ts](https://github.com/microsoft/vscode/blob/07f806f999227108933c2e30515b26eecc1fda74/src/vs/platform/agentHost/node/agentHostPeerChatStore.ts) treats the central catalog as authority and legacy metadata as compatibility data. The default provider-ID fallback exists in `CopilotAgent._sdkConversationId`; allowing it offline under stronger checks and warnings is an explicit exporter policy, not proof of a persisted mapping.
 
 **Observed here:** SDK headers and top-level agent attribution in the private read-only corpus. [sdk-events.ts](../src/session/sdk-events.ts) retains every raw event field without text trimming or payload clipping. Schema-envelope verification does not establish that all unknown event semantics are handled by a renderer. SHA-256 records the verified bytes; cached scope evidence detects size/mtime changes but is not an atomic cross-store snapshot.
+
+### Observed Fusion records and persisted usage
+
+**Observed here, 261113:** Agent Host event-format version 1 logs contain six Fusion event families. These are private recorded fields, not a published Fusion specification. [sdk-fusion.ts](../src/session/sdk-fusion.ts) validates the observed variants before building ordered notes.
+
+| Record | Observed fields relevant to interpretation |
+| --- | --- |
+| `session.fusion_resolved` | `syntheticModel`, `pattern`, `contractVersion`, policy/routing fields, top-level model roles and `phasePlan` records with `kind`, `role`, `scope`, `conditional` |
+| `assistant.fusion_phase_completed` | Phase/model/effort/role/scope/status, `content`, optional `projectionMessage.content` and usage summary |
+| `session.fusion_commit_started` | Commit ID, source phase/model, `kind` and nullable tool-call ID. "Commit" belongs to the Fusion protocol here, not Git. |
+| `session.fusion_change_checkpoint` | `codeChanges.filesModified`, `linesAdded`, `linesRemoved` |
+| `session.fusion_completed` | Outcome, final source phase/model, follow-up model, counts, timing and totals |
+| `session.fusion_handoff` | Source/target phase, target model and `message.role`/`message.content` |
+
+Equal phase and projection text occurs within one event. The exporter accounts for that exact equality once. It doesn't merge distinct equal-text events. Unknown fields, malformed values and unsupported versions produce diagnostics while valid sibling fields remain usable. No general raw-event JSON dump substitutes for interpretation.
+
+**Observed here:** some child scopes have unambiguous `subagent.started` tool-call-to-agent mappings but no recorded parent call. The mapping establishes a child identity, not a delegation position. Main exports keep these conversations separately. The source of sparse ordinary history remains **unknown**. These observations don't establish Fusion as its cause.
+
+**Observed here:** `session.usage_record` stores its receipt under `data.usage`. [sdk-usage-record.ts](../src/session/sdk-usage-record.ts) normalizes these fields:
+
+| Field | Meaning used by the exporter |
+| --- | --- |
+| `accounting.usageId`, `accounting.sourceSessionId`, `accounting.sequence` | Recorded accounting identity and sequence. Deduplication uses the source-session/usage-ID pair. |
+| `model`, `reasoningEffort`, `parentToolCallId`, top-level event `agentId` | Recorded call/model/agent attribution. Missing parent calls don't establish root-turn ownership. |
+| `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `reasoningTokens`, `duration` | Per-call metrics when valid. Missing or invalid values stay unknown. |
+| `copilotUsage.totalNanoAiu`, optional `aiCreditsStatus` | Recorded billable amount/status. Partial or unavailable status doesn't become a complete charge or zero. |
+| `fusion` | Optional Fusion ID, synthetic model, policy/pattern, phase ID/kind, role, conversation scope and source model |
+
+Identical repeats of one accounting identity count once. Conflicting repeats keep one call with unknown counters and diagnostics. Equal counters on different identities remain different calls. The database ledger, receipts and legacy successes aren't added together. The nonempty ledger wins before child filtering, even when it covers fewer calls. See [SPEC](SPEC.md#agent-usage-and-credits-approved-october-14) for the full selection and cumulative-total rules.
+
+**Documented:** the [official generated SDK types at `cf045793958ce674259c557f7769788f94ee20c9`](https://github.com/github/copilot-sdk/blob/cf045793958ce674259c557f7769788f94ee20c9/nodejs/src/generated/session-events.ts#L9103) describe `AssistantUsageData.duration` in milliseconds and its accounting identity. **Inferred from source:** the exporter applies milliseconds to persisted `data.usage.duration`. The private receipt wrapper isn't documented by that reference, and its duration mapping hasn't been checked against matching ledger rows.
+
+**Unknown:** Fusion's execution algorithm, a separate mode-level effort independent of the selected synthetic model ID, complete projection semantics and whether all live history was persisted. Model switching doesn't identify Fusion. Observed support doesn't promise compatibility with future variants.
 
 There are two different things called a chat export:
 

@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { finishCapture, registerCapture } from '../src/session/source-cache.ts';
+import { readLinkedArchiveCompanions } from '../src/verify/images.ts';
 
 const CLI = process.env.CCE_TEST_CLI ?? fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 const UUID = '11111111-1111-4111-8111-111111111111';
@@ -146,6 +147,85 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   await fs.rm(env.COPILOT_HOME, { recursive: true });
   const withoutNative = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(withoutNative.status, 0, 'kept SDK file verification never requires native index/event/usage stores');
+});
+
+test('Fusion long companions verify in memory and saved archives with order, redaction and missing-body checks', async (context) => {
+  const { home, root, workspace, invoke } = await fixture(context);
+  const chat = 'dddddddd-1111-4111-8111-111111111111';
+  const database = new DatabaseSync(path.join(workspace, 'state.vscdb'));
+  try {
+    const row = database.prepare('SELECT value FROM ItemTable WHERE key = ?').get('chat.ChatSessionStore.index');
+    assert.ok(row);
+    const index = JSON.parse(String(row.value));
+    index.entries[`agent-host-copilotcli:/${chat}`] = { title: 'Fusion companions' };
+    database.prepare('UPDATE ItemTable SET value = ? WHERE key = ?').run(JSON.stringify(index), 'chat.ChatSessionStore.index');
+  } finally {
+    database.close();
+  }
+  const metadata = path.join(root, 'agentSessionData', chat, 'session.db');
+  await fs.mkdir(path.dirname(metadata), { recursive: true });
+  const agentDb = new DatabaseSync(metadata);
+  try {
+    agentDb.exec('CREATE TABLE session_metadata (key TEXT PRIMARY KEY, value TEXT)');
+  } finally {
+    agentDb.close();
+  }
+  const body = (label: string) => Array.from({ length: 340 }, (_unused, index) =>
+    `${label} line ${index + 1}: ${'complete evidence '.repeat(5)}authorization: bearer cli-fusion-secret`).join('\n');
+  const events = [
+    { type: 'session.start', data: { sessionId: chat, version: 1, producer: 'synthetic-test' } },
+    { type: 'user.message', data: { content: 'Keep long Fusion outputs' } },
+    { type: 'assistant.fusion_phase_completed', data: {
+      fusionId: 'cli-fusion', phaseId: 'primary', phaseKind: 'primary', content: body('PHASE'),
+      projectionMessage: { role: 'assistant', content: body('PROJECTION') },
+    } },
+    { type: 'session.fusion_handoff', data: {
+      fusionId: 'cli-fusion', sourcePhaseId: 'primary', targetPhaseId: 'repair', message: { role: 'assistant', content: body('HANDOFF') },
+    } },
+    { type: 'assistant.message', data: { content: 'Ordinary answer between phases.' } },
+    { type: 'assistant.fusion_phase_completed', data: { fusionId: 'next', phaseKind: 'repair', content: 'Final phase content.' } },
+  ];
+  const eventPath = path.join(home, 'copilot', 'session-state', chat, 'events.jsonl');
+  await fs.mkdir(path.dirname(eventPath), { recursive: true });
+  await fs.writeFile(eventPath, events.map((event) => JSON.stringify(event)).join('\n'));
+  const memory = invoke('--verify', '--strict', '--json', 'dddddddd', '--user-data-root', root);
+  assert.equal(memory.status, 0, memory.stdout + memory.stderr);
+  assert.equal(JSON.parse(memory.stdout).layerD.failed, false);
+  const output = path.join(home, 'fusion.md');
+  const exported = invoke('dddddddd', output, '--strict', '--keep-source', '--user-data-root', root);
+  assert.equal(exported.status, 0, exported.stdout + exported.stderr);
+  const markdown = await fs.readFile(output, 'utf8');
+  const companions = await readLinkedArchiveCompanions(markdown, output);
+  assert.equal(companions.length, 2);
+  assert.doesNotMatch(`${markdown}\n${companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')}`, /cli-fusion-secret/u);
+  const verify = () => {
+    const result = invoke('--verify', '--strict', '--json', 'dddddddd', output, '--user-data-root', root);
+    return { status: result.status, report: JSON.parse(result.stdout) };
+  };
+  assert.equal(verify().status, 0);
+  const phase = companions.find((item) => Buffer.from(item.bytes).toString('utf8').includes('PHASE line 170'))!;
+  assert.ok(phase);
+  const fullPath = path.join(home, phase.relativePath);
+  await fs.writeFile(fullPath, Buffer.from(phase.bytes).toString('utf8').replace('PHASE line 170', 'CORRUPTED line 170'));
+  const corrupt = verify();
+  assert.equal(corrupt.status, 2);
+  assert.ok(corrupt.report.failureReasons.includes('layer-d'));
+  await fs.writeFile(fullPath, phase.bytes);
+  await fs.rename(fullPath, `${fullPath}.unlinked`);
+  assert.equal(verify().status, 2);
+  await fs.rename(`${fullPath}.unlinked`, fullPath);
+  const link = markdown.match(/\[[^\]\n]+\]\([^)]*\.txt\)/u)![0];
+  await fs.writeFile(output, markdown.replace(link, '[full body link removed]'));
+  assert.equal(verify().status, 2, 'unused files do not replace a removed live link');
+  const blocks = [...markdown.matchAll(/<details><summary>[^\n]*Fusion (?:phase|handoff)[^\n]*<\/summary>[\s\S]*?<\/details>/gu)];
+  assert.equal(blocks.length, 3);
+  const swapped = markdown.replace(blocks[0]![0], 'SYNTHETIC_SWAP').replace(blocks[1]![0], blocks[0]![0]).replace('SYNTHETIC_SWAP', blocks[1]![0]);
+  await fs.writeFile(output, swapped);
+  const reordered = verify();
+  assert.equal(reordered.status, 2);
+  assert.ok(reordered.report.layerD.order.outOfOrder > 0);
+  await fs.writeFile(output, markdown);
+  assert.equal(verify().status, 0);
 });
 
 test('an unknown agent event type is schema drift that --verify --strict reports', async (context) => {

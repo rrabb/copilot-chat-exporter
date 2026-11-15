@@ -6,7 +6,7 @@ import { eventsInScope, readSdkEvents } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import type { SdkEventSource, SessionOccurrence } from './sources.ts';
 import { buildSdkSession } from './sdk-session.ts';
-import { attachRunningTotals, attachUsage, copilotHomeOf, readUsageLedger, usageFromEvents } from './sdk-usage.ts';
+import { attachRunningTotals, attachUsage, copilotHomeOf, readUsageLedger, selectUsage, usageForScope } from './sdk-usage.ts';
 import type { UsageCall } from './sdk-usage.ts';
 import type { SourceCopy } from './source-snapshot.ts';
 
@@ -16,7 +16,7 @@ export interface SdkExport {
   companions: CompanionArtifact[];
   session: ParsedSession;
   leftOut: Map<string, number>;
-  /** Every event in the log, for the independent content check; delegated agents are included. */
+  /** Selected conversation and descendants, for the independent content check. Main selections cover the whole log. */
   events: SdkEvent[];
 }
 
@@ -41,10 +41,11 @@ export async function readSdkScope (source: SdkEventSource): Promise<SdkEvent[]>
 /** Pure: one verified SDK scope, with delegated agents nested, as Markdown plus the companion files it links to. */
 export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, options: SdkExportOptions): SdkExport {
   const scoped = eventsInScope(events, source.scope);
-  const built = buildSdkSession(events, scoped, { title: options.title, assetsDirectory: options.assetsDirectory });
-  const stored = options.ledger ?? [];
-  stored.length ? attachUsage(built.session, stored, 'session-store', events, scoped) : attachUsage(built.session, usageFromEvents(events), 'event-log', events, scoped);
-  attachRunningTotals(built.session, events);
+  const built = buildSdkSession(events, scoped, { title: options.title, assetsDirectory: options.assetsDirectory, scope: source.scope });
+  const rootAgentId = source.scope.kind === 'subagent' ? source.scope.agentId : null;
+  const selected = usageForScope(events, selectUsage(events, options.ledger), rootAgentId);
+  attachUsage(built.session, selected.calls, selected.source, built.events, scoped, selected.selection, rootAgentId);
+  source.scope.kind === 'main' && attachRunningTotals(built.session, built.events);
   const opaque = built.session.turns.reduce((sum, turn) => sum + (turn.scalar.opaqueReasoningBlocks ?? 0), 0);
   const overflow = { assetsDirectory: options.assetsDirectory, companions: [] as CompanionArtifact[] };
   const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
@@ -81,7 +82,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     `Reasoning recorded only as an encrypted token and therefore not readable: ${opaque.toLocaleString('en-US')} assistant message(s).`,
     '',
   ];
-  return { markdown: `${base}${lines.join('\n')}`, companions: [...built.companions, ...overflow.companions], session: built.session, leftOut: built.leftOut, events, fenceRepairs };
+  return { markdown: `${base}${lines.join('\n')}`, companions: [...built.companions, ...overflow.companions], session: built.session, leftOut: built.leftOut, events: [...built.events], fenceRepairs };
 }
 
 /** The usage rows the CLI stored for one chat's event log, read without changing the database. Empty when there are none. */

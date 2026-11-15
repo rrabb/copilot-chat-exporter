@@ -34,7 +34,7 @@ const turn = (id: string, second: number): ListingTurnEvidence => ({
 
 const events = (): SdkEvent[] => [
   event('user.message', { content: 'Q1' }, T(1)),
-  event('assistant.message', { model: 'gpt-test', content: 'A1' }, T(2)),
+  event('assistant.message', { model: 'gpt-test', content: 'A1', toolRequests: [{ toolCallId: 'task1', name: 'task' }] }, T(2)),
   event('subagent.started', { toolCallId: 'task1', agentName: 'dig' }, T(3), 'agent-1'),
   event('assistant.message', { model: 'gpt-test', content: 'child' }, T(4), 'agent-1'),
   event('session.usage_checkpoint', { totalNanoAiu: 4_000_000_000 }, T(10)),
@@ -105,7 +105,7 @@ test('partial rows are shown as a lower bound where no running total exists', ()
 
 test('a delegated agent scope shows only its own calls, and nothing is invented without data', () => {
   const evidence = detailedEvidence();
-  const child = source({ kind: 'subagent', agentId: 'agent-1', parentToolCallId: 'task1' } as SdkEventSource['scope']);
+  const child = source({ kind: 'subagent', agentId: 'agent-1', parentToolCallId: 'task1', evidenceRecordIds: ['synthetic-start'] });
   attachSdkListingUsage(evidence, events(), events(), child, { source: 'session-store', calls: [call(4, 500_000_000, { agentId: 'agent-1' }), call(2, 1_000_000_000)] });
   assert.equal(evidence.usage!.scope, 'subagent');
   assert.equal(evidence.usage!.agent!.credits, 0.5);

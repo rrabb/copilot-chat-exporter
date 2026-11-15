@@ -10,6 +10,7 @@ import { parseChatSession } from '../src/session/journal.ts';
 import { readLinkedImageCompanions, verifyLocalImages, verifySdkImages } from '../src/verify/images.ts';
 import type { CompanionArtifact } from '../src/export-policy.ts';
 import { buildParserCheck, loadMarkdownParser } from '../src/verify/parser-check.ts';
+import { testSession, testTool, testTurn } from './helpers.ts';
 
 const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
 const encoded = bytes.toString('base64');
@@ -87,6 +88,34 @@ test('Local prompt and tool images keep their positions and replace raw Base64 t
   assert.equal(account.excludedNotSubmitted, 1);
   assert.equal(account.failed, false);
   assert.equal(buildParserCheck(markdown, await loadMarkdownParser(), { turns: 1, strict: true }).failed, false);
+});
+
+test('detached image inventory includes nested conversations and replaces Base64 in persisted output', () => {
+  for (const nested of [false, true]) {
+    const parsed = parseChatSession('synthetic.jsonl', JSON.stringify({ kind: 0, v: { requests: [fixture()] } }));
+    const childTool = testTool({ subagent: {
+      agentId: 'nested-image-agent', name: 'Nested', displayName: 'Nested', description: 'Nested image task',
+      agentType: 'task', model: 'test-model', durationMs: null, totalToolCalls: null, totalTokens: null,
+      cancelled: false, turns: parsed.turns,
+    } });
+    const session = testSession({ detachedSubagents: [{
+      agentId: 'detached-image-agent', parentToolCallId: 'missing-image-call', title: 'Detached images',
+      turns: nested ? [testTurn({ body: [childTool], toolNodes: [childTool] })] : parsed.turns,
+    }] });
+    const companions: CompanionArtifact[] = [];
+    const resource = { toolCallId: 'tool-one', filePath: 'image-resource.json', relative: 'image-resource.json', bytes: encoded.length, content: JSON.stringify(image) };
+    const markdown = buildDocument(session, {
+      location: { sessionId: 'synthetic', sessionPath: 'synthetic.jsonl', hashRoot: '' },
+      resources: { resources: [resource], byCall: new Map([['tool-one', [resource]]]), resourceRoot: '' },
+      versions: { copilotVersion: 'unknown', vscodeVersion: 'unknown' },
+      memory: { session: [], repo: [], user: [] }, outputPath: '', gitStatus: '', generatedAt: '2026-10-20T00:00:00Z',
+      overflow: { assetsDirectory: 'assets', companions },
+    });
+    assert.equal(companions.filter((item) => item.kind === 'image').length, 1);
+    assert.match(markdown, /Images bypass text redaction and may contain private information/u);
+    assert.match(markdown, /recorded image saved separately; SHA-256/u);
+    assert.ok(!markdown.includes(encoded));
+  }
 });
 
 test('image-only prompts, orphan tool metadata and unresolved images remain visible', () => {

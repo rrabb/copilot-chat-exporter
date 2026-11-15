@@ -19,7 +19,28 @@ what-to-do-about-it.
 
 Run `node scripts/test.mjs test/provider-sources.test.ts test/inventory.test.ts test/cli.test.ts` when changing SDK/provider resolution. The runner isolates captures/receipts and rejects real-cache writes. Verify central-versus-legacy precedence against the installed build and pinned public source. Do not use missing metadata, a title, a similar UUID or a tool summary to infer a peer/child backing. Preserve unresolved occurrences and warnings; default-only provider-ID fallback requires an existing session database and matching SDK header. `🟠 ❓` identifies ambiguous child scopes without invalidating an independently verified main.
 
-Re-read the source for export and compare its identity/integrity to the selection evidence. Reject concurrent changes or retry with a fresh resolver; do not reuse cached scope evidence across changed logs. Preserve unrecognized event fields for the fidelity adapter and report unsupported semantics. Current SDK identity verification is not a claim of implemented Markdown export or complete private-schema coverage.
+Re-read the source for export and compare its identity/integrity to the selection evidence. Reject concurrent changes or retry with a fresh resolver; do not reuse cached scope evidence across changed logs. Keep unrecognized event fields for the fidelity adapter and report unsupported semantics. SDK Markdown export has separate content checks. Passing identity verification doesn't establish complete private-schema coverage.
+
+### Fusion and persisted usage regressions
+
+Observed Fusion support covers six private event families, not a published upstream protocol. Start with [the recorded fields and evidence limits](CHAT-SESSION-SCHEMA.md#observed-fusion-records-and-persisted-usage). Don't infer Fusion from model switches, treat protocol commits as Git commits, or infer mode-level effort from a synthetic model ID.
+
+1. Freeze the motivating event log using the existing capture workflow. Keep native stores read-only. Diagnose unsupported fields, missing exported content and absent source history separately.
+2. Extend validated variants in `src/session/sdk-fusion.ts` or `src/session/sdk-usage-record.ts`. Keep valid sibling fields. Diagnose unknown fields, malformed values and unsupported versions rather than ignoring them.
+3. Add synthetic cases for the new variant before changing behavior. Include distinct projection text, repeated equal-text events, missing optional fields and malformed/future values. A `phasePlan` entry is a record, not a string.
+4. Check child identity separately from parent-call availability. Identifiable children without parent calls belong in the labelled separate section. Ambiguous identities still use omission and warning. Test nested ownership and selected-child isolation without inventing calls or turns.
+5. Test receipt identity conflicts, unknown counters and all three source choices. A partial nonempty ledger must still win before child filtering. An empty child ledger subset must not switch to receipts. Never add cumulative summaries or copied histories.
+6. Extend the independent raw-event checks in `src/verify/sdk-loss-account.ts` for new content fields. Test removal, order and repeated occurrences, including long bodies reached through live companion links. Don't reuse the parser's normalized notes as expected source content.
+
+For focused usage regressions, run `pnpm test test\sdk-usage-record.test.ts test\sdk-usage.test.ts test\listing-sdk-usage.test.ts`. Run the Fusion content and loss-account tests when those handlers change. Then run `pnpm run verify`, rebuild with `pnpm run build`, and check the built CLI against the same frozen source and saved Markdown. Keep positive and negative results.
+
+Text verification checks coverage, order and repeated occurrences, not every text companion's checksum. Corrupting a redundant companion can still pass if required content appears elsewhere. Use a body containing required source text for a loss probe. Image byte hashes are a separate guarantee. Existing persisted-resource clipping remains a separate limit.
+
+Receipt duration currently uses milliseconds by inference from the official SDK usage type. Check a matching persisted receipt and ledger row before changing that evidence label. Sparse native history doesn't by itself establish Fusion as the cause.
+
+### Library usage metrics
+
+The public `UsageCall` and `UsageFigures` types now allow `null` for token, cost (`nanoAiu`) and duration metrics. Call timestamps and model IDs can also be `null`. Update callers to check for unknown values before formatting, arithmetic or aggregation. Don't replace `null` with zero: missing or invalid metrics don't establish zero usage. Known zero remains a valid recorded value. This is a type and data-handling change, not a Node.js requirement or package-version change.
 
 ## Vocabulary you need first
 

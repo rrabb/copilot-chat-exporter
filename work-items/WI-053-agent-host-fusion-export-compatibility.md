@@ -4,17 +4,17 @@ Part of WI-042, found while working on: understanding Fusion mode and its record
 
 ## At a glance
 
-- **Goal:** diagnose the recorded Agent Host Fusion export failure and propose supported rendering, accounting and verification.
+- **Goal:** export recorded Agent Host Fusion content and usage without inventing missing history.
 - **Developer decision, 261113:** create this focused child of WI-042 with High priority.
-- **Reason:** a real captured Fusion stress case fails both export verification and saved-file verification with exit 2.
+- **Baseline reason:** a real captured Fusion stress case failed export and saved-file verification with exit 2. The same frozen source now passes both through the built CLI.
 - **Evidence:** use the retained WI-052 research capture, sample S017, without changing native session stores.
 - **Separate questions:** unsupported Fusion events, usage records and absent ordinary conversation records do not have an established shared cause.
-- **Boundary:** diagnosis and a proposed fix first. No implementation is approved.
-- **Finding, 261113:** reproduced 125 Layer D gaps from the frozen source and saved archive. The checked main conversation has no gaps; three unattached child conversations explain the failed categories.
-- **Separate loss:** seven Fusion phase records contain text that today's verifier does not check.
-- **Proposal:** extend the existing SDK path, keep phase content with its recorded attribution, handle children with missing parent calls, and reconcile persisted usage.
+- **Boundary:** all four implementation phases approved 261113. Item closure and Git actions remain unapproved.
+- **Baseline finding, 261113:** reproduced 125 Layer D gaps from the frozen source and saved archive. The checked main conversation had no gaps; three unattached child conversations explained the failed categories.
+- **Separate baseline loss:** seven Fusion phase records contained text that the old verifier didn't check.
+- **Implemented:** the existing SDK path keeps Fusion content and recorded attribution, renders identifiable children without parent calls, and accounts for persisted usage without combining incompatible sources.
 - **Placement decision, 261113:** keep identifiable children without recorded parent calls in a clearly labelled separate section.
-- **Next:** review the implementation plan. Implementation needs separate approval.
+- **Next:** developer review and acceptance. All four phases are independently reviewed. Full verification still reports the unchanged pre-existing privacy failure. No item closure or Git actions are approved.
 - **Estimate:** 14-24 hours for implementation and validation, excluding a new capture or broader listing changes.
 
 ## Original goal
@@ -30,6 +30,9 @@ The developer identifies Fusion as a new Copilot Agent Host chat mode. Determine
 - Propose regression fixtures and verification expectations for each identified behavior.
 - Propose surgical implementation steps, directly related documentation changes and their effort. Obtain separate implementation approval.
 - The developer accepts the diagnosis and proposal.
+- Under the later four-phase implementation approval, keep phase and handoff content, identifiable children without parent calls, and usage with its recorded ownership.
+- Verify the frozen source through strict CLI export and saved-file checks, including negative cases. Check ordinary exports and update product documentation and generated output.
+- Report remaining evidence limits and request developer acceptance before closing.
 
 ## Current understanding
 
@@ -108,13 +111,15 @@ This table describes proposed behavior, not current support. Keep source order a
 
 Fields outside a supported variant must stay available in the reader's raw record and produce a diagnostic where interpretation is missing. Don't implement a blanket raw-JSON export or silence unknown events. Existing hook, permission and snapshot exclusions remain unchanged.
 
-## Implementation plan - proposed, not approved
+## Implementation plan
+
+**Approved, 261113:** implement all four phases with one implementation worker at a time. The coordinator reviews each phase and can advance after checking corrections. Approval does not close this item or allow staging, commits, pushes, worktrees, merges, deletion or history changes. Worker model/effort constraints must be verified before launch.
 
 **Recommendation:** extend the existing Agent Host/Copilot CLI event path. A separate provider, parser or Fusion renderer would duplicate discovery, redaction, companion handling and verification.
 
 | Phase | Work and expected result | Depends on | Estimate |
 | --- | --- | --- | --- |
-| 1. Lock evidence and tests | Turn observed sequences into synthetic fixtures. Establish ID relationships, projection rules and usage summary scope. Add failing tests for missing Fusion text, valid children without a parent call, and persisted usage. Review the output sample below. | Implementation approval | 2-4 hours |
+| 1. Lock evidence and tests | Turn observed sequences into synthetic fixtures. Establish ID relationships, projection rules and usage summary scope. Add failing tests for missing Fusion text, valid children without a parent call, and persisted usage. Review the output sample below. | Verified worker configuration | 2-4 hours |
 | 2. Keep recorded content | Add validated Fusion payload types and parsing. Reuse ordered notes/text and existing overflow companions. Keep phase, handoff, outcome and change-summary content. Render verified children whose parent call is missing using the approved fallback. Extend independent text checks alongside these changes. | Phase 1 | 6-10 hours |
 | 3. Account for usage | Adapt persisted usage records. Reconcile them with the captured database ledger, legacy calls and phase/Fusion/checkpoint summaries. Keep one count per verified identity, missing values unknown and unresolved ownership separate. Feed the existing export and listing usage consumers without new filters. | Phase 1; integrate with Phase 2 attribution | 3-5 hours |
 | 4. Verify and document | Re-export the same frozen sample through the CLI and verify the saved artifact and companions. Check synthetic failures, ordinary SDK/Local regressions and deterministic/redacted output. Update owning docs and rebuild generated output when needed. | Phases 2 and 3 | 3-5 hours |
@@ -208,9 +213,42 @@ Start with `pnpm test test\sdk-session.test.ts test\sdk-usage.test.ts test\listi
 - A bounded Context7 lookup of the official Copilot SDK returned general session-event documentation, not a Fusion specification. No public-schema completeness claim is made.
 - No live UI comparison, fresh Fusion chat, new full CLI export, unknown-mode execution test or complete sparse-history diagnosis was performed during planning.
 
+### Implementation preflight, 261113
+
+- Agent-mode terminal and editing tools are available. Initial Git status showed no tracked edits and one unrelated untracked instruction file, which was left untouched.
+- The submitted worker model and effort were placeholders. A model-selection question returned no concrete selection. The checked user settings contain no worker model/effort preference. No worker launched, so its effective model, effort and workspace isolation are unverified.
+- The developer's revised prompt allows model selection within eligibility rules rather than requiring an exact name. Those rules exclude Luna, Haiku and lower-capability workers, forbid Auto/fallback, and cap effort at medium. The remaining launch gate is verifying an eligible runtime configuration, not obtaining an exact-name choice. Tool discovery did not expose a worker-defaults inspection command. No worker was launched to guess its settings.
+- `pnpm test test\privacy.test.ts` still fails on the existing dashboard UUID link. No test expectations were changed.
+- The earlier export cache path is unavailable. The survey's frozen S017 source still exists and matches the planning SHA-256. Use that frozen copy, not a live session. Source bytes were not modified.
+- Phase 1 acceptance remains synthetic regression cases for phase/projection text, valid children without parent calls, persisted usage identity and independent loss detection. Expected failures must demonstrate unsupported behavior, not missing imports or invalid fixtures.
+- **Launch confirmed later, 261113:** the coordinator requested `gpt-5.3-codex` at `medium` effort. The launcher accepted those arguments and runtime agent metadata reports that model. Internal reasoning effort isn't independently observable. Worker cwd and visible tracking edits match this repository, so writes are treated as shared and serialized. Phase 1 is delegated.
+- **Serialized replacement, 261113:** the first worker confirmed it had stopped with no commands or writes running. The coordinator launched `gpt-6.1-sol` at requested medium effort for a smaller metadata-parsing correction before the remaining Phase 2 integration work.
+- **Usage-unit reference, 261113:** the [official generated SDK types at `cf045793958ce674259c557f7769788f94ee20c9`](https://github.com/github/copilot-sdk/blob/cf045793958ce674259c557f7769788f94ee20c9/nodejs/src/generated/session-events.ts#L9103) document `assistant.usage.duration` as milliseconds and describe its shared accounting identity. Applying that unit to persisted `usage_record.usage.duration` remains an inference until the receipt mapping is checked. A targeted read-only lookup found no rows for S017 in the current CLI ledger, so that comparison cannot verify the mapping. The pinned source and bounded comparison script are kept in the ignored review folder.
+- **Approved resumption, 261113:** for WI-053, the developer allows `gpt-6-sol` at medium/high, `claude-sonnet-5.5` at medium, `claude-opus-5.5` at medium/low, or `gpt-6.1-sol` at medium/low. The GPT-6 Sol high option updates the earlier medium cap for that model. The developer confirmed that this allowance is for WI-053, not a permanent personal preference. The coordinator checked the existing GPT-6.1 Sol worker and picked up its saved work. No new worker was needed.
+
 ## Resume point
 
-Review this proposal. The separate child section is chosen. After implementation approval, start Phase 1 using S017's existing capture and the recorded producer version. Keep the old failed artifact for before/after comparison. Don't rerun the survey against live stores.
+**Implementation and independent review complete, 261113.** All four approved phases are reviewed. The coordinator picked up the existing `gpt-6.1-sol` worker's five product-documentation updates and build, checked the nullable public types and unmatched-usage label, and found no further corrections needed. The worker remains idle. No source/test changes were taken over by the coordinator.
+
+Next, the developer reviews [the built-CLI frozen export](../temp-tool-output/261113-1515-fusion-review/final-built-2233/S017.md), its child section and usage figures, and the documented evidence limits. [The final built-CLI report](../temp-tool-output/261113-1515-fusion-review/final-built-2233/review.json) confirms strict export and saved-file verification, rejection of removed handoff text and a corrupted required companion, successful restoration, and unchanged source bytes. Keep all edits and evidence. No more implementation is proposed unless review finds a specific issue.
+
+`pnpm run verify` passes generated-file checks and both typechecks, then fails on the same pre-existing privacy check. The final suite reports no other failures. The privacy test and dashboard UUID set are unchanged from `HEAD`. A separate golden check passes because full verification stops before that step. Keep the failure visible and don't weaken its test or alter the unrelated link.
+
+Receipt duration remains inferred from the official SDK millisecond field, not matched to ledger rows. Text checks assess coverage, order and repeated occurrences, not every text companion's checksum. The cause of sparse native history remains unknown. Existing persisted-resource clipping and broader mode/filter research remain outside this work. Neither implementation completion nor this handoff closes the item or approves Git actions.
+
+### Implementation evidence, 261113
+
+The [first saved-artifact review](../temp-tool-output/261113-1515-fusion-review/metadata-review/review.json) found the missing child and Fusion text but rejected duplicate root-heading markers. The [corrected child-rendering review](../temp-tool-output/261113-1515-fusion-review/child-review/review.json) passes content and structural checks. The [independent Phase 2 review](../temp-tool-output/261113-1515-fusion-review/verifier-review/review.json) also uses actual saved companion objects. All generated companions are linked, repeated renders are identical and the source hash is unchanged. Synthetic CLI checks reject missing, corrupt, unlinked or reordered long Fusion bodies. Legacy concatenated-string verifier input remains compatible but cannot prove link positions.
+
+**Observed here, Phase 3:** [the frozen usage review](../temp-tool-output/261113-1515-fusion-review/usage-review/review.json) has no unsupported event families or missing text. Persisted receipts supply 233 distinct calls: 222 match root turns and 11 remain detached or unmatched. The one legacy success isn't added. A nonempty ledger still wins, even if partial. Otherwise receipts win over legacy successes. Missing metrics stay unknown, conflicting identities count once with diagnostics, and detached child calls aren't assigned invented parent turns.
+
+**Observed here, CLI and negative checks:** [the source CLI review](../temp-tool-output/261113-1515-fusion-review/usage-cli-unique/review.json) passes strict export and saved-file verification. Removing the handoff or corrupting a required system-prompt companion fails. Restoring the derived artifacts passes, and the frozen input hash is unchanged. [The targeted negative review](../temp-tool-output/261113-1515-fusion-review/negative-review.json) rejects removal of each of the eight Fusion phase/handoff blocks, including text repeated in ordinary assistant messages.
+
+**Verification limit:** this checks source-text coverage, order and multiplicity, not every text artifact's checksum. Corrupting a redundant companion can pass when other rendered records still supply the required evidence. The first broad corruption probe chose such a file. The corrected probe uses a companion with required source text. General text-artifact authentication is not added here.
+
+**Phase 4 pause checkpoint, 261113:** the [worker handoff](../temp-tool-output/261113-1605-fusion-final/phase4-handoff.txt) records five owning-document updates, focused usage checks and a successful generated build. Those documentation changes awaited independent review at the pause. The [renewed frozen-source check](../temp-tool-output/261113-1515-fusion-review/final-source-1605/review.json) passes text, structure, image, companion-link, determinism and unchanged-input checks. The [ordinary golden check](../temp-tool-output/261113-1515-fusion-review/final-source-1605/golden.log) still matches. The [privacy recheck](../temp-tool-output/261113-1515-fusion-review/final-source-1605/privacy-recheck.log) and [comparison with HEAD](../temp-tool-output/261113-1515-fusion-review/final-source-1605/privacy-head-comparison.log) confirm the existing unrelated failure without printing identifiers.
+
+**Final independent review, 261113:** the five documentation changes match the implemented rules and evidence limits. The [final verification log](../temp-tool-output/261113-2233-fusion-final-review/verify.log) contains the unchanged privacy failure and no other test failures. [Comparison with HEAD](../temp-tool-output/261113-2233-fusion-final-review/privacy-head-comparison.log) confirms that baseline without printing identifiers. [Build](../temp-tool-output/261113-2233-fusion-final-review/build.log) and [normalized golden](../temp-tool-output/261113-2233-fusion-final-review/golden.log) checks pass. [Frozen-source checks](../temp-tool-output/261113-1515-fusion-review/final-source-2233/review.json) keep nine root turns, three detached children and twelve linked companions, with no unsupported events or lost text. [Usage assertions](../temp-tool-output/261113-2233-fusion-final-review/usage-assertions.log) confirm 233 receipts counted once: 222 root-matched and 11 detached/unmatched. The available legacy success isn't added. [Built-CLI checks](../temp-tool-output/261113-1515-fusion-review/final-built-2233/review.json) pass positive, negative and restored-artifact cases. No native session data was changed.
 
 ## Scope and guardrails
 
@@ -230,6 +268,11 @@ Never modify session stores. Keep source gaps labelled. A clean verification res
 - **Approved evidence boundary:** diagnosis can start with this session's retained, read-only capture. A fresh chat is needed only for unanswered controlled experiments.
 - **Approved, 261113:** save this planning pass in WI-053 and update related tracking while keeping existing edits. This does not approve implementation.
 - **Chosen, 261113:** keep identifiable children whose parent calls are missing in a clearly labelled separate section. Don't guess their parent turn.
+- **Approved later, 261113:** all four implementation phases, with delegated source/test/product-documentation changes and coordinator review. Worker configuration remains a launch prerequisite. Item closure and Git actions remain separate.
+- **Implementation review, 261113:** detached child sections must reuse the complete shared renderer, including redaction, nested agents and tool details. Parser-created text previews must not bypass renderer redaction or leave a second long projection unlinked. Phase 2 was returned for these corrections before usage work.
+- **Worker review, 261113:** the `gpt-5.3-codex` worker corrected several issues but still used configuration fields that don't match the frozen records and missed requested regression cases. Try `gpt-6.1-sol` at medium effort after a serialized handoff. No comparative model benchmark was run, and the same independent review gates still apply.
+- **Approved evidence extension, 261113:** real Fusion chats from the preceding three weeks may be used if needed. Inspect them read-only and test frozen, hash-checked copies under ignored run folders. This does not allow modifying native sessions or publishing private chat content.
+- **Phase 3 implementation choice, 261113:** keep the existing database-ledger-first rule. When it has no rows, prefer validated persisted usage receipts over legacy model-call events. Report the chosen source and alternatives rather than combining streams without shared identities. Keep phase and cumulative summaries separate.
 - **Recommendation:** diagnose first, then approve implementation. A generic JSON fallback may keep unknown payloads, but does not establish correct semantic rendering or usage attribution.
 - **Cheaper option considered:** promote WI-042 alone. Rejected for tracking because it mixes urgent export failures with broader presentation work.
 

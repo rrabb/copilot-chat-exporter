@@ -19,6 +19,7 @@ import type { CompanionArtifact, CompanionKind } from './export-policy.ts';
 import { collectRecordedImages, saveImageCompanion } from './images.ts';
 import type { RecordedImage } from './images.ts';
 import { sourceCopyNotice } from './session/source-snapshot.ts';
+import { sumKnown, sumUsageFigures } from './session/usage-figures.ts';
 import { exporterCommit, exporterVersion } from './version.ts';
 import type { SourceCopy } from './session/source-snapshot.ts';
 import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
@@ -564,16 +565,12 @@ function renderNote (node: NoteNode) {
   if (!node.text)
     return [`> ${esc(node.title)}${link}`, '', ...image];
   const text = closeUnbalancedFences(neutralizeStructuralHtml(redact(node.text)));
-  const fence = fenceFor(text, 'text');
-  return [
-    `<details><summary>${mutedSummary(`${esc(node.title)}${link}`)}</summary>`,
-    '',
-    ...indentBlock([fence.open, text, fence.close], NESTED_INDENT),
-    '',
-    '</details>',
-    '',
-    ...image,
-  ];
+  return [...toolTextBlock(
+    `${esc(node.title)}${link}`,
+    text,
+    'text',
+    { kind: 'metadata', label: `note-${createHash('sha256').update(`${node.title}\n${text}`).digest('hex').slice(0, 8)}` },
+  ), ...image];
 }
 
 // Warnings a markdownVuln record attached to its text. Written after the text run, never inside it.
@@ -889,16 +886,13 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
 }
 
 function sumFigures (left: UsageFigures, right: UsageFigures): UsageFigures {
-  return {
-    calls: left.calls + right.calls, inputTokens: left.inputTokens + right.inputTokens,
-    cacheReadTokens: left.cacheReadTokens + right.cacheReadTokens, cacheWriteTokens: left.cacheWriteTokens + right.cacheWriteTokens,
-    outputTokens: left.outputTokens + right.outputTokens, reasoningTokens: left.reasoningTokens + right.reasoningTokens,
-    nanoAiu: left.nanoAiu + right.nanoAiu, durationMs: left.durationMs + right.durationMs,
-  };
+  return sumUsageFigures(left, right);
 }
 
+const usageNumber = (value: number | null) => value === null ? 'unknown' : thousands(value);
+
 function usageTokens (figures: UsageFigures) {
-  return `${thousands(figures.inputTokens)} in (${thousands(figures.cacheReadTokens)} cached read, ${thousands(figures.cacheWriteTokens)} cache write) + ${thousands(figures.outputTokens)} out`;
+  return `${usageNumber(figures.inputTokens)} in (${usageNumber(figures.cacheReadTokens)} cached read, ${usageNumber(figures.cacheWriteTokens)} cache write) + ${usageNumber(figures.outputTokens)} out`;
 }
 
 function totalsSpan (totals: NonNullable<TurnScalars['usageTotals']>) {
@@ -912,7 +906,7 @@ function usageCredits (scalar: TurnScalars) {
     return scalar.usageTotals ? `💳 ${fmtAiCredits(scalar.usageTotals.nanoAiu)} credits (from running totals${totalsSpan(scalar.usageTotals)})` : null;
   const all = sumFigures(usage.own, usage.agents);
   if (!usage.complete)
-    return `💳 at least ${fmtAiCredits(all.nanoAiu)} credits (per-call rows are partial for this chat)`;
+    return `💳 ${all.nanoAiu === null ? '' : 'at least '}${fmtAiCredits(all.nanoAiu)} credits (per-call rows are partial for this chat)`;
   const split = usage.agents.calls
     ? ` (${fmtAiCredits(usage.own.nanoAiu)} main + ${fmtAiCredits(usage.agents.nanoAiu)} in ${thousands(usage.agents.calls)} sub-agent call${usage.agents.calls === 1 ? '' : 's'})`
     : '';
@@ -1042,6 +1036,7 @@ export interface DocumentContext {
 
 const USAGE_SOURCE_TEXT: Record<SessionUsage['source'], string> = {
   'session-store': 'the Copilot CLI session store (`session-store.db`, table `assistant_usage_events`)',
+  'usage-record': '`session.usage_record` receipts in the event log',
   'event-log': '`model.model_call_success` events in the event log',
   none: 'none',
 };
@@ -1056,13 +1051,15 @@ function loggedText (usage: SessionUsage) {
   const logged = usage.logged;
   if (!logged)
     return '';
-  const rowsNano = usage.recorded.nanoAiu + usage.unattributed.nanoAiu;
-  const share = usage.source !== 'none' && logged.nanoAiu > 0 ? ` The per-call rows add up to ${Math.round((rowsNano / logged.nanoAiu) * 100)}% of it.` : '';
+  const rowsNano = sumKnown(usage.recorded.nanoAiu, usage.unattributed.nanoAiu);
+  const share = rowsNano !== null && usage.source !== 'none' && logged.nanoAiu > 0 ? ` The per-call rows add up to ${Math.round((rowsNano / logged.nanoAiu) * 100)}% of it.` : '';
   return `Last logged total for the whole event log: ${fmtAiCredits(logged.nanoAiu)} credits (about $${(logged.nanoAiu / 1e11).toFixed(2)} at $0.01 per credit), from \`${logged.event}\`${logged.at ? ` at ${isoTimestamp(logged.at)}` : ''}; it is a running total, and the log has ${thousands(logged.shutdowns)} shutdown record${logged.shutdowns === 1 ? '' : 's'}.${share}`;
 }
 
 /** One line for the metadata list and the executive summary. */
 function usageHeadline (usage: SessionUsage) {
+  if (usage.source !== 'none' && !usage.recorded.calls && !usage.unattributed.calls)
+    return '💳 no per-call usage recorded for this conversation in the selected source';
   if (usage.source === 'none')
     return `💳 ${fmtAiCredits(usage.logged?.nanoAiu ?? 0)} credits (last logged total; no per-call usage recorded)`;
   const logged = usage.logged ? `; last logged total ${fmtAiCredits(usage.logged.nanoAiu)}` : '';
@@ -1106,24 +1103,33 @@ function totalsByTurn (usage: SessionUsage, turns: readonly Turn[]): string[] {
 /** The agent version of the cost table plus the notes a reader needs to judge the figures. */
 function agentCostSection (usage: SessionUsage, turns: readonly Turn[]): string[] {
   const row = (label: string, figures: UsageFigures) =>
-    `| ${label} | ${thousands(figures.calls)} | ${thousands(figures.inputTokens)} | ${thousands(figures.cacheReadTokens)} | ${thousands(figures.cacheWriteTokens)} | ${thousands(figures.outputTokens)} | ${fmtAiCredits(figures.nanoAiu)} |`;
+    `| ${label} | ${thousands(figures.calls)} | ${usageNumber(figures.inputTokens)} | ${usageNumber(figures.cacheReadTokens)} | ${usageNumber(figures.cacheWriteTokens)} | ${usageNumber(figures.outputTokens)} | ${fmtAiCredits(figures.nanoAiu)} |`;
   const lines: string[] = [];
   if (usage.source === 'none') {
     lines.push('Per-call usage is not recorded for this chat, so no per-turn, per-agent or per-model figures can be shown.', '');
-  } else {
+  } else if (usage.recorded.calls || usage.unattributed.calls) {
     lines.push(
       '| Model | Calls | Input tokens | Cache read | Cache write | Output tokens | AI credits |',
       '|---|---:|---:|---:|---:|---:|---:|',
       ...usage.byModel.map(([model, figures]) => row(`\`${modelName(model)}\``, figures)),
       row('**Recorded total**', usage.recorded),
-      ...(usage.unattributed.calls ? [row('Not matched to a turn or agent of this conversation', usage.unattributed)] : []),
+      ...(usage.unattributed.calls ? [row('Not matched to a turn in this conversation', usage.unattributed)] : []),
       '',
     );
+  } else {
+    lines.push('The selected source contains no calls for this conversation. This doesn\'t establish zero usage.', '');
   }
   lines.push(
     '> **AI credits** are the recorded nano-AIU divided by 1,000,000,000 (1 credit = 1 AIU = $0.01). They are never estimated from token counts. Input tokens include cached ones, and each call re-sends its context, so input tokens are not additive across turns as a measure of text.',
     '',
     ...(usage.source === 'none' ? [] : [`> Per-call source: ${USAGE_SOURCE_TEXT[usage.source]}. It holds ${coverageText(usage)}. Turns and agents without a recorded call show no usage figures.`, '']),
+    ...(usage.selection ? [
+      `> Separate source availability ${usage.selection.selectedForWholeLog ? 'for this conversation' : 'in this log'}: ${usage.selection.available.ledger} ledger rows, ${usage.selection.available.receipts} distinct receipts, ${usage.selection.available.legacy} legacy successes. Only the selected source is counted. Alternatives aren't merged, even when the ledger is partial.${usage.selection.selectedForWholeLog ? ' Source selection happened for the whole log before filtering to this conversation.' : ''}`,
+      '',
+      ...(usage.selection.receiptRecords ? [`> Receipt identity checks: ${usage.selection.receiptRecords} records, ${usage.selection.duplicateReceipts} identical repeats, ${usage.selection.conflictingReceipts} conflicting repeats, ${usage.selection.unsupportedReceipts} unsupported records. Repeated accounting identities count once. Conflicting counters stay unknown.`, ''] : []),
+      ...(usage.source === 'usage-record' ? ['> Receipt durations use the official SDK usage field\'s milliseconds. Applying that unit to this persisted wrapper is inferred, not matched to ledger rows.', ''] : []),
+    ] : []),
+    ...(usage.calls?.some((call) => call.provenance?.issues?.length) ? ['> Some selected usage calls have invalid or unsupported fields. Their known values remain available. Missing or invalid counters stay unknown.', ''] : []),
     ...(usage.logged ? [`> ${loggedText(usage)}`, ''] : []),
     ...totalsByTurn(usage, turns),
   );
@@ -1161,6 +1167,24 @@ function hasLinkedImageNote (turns: readonly Turn[]): boolean {
   }));
 }
 
+function renderPrompt (turn: Turn): string[] {
+  const promptNotes: string[] = [];
+  const prompt = blockquote(escapeModelHtml(String(turn.prompt ?? ''), turn.number, promptNotes));
+  return [
+    '> [!NOTE]',
+    '> **USER QUESTION / REQUEST**',
+    '',
+    `<div style="${PROMPT_BOX}">`,
+    '',
+    prompt,
+    '',
+    ...renderImages(turn.promptImages),
+    '</div>',
+    '',
+    ...promptNotes,
+  ];
+}
+
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
   overflow = context.overflow ?? null;
   fenceRepairs = context.fenceRepairs ?? null;
@@ -1170,7 +1194,8 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
       ? [...(node.images ?? []), ...(node.subagent ? collect(node.subagent.turns) : [])]
       : node.type === 'note' ? node.images ?? [] : []),
   ]);
-  imageReplacements = [...new Map(collect(session.turns).filter((image) => image.bytes).map((image) => [
+  const imageTurns = [...session.turns, ...(session.detachedSubagents ?? []).flatMap((child) => child.turns)];
+  imageReplacements = [...new Map(collect(imageTurns).filter((image) => image.bytes).map((image) => [
     Buffer.from(image.bytes!).toString('base64'),
     `[recorded image saved separately; SHA-256 ${createHash('sha256').update(image.bytes!).digest('hex').slice(0, 12)}]`,
   ])).entries()].map(([encoded, label]) => ({ encoded, label }));
@@ -1234,7 +1259,9 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     sdk
       ? '> Conversation archive sourced from the Copilot SDK event log (Agent Host / Copilot CLI): prompts, readable reasoning, assistant messages, tool calls with inputs, outputs and errors, code blocks and timing.'
       : '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',
-    ...(imageReplacements.length || hasLinkedImageNote(turns) || context.overflow?.companions.some((item) => item.kind === 'image')
+    ...(imageReplacements.length || hasLinkedImageNote(turns)
+      || session.detachedSubagents?.some((child) => hasLinkedImageNote(child.turns))
+      || context.overflow?.companions.some((item) => item.kind === 'image')
       ? ['', '> Images bypass text redaction and may contain private information. Review image companions before sharing.'] : []),
     '',
     '## Session Metadata',
@@ -1273,8 +1300,13 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     '5. [Files Modified](#files-modified)',
     '6. [Tool Usage](#tool-usage)',
     '7. [Conversation Transcript](#conversation-transcript)',
-    '8. [Memory and Plan Artifacts](#memory-and-plan-artifacts)',
-    '9. [Export Provenance](#export-provenance)',
+    ...(session.detachedSubagents?.length
+      ? [
+        '8. [Recorded child conversations - parent call missing](#recorded-child-conversations-parent-call-missing)',
+        '9. [Memory and Plan Artifacts](#memory-and-plan-artifacts)',
+        '10. [Export Provenance](#export-provenance)',
+      ]
+      : ['8. [Memory and Plan Artifacts](#memory-and-plan-artifacts)', '9. [Export Provenance](#export-provenance)']),
     '',
     sectionAnchor(MARK.sectionUserQuestions),
     '',
@@ -1381,8 +1413,6 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
 
   for (const turn of turns) {
     const badge = esc(clip(turn.prompt, 90));
-    const promptNotes: string[] = [];
-    const prompt = blockquote(escapeModelHtml(String(turn.prompt ?? ''), turn.number, promptNotes));
     lines.push(
       '---',
       '',
@@ -1390,22 +1420,45 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       '',
       `${MARK.requestHeadingPrefix}${turn.number}&nbsp; <span style="${PROMPT_BADGE}">${badge}</span> <span style="${MUTED}">${headerTimestamp(turn.ts)}</span></h3>`,
       '',
-      '> [!NOTE]',
-      '> **USER QUESTION / REQUEST**',
-      '',
-      `<div style="${PROMPT_BOX}">`,
-      '',
-      prompt,
-      '',
-      ...renderImages(turn.promptImages),
-      '</div>',
-      '',
-      ...promptNotes,
+      ...renderPrompt(turn),
     );
     lines.push(...renderTurnBody(turn, resources.byCall, outputPath, { previousTools }), '');
     lines.push(...turnInfo(turn), '');
     lines.push(turnCost(turn.scalar), '');
     lines.push('<div align="right"><a href="#user-questions-and-requests">⬆️ Back to questions</a></div>', '');
+  }
+  if (session.detachedSubagents?.length) {
+    lines.push(
+      '<a id="recorded-child-conversations-parent-call-missing"></a>',
+      '',
+      '## Recorded child conversations - parent call missing',
+      '',
+      'These child records are unambiguous. The parent tool call is not recorded, so no parent turn position is inferred.',
+      '',
+    );
+    for (const [index, child] of session.detachedSubagents.entries()) {
+      const childPreviousTools = new Map<string, PreviousTool[]>();
+      lines.push(`### Child ${index + 1}: ${esc(child.title)} (\`${esc(child.agentId)}\`)`, '');
+      child.usage && lines.push(`Recorded usage of this child alone: ${fmtAiCredits(child.usage.nanoAiu)} credits in ${thousands(child.usage.calls)} call${child.usage.calls === 1 ? '' : 's'}. Its missing parent call doesn't establish ownership by a main turn.`, '');
+      for (const turn of child.turns) {
+        const badge = esc(clip(turn.prompt, 90));
+        lines.push(
+          `<a id="detached-child-${index + 1}-message-${turn.number}"></a>`,
+          '',
+          `<h4>🔷 Child request #${turn.number}&nbsp; <span style="${PROMPT_BADGE}">${badge}</span> <span style="${MUTED}">${headerTimestamp(turn.ts)}</span></h4>`,
+          '',
+          ...renderPrompt(turn),
+          `<a id="detached-child-${index + 1}-assistant-${turn.number}"></a>`,
+          '',
+          '##### 💬 Child assistant response',
+          '',
+        );
+        lines.push(...renderTurnBody(turn, resources.byCall, outputPath, { heading: false, previousTools: childPreviousTools }), '');
+        lines.push(...turnInfo(turn), '');
+        lines.push(turnCost(turn.scalar), '');
+      }
+    }
+    lines.push(backToContents(), '');
   }
 
   lines.push(

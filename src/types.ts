@@ -163,13 +163,58 @@ export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode | No
 export interface UsageFigures {
   calls: number;
   /** Total prompt tokens, including cached ones. */
-  inputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  nanoAiu: number;
-  durationMs: number;
+  inputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
+  nanoAiu: number | null;
+  durationMs: number | null;
+}
+
+export interface UsageFusionAttribution {
+  fusionId?: string;
+  syntheticModel?: string;
+  policy?: string;
+  pattern?: string;
+  phaseId?: string;
+  phaseKind?: string;
+  role?: string;
+  conversationScope?: string;
+  sourceModel?: string;
+}
+
+/** A concrete call. Missing counters stay unknown, unlike an empty aggregate's known zero. */
+export interface UsageCall extends Omit<UsageFigures, 'calls'> {
+  at: number | null;
+  agentId: string | null;
+  model: string | null;
+  provenance?: {
+    source: 'usage-record' | 'session-store' | 'event-log';
+    accounting?: { usageId: string; sourceSessionId: string; sequence: number | null };
+    fusion?: UsageFusionAttribution;
+    parentToolCallId?: string;
+    reasoningEffort?: string | null;
+    billingStatus?: 'complete' | 'partial' | 'unavailable';
+    /** A reported subtotal or placeholder, not a complete billable amount. */
+    reportedNanoAiu?: number;
+    durationEvidence?: 'sdk-milliseconds-inferred-wrapper';
+    /** Validated non-accounting telemetry, named by its recorded field path. */
+    telemetry?: Array<{ field: string; value: string | number | boolean | readonly string[] }>;
+    issues?: string[];
+    conflicted?: boolean;
+  };
+}
+
+export interface UsageSelection {
+  /** Available calls in each separate stream, before selecting one. Never summed together. */
+  available: { ledger: number; receipts: number; legacy: number };
+  receiptRecords: number;
+  duplicateReceipts: number;
+  conflictingReceipts: number;
+  unsupportedReceipts: number;
+  /** Source selection happened before filtering to a child conversation. */
+  selectedForWholeLog?: boolean;
 }
 
 /** What one turn cost: its own model calls, and the calls of the agents it delegated to. */
@@ -203,11 +248,14 @@ export interface LoggedUsageTotal {
 
 export interface SessionUsage {
   /** Where the per-call figures came from; 'none' when only the logged total exists. */
-  source: 'session-store' | 'event-log' | 'none';
+  source: 'session-store' | 'usage-record' | 'event-log' | 'none';
+  selection?: UsageSelection;
+  /** Selected calls, including recorded accounting and phase provenance. No cross-log merging. */
+  calls?: readonly UsageCall[];
   /** Assistant replies in the log, for judging how much of the work the per-call figures cover. */
   replies: number;
   recorded: UsageFigures;
-  /** Calls that fit no turn and no delegated agent of this conversation. */
+  /** Calls not matched to a turn in this conversation. Their child agent may still be known. */
   unattributed: UsageFigures;
   byModel: Array<[string, UsageFigures]>;
   logged: LoggedUsageTotal | null;
@@ -385,6 +433,14 @@ export interface ParsedSession {
   rawRequests: RawRequest[];
   /** Agent chats: recorded model usage; unset when none was recorded. */
   usage?: SessionUsage;
+  /** Agent chats: delegated child conversations whose parent call was not recorded. */
+  detachedSubagents?: Array<{
+    agentId: string;
+    parentToolCallId: string;
+    title: string;
+    turns: Turn[];
+    usage?: UsageFigures;
+  }>;
   census: Census;
   editedFiles: string[];
   /** Non-fatal parse problems, surfaced in the export rather than thrown. */

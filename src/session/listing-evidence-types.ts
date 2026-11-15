@@ -1,4 +1,5 @@
 import type { StorageArtifact } from './listing-storage.ts';
+import type { SessionUsage, UsageSelection } from '../types.ts';
 
 export interface ListingTitleEvidence { source: string; value: string }
 export interface ListingDateEvidence { source: string; timestamp: number; recordedValue: string }
@@ -17,8 +18,8 @@ export interface ListingTurnUsage {
   span: { from: number; to: number } | null;
   /** Per-call rows matched to this turn. */
   calls: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
   /** Basis running-total only: credits of the per-call rows this turn also has, which are incomplete. */
   perCallCredits: number | null;
 }
@@ -26,17 +27,18 @@ export interface ListingTurnUsage {
 export interface ListingUsageModel {
   model: string;
   calls: number;
-  credits: number;
-  inputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  outputTokens: number;
+  credits: number | null;
+  inputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  outputTokens: number | null;
 }
 
 /** Chat-level usage of an agent conversation, for the detailed listing. */
 export interface ListingSessionUsage {
   scope: 'main' | 'subagent';
-  source: 'session-store' | 'event-log' | 'none';
+  source: SessionUsage['source'];
+  selection?: UsageSelection;
   perCallRows: number;
   /** Assistant replies in the whole log, to judge how much of the work the per-call rows cover. */
   replies: number;
@@ -46,10 +48,11 @@ export interface ListingSessionUsage {
   loggedEvent: string | null;
   shutdowns: number;
   beforeFirstTurnCredits: number;
-  unmatchedCredits: number;
+  unmatchedCredits: number | null;
+  unmatchedCalls?: number;
   byModel: ListingUsageModel[];
   /** Subagent scope only: this agent's own recorded calls. */
-  agent?: { calls: number; credits: number; inputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; outputTokens: number };
+  agent?: { calls: number; credits: number | null; inputTokens: number | null; cacheReadTokens: number | null; cacheWriteTokens: number | null; outputTokens: number | null };
 }
 
 export interface ListingTurnEvidence {

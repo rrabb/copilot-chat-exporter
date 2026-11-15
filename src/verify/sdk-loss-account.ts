@@ -4,13 +4,15 @@
 
 import { scoreLossPieces } from './loss-account.ts';
 import type { LossAccount, LossPiece } from './loss-account.ts';
-import { childScopes } from '../session/sdk-events.ts';
+import { childScopes, isRecord } from '../session/sdk-events.ts';
 import type { SdkEvent } from '../session/sdk-events.ts';
+import type { CompanionArtifact } from '../export-policy.ts';
+import { scanFences } from '../text.ts';
 
 const LINES = new Set(['tool-input', 'tool-output', 'tool-detail']);
 
 const str = (value: unknown): string => typeof value === 'string' ? value : '';
-const record = (value: unknown): Record<string, any> | null => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : null;
+const record = (value: unknown): Record<string, unknown> | null => isRecord(value) ? value : null;
 
 function strings (value: unknown, depth = 0): string[] {
   if (typeof value === 'string')
@@ -80,11 +82,13 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
         add('prompt', str(data.content), event, true);
         break;
       case 'assistant.message': {
-        const blocks = Array.isArray(record(data.reasoningBlocks)?.blocks) ? record(data.reasoningBlocks)!.blocks : [];
-        const fallback = blocks.flatMap((block: any) => [str(block?.thinking), ...(Array.isArray(block?.summary) ? block.summary.map((item: any) => str(item?.text)) : [])]).join('\n\n');
+        const reasoning = record(data.reasoningBlocks);
+        const blocks = Array.isArray(reasoning?.blocks) ? reasoning.blocks.filter(isRecord) : [];
+        const fallback = blocks.flatMap((block) => [str(block.thinking), ...(Array.isArray(block.summary)
+          ? block.summary.filter(isRecord).map((item) => str(item.text)) : [])]).join('\n\n');
         add('reasoning', str(data.reasoningText) || fallback, event, true);
         add('assistant-text', str(data.content), event, true);
-        for (const request of Array.isArray(data.toolRequests) ? data.toolRequests : []) {
+        for (const request of Array.isArray(data.toolRequests) ? data.toolRequests.filter(isRecord) : []) {
           add('tool-intent', str(request?.intentionSummary), event, true);
           const args = record(request?.arguments);
           !toolStartsWithArguments.has(callKey(event, str(request?.toolCallId))) && args && add('tool-input', strings(args).join('\n'), event);
@@ -113,6 +117,19 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
       case 'session.error':
         add('session-error', str(data.message), event);
         break;
+      case 'assistant.fusion_phase_completed': {
+        const content = str(data.content);
+        add('fusion-phase', content, event, true);
+        const projection = record(data.projectionMessage);
+        const projectionText = str(projection?.content);
+        projectionText && projectionText !== content && add('fusion-phase-projection', projectionText, event, true);
+        break;
+      }
+      case 'session.fusion_handoff': {
+        const message = record(data.message);
+        add('fusion-handoff', str(message?.content), event, true);
+        break;
+      }
       case 'system.message':
         addCompanion('system-prompt', typeof data.content === 'string' ? data.content : '', event);
         break;
@@ -126,7 +143,38 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
   return [...pieces, ...companionPieces];
 }
 
-/** `companionText` is the text of saved companion files; content saved there counts as exported. */
-export function buildSdkLossAccount (events: readonly SdkEvent[], markdown: string, companionText = ''): LossAccount {
-  return scoreLossPieces(sdkLossPieces(events), `${markdown}\n${companionText}`, LINES);
+/** Expand supplied text at live archive links, once per reference, without reading files or following links in the bodies. */
+function withLinkedCompanions (markdown: string, companions: readonly CompanionArtifact[]): string {
+  const bodies = new Map(companions.filter((item) => item.mediaType.startsWith('text/'))
+    .map((item) => [item.relativePath, new TextDecoder().decode(item.bytes)]));
+  const lines = markdown.split(/\r?\n/u);
+  const document = lines.join('\n');
+  const { inside } = scanFences(lines);
+  // Keep offsets while hiding fenced text and backtick spans, including spans across lines.
+  const live = lines.map((line, index) => inside[index] ? ' '.repeat(line.length) : line).join('\n')
+    .replace(/(`+)(?:(?!\1)[\s\S])*?\1(?!`)/gu, (span: string) => span.split('\n').map((line) => ' '.repeat(line.length)).join('\n'));
+  return document.replace(/!?\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu, (link: string, encoded: string, index: number) => {
+    const escapes = /\\+$/u.exec(document.slice(0, index))?.[0].length ?? 0;
+    if (link.startsWith('!') || escapes % 2 !== 0 || live.slice(index, index + link.length) !== link)
+      return link;
+    let target: string;
+    try {
+      target = decodeURIComponent(encoded);
+    } catch (error) {
+      if (!(error instanceof URIError))
+        throw error;
+      return link;
+    }
+    const parts = target.split('/');
+    if (parts.length !== 2 || parts.some((part) => !part || part === '.' || part === '..' || /[:\\?#\u0000-\u001f]/u.test(part)))
+      return link;
+    const body = bodies.get(target);
+    return body === undefined ? link : `${link}\n${body}\n`;
+  });
+}
+
+/** Artifact objects keep link positions and repeated references. Legacy concatenated text supports presence checks but cannot prove link order. */
+export function buildSdkLossAccount (events: readonly SdkEvent[], markdown: string, companions: string | readonly CompanionArtifact[] = []): LossAccount {
+  const evidence = typeof companions === 'string' ? `${markdown}\n${companions}` : withLinkedCompanions(markdown, companions);
+  return scoreLossPieces(sdkLossPieces(events), evidence, LINES);
 }

@@ -52,7 +52,9 @@ For Local tool records, an explicit missing-data representation is allowed only 
 
 Container fence repairs repeat list indentation and blockquote prefixes. Fence whitespace excludes BOM characters. Outside code, unclosed comments and `script`, `style`, `textarea` and `pre` tags are escaped and recorded as representation changes.
 
-Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backing id>/events.jsonl`. The export is selected like a Local chat (`copilot-chat-export <id>`), by the chat UUID, the backing ID, a unique prefix of at least 8 hex characters, or the exact qualified chat key shown by `--list`. The main conversation is exported, and each sub-agent conversation with a verified tool-call/agent-ID mapping is nested inline at the delegation point (collapsed, always labelled as a sub-agent with its title, a summary line and a collapsible full conversation). Nesting is followed up to 8 levels; child events without a verified delegation are counted under "Left out of this export". An ambiguous or incomplete mapping omits that child conversation and adds an archive warning. The warning marks an intentional omission, so `--strict` still checks the main conversation, verified children and other failure conditions without treating the unverified candidate text as loss. Usage is exported as AI credits (see "Agent usage and credits" below); where none was recorded it shows "not recorded", never zero.
+Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backing id>/events.jsonl`. The export is selected like a Local chat (`copilot-chat-export <id>`), by the chat UUID, the backing ID, a unique prefix of at least 8 hex characters, or the exact qualified chat key shown by `--list`. The main conversation is exported, and each sub-agent conversation with a verified tool-call/agent-ID mapping is nested inline at the recorded delegation point (collapsed, labelled as a sub-agent with its title, summary and full conversation). Nesting is followed up to 8 levels. An ambiguous or incomplete identity mapping omits that child conversation and adds an archive warning. The warning marks an intentional omission, so `--strict` still checks the main conversation, verified children and other failure conditions without treating the unverified candidate text as loss. Usage is exported as AI credits (see "Agent usage and credits" below); where none was recorded it shows "not recorded", never zero.
+
+An unambiguous child identity with no recorded parent call is different from an ambiguous mapping. Main exports keep these children under **Recorded child conversations - parent call missing**, ordered by their first event in the log. Each child keeps its internal order, complete recorded prompts and the shared renderer's reasoning, tools, images, nested children, redaction and text companions. The exporter invents neither a parent call nor a parent-turn position. Actual call ownership prevents an already nested child, including one beyond the nesting limit, from being moved into this section. Remaining unplaced events are counted under "Left out of this export". Selecting a child limits content to that child and descendants linked by recorded calls, not unrelated root or sibling conversations.
 
 | Record | Decision | Where it appears |
 | --- | --- | --- |
@@ -62,6 +64,8 @@ Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backin
 | Reasoning recorded only as an encrypted token | Count, never reconstruct | Turn info and the closing "Left out" section |
 | Tool calls with arguments (shown as readable lines, not escaped JSON), output, errors, exit codes, duration and detailed results such as diffs | Keep | Tool call blocks |
 | Compaction summaries, model and effort changes, Auto model choice, mode changes, plan changes, resume markers, task-complete summary, aborts, errors, notifications | Keep | Notes in the turn |
+| Observed Fusion selection, phase, commit, change-checkpoint, completion and handoff records | Keep supported fields in order; diagnose unsupported fields | Readable notes, including phase output and handoff text |
+| Persisted `session.usage_record` receipts | Normalize for usage accounting; diagnose unsupported fields | Cost and turn/agent usage, not raw event dumps |
 | Turn and model-call boundary records | Used only for turn timing | Turn info elapsed time |
 | System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at the turn where it changed |
 | Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note in the turn |
@@ -74,6 +78,24 @@ Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backin
 | Usage and cache checkpoints | Left out, counted; the last running total is shown in the Cost section | Same |
 
 An event type outside both the kept and the left-out lists is reported as schema drift and fails `--verify --strict`, so a new SDK record cannot be dropped in silence. Nothing here deletes or modifies session data.
+
+### Recorded Fusion content
+
+Fusion support covers six observed private event families. It extends the existing SDK path, not a separate provider or inferred selection mode.
+
+| Event | Kept content and attribution |
+| --- | --- |
+| `session.fusion_resolved` | Synthetic model ID, pattern, policy/version, model roles, routing metadata and the recorded phase plan |
+| `assistant.fusion_phase_completed` | Phase ID/kind, model, reasoning effort, role, scope, status, verdict, duration, output and projection message |
+| `session.fusion_commit_started` | Commit ID, source phase/model, kind and optional tool-call ID. This is a Fusion protocol record, not evidence of a Git commit. |
+| `session.fusion_change_checkpoint` | Recorded file names and added/removed line totals, not a reconstructed working-tree diff |
+| `session.fusion_completed` | Outcome, final source phase/model, follow-up model, counts, timing and recorded usage totals |
+| `session.fusion_handoff` | Source/target phase, target model, message role and complete message text |
+
+Fields are validated before conversion to readable notes. `phasePlan` is an array of records, not strings. Unknown fields, malformed values and unsupported versions produce diagnostics rather than a blanket event JSON dump. Supported sibling fields remain readable. Synthetic model IDs and phase reasoning effort are separate recorded facts. Model switching doesn't prove Fusion, and a synthetic ID doesn't establish a separate mode-level effort.
+
+Within one phase event, identical `content` and `projectionMessage.content` appear once. Distinct projection text is kept. Equal text in separate phase or ordinary assistant events stays separate and in recorded order. Phase and completion usage summaries aren't added to per-call accounting. The existing text policy applies: over 300 lines AND over 15 KiB uses a 10-line preview and a complete redacted content-hash companion. Callers without a text companion sink keep the complete text inline. This doesn't fix persisted-resource clipping.
+
 ### Recorded image policy
 
 Local prompt attachments and tool results use the same companion-file helper as SDK image assets. The exporter decodes recorded direct Base64 strings, `$base64` objects, byte arrays and numeric-keyed byte objects. It writes exact decoded bytes without resizing, re-encoding or an exporter size cap. It never opens a recorded image path or fetches a URL. Archives with image companions warn that images bypass text redaction and may contain private information.
@@ -88,21 +110,27 @@ Independent image verification reads final replayed Local requests and kept SDK 
 
 ### Agent usage and credits (approved October 14)
 
-GitHub documents the per-call `assistant.usage` event as ephemeral and not replayed on resume, so the event log carries no per-call usage. Three recorded sources are used, most detailed first; the first one with rows wins and they are never added together.
+The live `assistant.usage` event is documented as ephemeral, but observed logs can persist per-call data inside `session.usage_record`. Choose one per-call source for the whole log in the priority order below. A nonempty ledger wins even when partial. Don't add alternative streams without shared accounting identities.
 
 | Source | What it gives | Limits |
 | --- | --- | --- |
 | `~/.copilot/session-store.db`, table `assistant_usage_events` (read-only) | One row per model call: time, agent id, model, input, cache read and write, output and reasoning tokens, nano-AIU, duration | Private, version-dependent CLI database; present for 11 of the 26 sessions on the development machine, and for some only a fraction of the calls |
-| `model.model_call_success` events in the log (`copilot_usage.total_nano_aiu`) | The same per call, in the log itself | Present in only a few logs; also includes helper calls such as permission checks that are not assistant replies |
-| Last `totalNanoAiu` on `session.shutdown` or `session.usage_checkpoint` | A running total for the whole event log | Not additive across resumes; covers every conversation in the log, not only the exported one |
+| `session.usage_record` in the log (`data.usage`) | Accounting identity/sequence, model, tokens, nano-AIU, duration and optional effort, Fusion and parent-call provenance | Observed private wrapper. Missing or invalid metrics stay unknown; unsupported variants are diagnosed. |
+| `model.model_call_success` events in the log (`copilot_usage.total_nano_aiu`) | Legacy per-call amounts | Also includes helper calls such as permission checks that are not assistant replies |
+
+The last valid `totalNanoAiu` on `session.shutdown` or `session.usage_checkpoint` is a separate whole-log running total. Never add cumulative totals across resumes, add them to per-call figures, or sum copied/forked histories. Fusion phase/completion summaries also remain separate from per-call totals.
+
+**Receipt identities and unknown values.** Deduplicate by `(sourceSessionId, usageId)`, not text, counters or sequence alone. An identical repeat with the same identity counts once. A conflicting repeat counts once with unknown counters and a diagnostic. Missing or invalid counters remain unknown independently for each metric. An unknown cost is not free. Partial or unavailable billing status keeps a reported subtotal as provenance, not a complete billable amount. Receipt durations use milliseconds by inference from the official SDK usage field. That mapping to the private persisted wrapper hasn't been verified against ledger rows.
 
 **Unit.** credits = nano-AIU / 1,000,000,000. Verified on 247 of 247 real logged calls: the recorded token counts times the recorded per-batch rates equal the recorded nano-AIU, and the implied per-million-token prices equal GitHub's published rates (GPT-6 Luna $0.10 / $0.01 / $0.125 / $0.50, GPT-6 Astra $10 / $1 / $12.50 / $50, GPT-5.5 $5 / $0.50 / $30 for input / cached input / cache write / output); GitHub defines 1 AI credit = $0.01. Credits are never derived from token counts.
 
-**Attribution.** A call belongs to the turn whose prompt is the last one at or before the call's time, and to a delegated agent by its agent id (checked: the stored parent tool call id equals the delegation's tool call id for every delegated row on the development machine). Calls that fit neither are shown as "Not matched to a turn or agent of this conversation", with their credits. A turn's credits are its own calls plus the calls of the agents it delegated to, shown split.
+**Attribution.** Calls in the selected conversation match timed turns within its recorded window. Delegated calls require a verified chain of actual parent calls back to that conversation. A recorded parent-call ID must agree with that chain. Calls without a matched turn appear as **Not matched to a turn in this conversation**. Their agent may still be known: detached children keep their own usage without an invented parent turn. A turn's credits split its own calls from its delegated calls.
 
-**Credits by turn from running totals.** Every log with checkpoints also gets credits per turn: each `session.usage_checkpoint` or `session.shutdown` total minus the previous total goes to the turn that holds it. Not every turn writes a checkpoint, so one difference can cover several turns; it is then shown on the last of them with the range ("covers turns 24-25, which the log did not separate"), never split. A difference includes delegated agents. Credits written before the first prompt are reported separately. This is shown next to per-call figures (Turn info) and alone where there are none (turn line, Cost section: the five most expensive turns and a collapsible table of all turns). Checked on the chats where the CLI store has every call: identical per turn when each turn wrote a checkpoint (4 chats), within 4-9% in the two largest, and visibly different where the store holds only some calls. Tokens: the log has no per-turn input tokens; only some logs carry `outputTokens` on assistant messages (3 of 27), shown as "from message records". Shutdown `tokenDetails` and `modelMetrics` are not used: they stopped updating while the credit total kept growing.
+Source selection happens before filtering to a child and its verified descendants. An empty child subset of a partial whole-log ledger doesn't trigger receipt or legacy fallback. A selected child doesn't inherit the root's running total.
 
-**Honesty rules.** Where a source has no rows, the turn, agent or chat shows "not recorded", never zero. The Cost section states the source, the number of usage rows against the assistant replies in the log, and the last logged total with the share the rows add up to (it can exceed 100%: the logged total is written at shutdown, before later calls). Real data (24 agent chats): 9 use the CLI store (5 of them cover about 100% of the replies, one covers 7%), 4 use log events, 11 show only the logged total.
+**Credits by turn from running totals.** Main exports also show checkpoint differences by turn: each `session.usage_checkpoint` or `session.shutdown` total contributes its increase over earlier totals. A decrease never creates negative usage. Not every turn writes a checkpoint, so one difference can cover several turns. It appears on the last of them with the covered range, never split. A difference includes delegated agents. Credits written before the first prompt are reported separately. Turn info shows these differences beside per-call figures. They supply the turn cost when per-call coverage is insufficient, with the most expensive turns listed in Cost. Running totals don't supply token counts. Selected per-call rows can supply tokens, and recorded assistant-message `outputTokens` appear as "from message records". Shutdown `tokenDetails` and `modelMetrics` aren't used as per-call rows.
+
+**Honesty rules.** Missing calls don't establish zero usage. The Cost section states the selected source, separate source availability, receipt identity diagnostics, coverage against recorded replies and the last logged total where available. Partial sources remain labelled rather than being topped up from another stream. Unknown metrics remain unknown in their aggregates. Detailed listings use the same source-selection and attribution rules. Coverage is a heuristic, not proof that the producer recorded every call.
 
 ## Approved upgrade: staged implementation
 
@@ -763,9 +791,7 @@ undoes the Markdown wrapping (escapes, entities, blockquotes, whitespace) and as
 rendered Markdown, after applying the same best-effort redaction. Each piece is `present`, `partial` (only the start or
 end, or some of its lines, appear) or `absent`. Multi-line categories are scored per line, so a trimmed command echo or a
 clipped middle shows as "N of M lines". Short fragments that sit next to code (for example a lone `{` merged from a `markdownVuln` item) are also checked as `assistant-text-joined`: adjacent text fragments, including `markdownVuln` content, are joined in source order, split into lines and scored as whole lines. The short-fragment rule for standalone pieces is unchanged. Order and exact-repeat checks apply only to source-distinct message text whose
-rendered sequence is preserved: Local prompts/prose across final replayed requests, and SDK prompts, reasoning, prose
-and tool intent within each `agentId` scope. Local reasoning snapshots, tool progress/results, notes and companion text
-still receive presence accounting but are not assumed to be separate inline messages for order or multiplicity.
+rendered sequence is kept: Local prompts/prose across final replayed requests, and SDK prompts, reasoning, prose, tool intent, Fusion phase output, distinct phase projection text and handoff content within each `agentId` scope. Local reasoning snapshots, tool progress/results and other notes still receive presence accounting without assuming separate inline positions. Identifiable SDK children without recorded parent calls are checked in their own scopes, not assigned a fabricated root position.
 `--verify` prints the totals and fails when text is partial or absent, eligible message text is out of order, or an identical eligible occurrence is missing, with or without `--strict`. No partial-cause exception is currently approved or implemented. A future exception must identify the cause and evidence for that exact piece; historical clipping, legacy byte caps and command-echo differences aren't category-wide exemptions.
 
 Layer D does not infer that adjacent text needs a separator: VS Code 1.141.2's version-matched
@@ -801,6 +827,10 @@ Tests, golden checks and baselines use isolated `CCE_CACHE_DIR` roots and clean 
 SDK shell calls render their command separately and keep every remaining argument in the input block, including shell IDs, descriptions and execution mode. Pending calls don't rely on a later tool result repeating those fields.
 
 SDK verification with an output path scores the saved Markdown and its linked sibling companions against the captured events. It doesn't substitute a new rendering or regenerate missing companions. Verification without an output path checks the in-memory rendering.
+
+SDK Layer D expands supplied text companion objects at each actual live relative link outside fenced code and backtick spans. Unsafe targets don't contribute companion evidence, and links inside companion bodies aren't followed. Repeated links contribute at their recorded archive positions, allowing order and multiplicity checks for linked phase/handoff text. Legacy library input containing concatenated companion text still supports presence checks but cannot prove link positions.
+
+These are source-text coverage checks, not checksum authentication of every text companion. A redundant companion can be corrupted without failing if other rendered content still supplies the required text and occurrences. A passing result doesn't prove that the producer recorded every live event, nor validate the meaning of readable reasoning. Image bytes use their separate independent hash check.
 
 **Historical verification limitations.** Earlier saved-file SDK verification regenerated the export instead of checking the supplied file. Its success did not prove that the saved Markdown or companions were intact. Layer D before October 20, 2026 did not cover images. Those historical results must not be read as image-preservation evidence. Current image coverage requires the independent recorded-byte hash check.
 

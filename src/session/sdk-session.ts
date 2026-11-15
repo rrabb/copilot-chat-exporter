@@ -18,6 +18,9 @@ import { collectRecordedImages, saveImageCompanion } from '../images.ts';
 import type { Census, NoteNode, ParsedSession, ToolNode, Turn, TurnNode, TurnScalars } from '../types.ts';
 import { childScopes, isRecord } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
+import { fusionNote } from './sdk-fusion.ts';
+import { parseUsageRecords } from './sdk-usage-record.ts';
+import type { SdkEventSource } from './sources.ts';
 
 /** Event types left out of the export on purpose, with the group name shown in the omission line. */
 export const SDK_LEFT_OUT: ReadonlyMap<string, string> = new Map([
@@ -42,6 +45,8 @@ const HANDLED = new Set([
   'session.start', 'session.resume', 'session.shutdown', 'session.model_change', 'session.mode_changed', 'session.auto_mode_resolved',
   'session.compaction_complete', 'session.plan_changed', 'session.task_complete', 'session.error', 'session.info',
   'session.context_changed', 'session.workspace_file_changed', 'session.truncation', 'abort',
+  'session.fusion_resolved', 'assistant.fusion_phase_completed', 'session.fusion_commit_started',
+  'session.fusion_change_checkpoint', 'session.fusion_completed', 'session.fusion_handoff', 'session.usage_record',
   'user.message', 'assistant.message', 'tool.execution_start', 'tool.execution_complete',
   'system.message', 'system.notification', 'skill.invoked', 'skill.invoked_ref', 'skill.context_delivered_ref',
   'session.binary_asset',
@@ -51,6 +56,8 @@ export interface SdkSessionOptions {
   title: string;
   /** Folder the Markdown will sit beside; companion links are built from it. */
   assetsDirectory: string;
+  /** Required for an empty child selection, whose identity cannot be inferred from its events. */
+  scope?: SdkEventSource['scope'];
 }
 
 export interface SdkSessionResult {
@@ -58,9 +65,20 @@ export interface SdkSessionResult {
   companions: CompanionArtifact[];
   /** Left-out groups and how many records each held. */
   leftOut: Map<string, number>;
+  orphanChildren: OrphanChildConversation[];
   unresolvedChildScopes: number;
   copilotVersion: string;
   producer: string | null;
+  /** Selected conversation and its verified descendants. A main selection covers the whole log. */
+  events: readonly SdkEvent[];
+}
+
+export interface OrphanChildConversation {
+  agentId: string;
+  parentToolCallId: string;
+  title: string;
+  startedAt: number | null;
+  turns: Turn[];
 }
 
 const text = (value: unknown): string => typeof value === 'string' ? value : '';
@@ -140,6 +158,7 @@ interface SubagentMeta {
 interface Shared {
   options: SdkSessionOptions;
   all: readonly SdkEvent[];
+  usageDiagnostics: Map<SdkEvent, string[]>;
   meta: ReadonlyMap<string, SubagentMeta>;
   attached: Set<string>;
   seen: Map<string, number>;
@@ -155,6 +174,7 @@ interface Shared {
 }
 
 const MAX_NESTING = 8;
+const firstString = (...values: unknown[]): string => values.map((value) => text(value)).find(Boolean) ?? '';
 
 /** Metadata for children whose tool-call/agent mapping has been verified. */
 function subagentMeta (events: readonly SdkEvent[], verifiedAgentIds: ReadonlyMap<string, string>): Map<string, SubagentMeta> {
@@ -206,6 +226,11 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
       });
     }
     return relativePath;
+  };
+  const unsupported = (eventType: string, reason: string) => {
+    const key = `${eventType}:unsupported`;
+    unhandled.set(key, (unhandled.get(key) ?? 0) + 1);
+    note({ type: 'note', title: `⚠️ ${eventType} has an unsupported payload.`, text: reason });
   };
   const note = (node: NoteNode) => (current ? current.body.push(node) : pendingNotes.push(node));
   if (implicit) {
@@ -376,6 +401,23 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
       case 'session.plan_changed':
         note({ type: 'note', title: `🗺️ Plan ${text(data.operation) || 'changed'}` });
         break;
+      case 'session.fusion_resolved':
+      case 'assistant.fusion_phase_completed':
+      case 'session.fusion_commit_started':
+      case 'session.fusion_change_checkpoint':
+      case 'session.fusion_completed':
+      case 'session.fusion_handoff': {
+        const normalized = fusionNote(type, data);
+        note(normalized.note);
+        normalized.issues.length && unsupported(type, normalized.issues.join('\n'));
+        break;
+      }
+      case 'session.usage_record': {
+        const issues = ctx.usageDiagnostics.get(event);
+        issues?.length && unsupported(type, issues.join('\n'));
+        ctx.usageDiagnostics.delete(event);
+        break;
+      }
       case 'session.task_complete':
         note({ type: 'note', title: `✅ Task complete${data.success === false ? ' (reported unsuccessful)' : ''}`, ...(text(data.summary) ? { text: text(data.summary) } : {}) });
         break;
@@ -476,9 +518,10 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
     turns.push({ requestId: 'session-notes', ts: null, prompt: '(no user prompt recorded)', reasoning: [], prose: [], body: pendingNotes, toolNodes: [], todos: [], filesTouched: [], scalar: { agentTurn: true }, number: 1 });
 
   // A call that started a delegated agent carries that agent's whole conversation.
+  const renderedTools = new Set(turns.flatMap((turn) => turn.toolNodes));
   for (const node of nodesById.values()) {
     const info = ctx.meta.get(node.toolCallId);
-    if (!info?.agentId || ctx.attached.has(info.agentId) || depth >= MAX_NESTING)
+    if (!renderedTools.has(node) || !info?.agentId || ctx.attached.has(info.agentId) || depth >= MAX_NESTING)
       continue;
     ctx.attached.add(info.agentId);
     const scopeEvents = ctx.all.filter((event) => event.agentId === info.agentId);
@@ -491,30 +534,110 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
   return turns;
 }
 
-/** The main conversation of one verified scope, with every delegated agent's conversation nested at its call. */
+/** The selected conversation, with verified descendants nested at their recorded calls. */
 export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkEvent[], options: SdkSessionOptions): SdkSessionResult {
   const childScopeResult = childScopes(all);
   const verifiedAgentIds = new Map(childScopeResult.scopes.map((scope) => [scope.parentToolCallId, scope.agentId]));
+  const firstAgentId = scoped[0]?.agentId;
+  const rootAgentId = options.scope
+    ? options.scope.kind === 'subagent' ? options.scope.agentId : undefined
+    : firstAgentId && scoped.every((event) => event.agentId === firstAgentId) ? firstAgentId : undefined;
+  const callOwners = new Map<string, Set<string | undefined>>();
+  const recordCall = (value: unknown, owner: string | undefined) => {
+    const id = text(value);
+    if (!id)
+      return;
+    const owners = callOwners.get(id) ?? new Set<string | undefined>();
+    owners.add(owner);
+    callOwners.set(id, owners);
+  };
+  // Inspect recorded calls even in scopes we haven't processed or won't render at the depth limit.
+  for (const event of all) {
+    if (event.type === 'assistant.message') {
+      for (const request of Array.isArray(event.data.toolRequests) ? event.data.toolRequests.filter(isRecord) : [])
+        recordCall(request.toolCallId, event.agentId);
+    } else if (event.type === 'tool.execution_start' || event.type === 'tool.execution_complete')
+      recordCall(event.data.toolCallId, event.agentId);
+  }
+  const relevantAgents = new Set(rootAgentId ? [rootAgentId] : []);
+  if (rootAgentId) {
+    let previousSize = -1;
+    while (previousSize !== relevantAgents.size) {
+      previousSize = relevantAgents.size;
+      for (const scope of childScopeResult.scopes) {
+        const owners = callOwners.get(scope.parentToolCallId);
+        if (owners && [...owners].some((owner) => owner !== undefined && relevantAgents.has(owner)))
+          relevantAgents.add(scope.agentId);
+      }
+    }
+  }
+  const relevantEvents = rootAgentId
+    ? all.filter((event) => event.agentId !== undefined && relevantAgents.has(event.agentId)) : all;
+  const relevantEventSet = new Set(relevantEvents);
   const ctx: Shared = {
-    options, all, meta: subagentMeta(all, verifiedAgentIds), attached: new Set(), seen: new Map(), dropped: new Map(), unhandled: new Map(),
+    options, all: relevantEvents,
+    usageDiagnostics: new Map([...parseUsageRecords(all).diagnostics].filter(([event]) => relevantEventSet.has(event))),
+    meta: subagentMeta(relevantEvents, verifiedAgentIds), attached: new Set(rootAgentId ? [rootAgentId] : []),
+    seen: new Map(), dropped: new Map(), unhandled: new Map(),
     leftOut: new Map(), companions: [], systemFiles: new Map(), copilotVersion: 'unknown', producer: null, creationDate: null, workingDirectory: '',
   };
   const turns = processScope(ctx, scoped, null, 0);
-  // Events attributed to an agent that no call in this conversation started cannot be placed; say so.
-  const unplaced = all.filter((event) => event.agentId !== undefined && !ctx.attached.has(event.agentId)
+  const scopeStartOrder = new Map<string, number>();
+  all.forEach((event, index) => event.agentId && !scopeStartOrder.has(event.agentId) && scopeStartOrder.set(event.agentId, index));
+  // A missing parent call cannot establish that an unrelated child belongs to a selected child.
+  const orphanCandidates = (rootAgentId ? [] : [...childScopeResult.scopes])
+    .sort((left, right) => (scopeStartOrder.get(left.agentId) ?? Number.MAX_SAFE_INTEGER) - (scopeStartOrder.get(right.agentId) ?? Number.MAX_SAFE_INTEGER));
+  const orphanChildren: OrphanChildConversation[] = [];
+  for (const scope of orphanCandidates) {
+    if (ctx.attached.has(scope.agentId) || callOwners.has(scope.parentToolCallId))
+      continue;
+    const scopeEvents = all.filter((event) => event.agentId === scope.agentId);
+    const startedAt = scopeEvents.map((event) => millis(event.timestamp)).find((stamp): stamp is number => stamp !== null) ?? null;
+    ctx.attached.add(scope.agentId);
+    orphanChildren.push({
+      agentId: scope.agentId,
+      parentToolCallId: scope.parentToolCallId,
+      title: ctx.meta.get(scope.parentToolCallId)?.displayName || ctx.meta.get(scope.parentToolCallId)?.name || `agent ${scope.agentId}`,
+      startedAt,
+      turns: processScope(ctx, scopeEvents, null, 0),
+    });
+  }
+  // Count children without a renderable parent call, including descendants beyond the nesting limit.
+  const unplaced = relevantEvents.filter((event) => event.agentId !== undefined && !ctx.attached.has(event.agentId)
     && !SDK_LEFT_OUT.has(event.type) && !SDK_MARKERS.has(event.type)).length;
   unplaced && ctx.leftOut.set('sub-agent events without a verified delegation', unplaced);
+  const errors: string[] = [];
+  for (const [event, issues] of ctx.usageDiagnostics) {
+    const key = `${event.type}:unsupported`;
+    ctx.unhandled.set(key, (ctx.unhandled.get(key) ?? 0) + 1);
+    ctx.seen.set(event.type, (ctx.seen.get(event.type) ?? 0) + 1);
+    errors.push(`${event.type} at line ${event.line} has an unsupported payload: ${issues.join('; ')}`);
+  }
+  for (const event of relevantEvents) {
+    if (event.type !== 'session.shutdown' && event.type !== 'session.usage_checkpoint')
+      continue;
+    const total = event.data.totalNanoAiu;
+    if (total === undefined || (typeof total === 'number' && Number.isFinite(total) && total >= 0))
+      continue;
+    const key = `${event.type}:unsupported`;
+    ctx.unhandled.set(key, (ctx.unhandled.get(key) ?? 0) + 1);
+    errors.push(`${event.type} at line ${event.line}: totalNanoAiu must be a finite nonnegative number.`);
+  }
   const census: Census = {
     seen: ctx.seen, dropped: ctx.dropped, toolData: new Map(), unrecognizedToolData: [],
     unhandled: [...ctx.unhandled].sort((left, right) => right[1] - left[1]),
   };
   const session: ParsedSession = {
     title: options.title, customTitle: '', defaultTitle: options.title, creationDate: ctx.creationDate, responderUsername: 'GitHub Copilot',
-    initialLocation: 'agent', workingDirectory: ctx.workingDirectory, turns, rawRequests: [], census, editedFiles: [], errors: [],
+    initialLocation: 'agent', workingDirectory: ctx.workingDirectory, turns, rawRequests: [], census, editedFiles: [], errors,
+    ...(orphanChildren.length ? { detachedSubagents: orphanChildren.map(({ startedAt: _startedAt, ...child }) => child) } : {}),
   };
   return {
     session, companions: ctx.companions, leftOut: ctx.leftOut,
-    unresolvedChildScopes: childScopeResult.problems.length,
+    orphanChildren,
+    unresolvedChildScopes: childScopeResult.problems.filter((problem) => !rootAgentId
+      || (problem.toolCallId && [...(callOwners.get(problem.toolCallId) ?? [])].some((owner) => owner !== undefined && relevantAgents.has(owner)))).length,
     copilotVersion: ctx.copilotVersion, producer: ctx.producer,
+    events: relevantEvents,
   };
 }
