@@ -48,12 +48,13 @@ Create synthetic Fusion golden fixtures based on the unique recorded structures,
 
 ## Work tree
 
-Progress as of 261114: 0 of 2 child items done. Both child implementations and their integrated goldens passed independent review. Child closure still requires developer acceptance.
+Progress as of 261115: 0 of 3 child items done. All three implementations passed independent review. Child closure still requires developer acceptance.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
 | 1 | [WI-056 Fusion routing and receipt fields](WI-056-fusion-routing-and-receipt-fields.md) | [build] | S | - |
 | 2 | [WI-055 New agent event families](WI-055-new-agent-event-families.md) | [build] | M | - |
+| 3 | [WI-057 Local golden scratch isolation](#wi-057-local-golden-scratch-isolation-261115) | [build] | S | - |
 
 ## Options and tradeoffs
 
@@ -319,13 +320,23 @@ The rebuilt CLI separately passes the current frozen S017 saved artifact and rej
 
 All approved implementation slices passed independent review. `pnpm run verify` passes generated checks, both typechecks, the full suite and the unchanged Local golden. `pnpm run build` rebuilt the CLI, library and declarations. Check mode and deliberate no-op SDK updates leave all retained bytes and mtimes unchanged. The coordinator independently checked all 1,164 mapping references and the unchanged historical matrix.
 
-The active [SDK golden generation](../test/fixtures/sdk-golden/active.json) selects five views and seven exact artifacts. Its two 42,265-byte text companions keep every redacted line. Only this generation is current. Two earlier candidates remain unchanged and inactive; cleanup requires separate permission.
+The active [SDK golden generation](../test/fixtures/sdk-golden/active.json) selects five views and seven exact artifacts. Its two 42,265-byte text companions keep every redacted line. Only this generation is current. On 261115, the developer approved deleting the two inactive candidates and excluding their 14 files from the index. The coordinator also deleted 68 obsolete Local golden asset folders after checking their identical synthetic PNGs, keeping the folder linked by the current render. The active SDK fixture passed all 34 focused tests afterward. Full verification passed all 762 tests, both typechecks and the Local golden. That check generated another asset folder; the coordinator removed its now-obsolete predecessor, leaving one current bundle. No other index entries changed. The later approved [WI-057 harness isolation](#wi-057-local-golden-scratch-isolation-261115) prevents new successful-run accumulation without changing ordinary export retention.
 
 Review the [fixture guide and maintenance commands](../test/fixtures/sdk-golden/README.md), [semantic/negative tests](../test/sdk-golden.test.ts), prefix migration and the bounded mapping limits before acceptance. The final projection covers 389 rows: 205 have scoped evidence and 184 remain unknown. It maps all 60 reviewed catalog descendants and seven WI-056 fields without claiming full corpus semantics. The full inventory still needs available unchanged originals for replay. Persisted-resource clipping and broader per-call Markdown archival remain outside this profile.
 
 Final evidence: `coordinator-verify-final.log`, `coordinator-build-01.log`, `coordinator-built-261114-213342.private.json`, `correction-04.private.md`, `bounded-evidence-map-04.private.json` and `ownership-evidence-audit-04.private.json` under the C folder. No native session data or Git history was changed. Earlier staged content was left intact; approved working-tree extensions remain unstaged. Implementation completion doesn't close WI-054, its children or WI-053.
 
 Private evidence: `sources.private.json`, `observations.private.json`, `configuration-followup.private.json`, `representative-findings.private.json`, `policy-and-scenarios.private.json`, `review-corrections.private.json` and `validation.private.json` under `temp-tool-output/261114-1612-fusion-representatives/`. The independent `coordinator-review.mjs` and `coordinator-review.private.json` verify the raw prefix reads and targeted observations. At that research checkpoint, all 25 protected implementation files matched their earlier hashes. `coordinator-corrections-check.mjs` and its result independently check the final saved-evidence amendment without more native reads.
+
+### WI-057 Local golden scratch isolation, 261115
+
+Part of WI-054, found while reviewing its staged fixtures and generated Local golden assets. The developer approved Local golden isolation only, using the ignored `temp-tool-output/` folder. Automatic SDK candidate pruning wasn't approved.
+
+The worker changed the Local golden CLI and helper, added six regression tests, updated README/SPEC/CHANGELOG and rebuilt generated output. Each operation owns a unique timestamped run. Success deletes its exact writer-recorded files and empty folders. Mismatches or errors keep the run and print its absolute path. Cleanup rejects symlinks, changed run identity and unowned entries before deletion. Existing baseline bundles, failed runs, SDK candidates and ordinary exports aren't pruned. An earlier verification failure isn't cleared by golden update.
+
+Independent coordinator review and full verification passed 768 tests, both typechecks and the unchanged Local expected render/digest. Two additional successful golden checks left no new retained run folders. The four baseline files and Local fixture files kept identical hashes. The retained failed archive and image also matched the worker's recorded hashes. Worker build and built-CLI checks passed. Evidence is under `temp-tool-output/261115-0013-local-golden-prevention/`: `coordinator-verify.log`, `coordinator-repeat-1.log`, `coordinator-repeat-2.log`, `proof.json`, `build.log` and `built-golden.log`.
+
+The staged file count remains 41 after the approved 14-entry removal. New implementation and tracking edits weren't staged. `git diff --check` passes for these working-tree edits. The separate cached check reports trailing spaces in the unchanged active SDK golden text; those fixture bytes weren't altered to silence the check. Review the success/failure retention behavior for acceptance. WI-057 is Waiting, not developer-closed.
 
 ### Storage correction and independent validation
 
@@ -368,6 +379,6 @@ Native preflight found one distinct accessible SDK root. Its 71 event logs total
 
 The inventory-only option and storage correction are independently reviewed and validated on the captured native inventory. Phase 1 is complete. Phase 2 produced all 12,198 matrix rows and the bounded 293-row Fusion/receipt audit. Other fields remain labelled unknown. The coordinator independently checked counts, correlations and new field gaps, and accepted the worker's scenario-wording addendum. No source/test changes or fixture creation occurred during this matrix pass.
 
-The approved representative reads, focused compatibility and synthetic goldens are complete and independently reviewed. Final verification/build, actual saved-file companion checks and frozen built-CLI positive/negative checks pass. The developer next reviews the guide, active artifacts and limits for separate WI-054/WI-055/WI-056 acceptance. Preserve the optional prefix representation, financial selection, inactive candidates and earlier work. The accepted 30-file B2 boundary is under `temp-tool-output/261114-1719-fusion-implementation/slice-b2/`. No full native copies were created.
+The approved representative reads, focused compatibility and synthetic goldens are complete and independently reviewed. Final verification/build, actual saved-file companion checks and frozen built-CLI positive/negative checks pass. The developer next reviews the guide, active artifacts and limits for separate WI-054/WI-055/WI-056 acceptance. Keep the optional prefix representation, financial selection and active fixture. The two inactive candidates were removed with approval on 261115. The accepted 30-file B2 boundary is under `temp-tool-output/261114-1719-fusion-implementation/slice-b2/`. No full native copies were created.
 
 The approved profile may extend the listed WI-053 files while keeping prior work. Other edits and the unrelated instruction file stay untouched. The coordinator owns this topic, the dashboard and the parent's work tree.

@@ -6,6 +6,7 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Local golden checks and updates use unique scratch runs under `temp-tool-output/`. Success removes that run's bundle. Failures keep it and print its path. Ordinary exports, SDK candidates and old baselines keep their existing retention rules.
 - SDK exports keep identifiable child conversations whose parent calls are missing in a labelled separate section. Ambiguous or incomplete identity mappings still omit the child with a warning.
 - Agent usage prefers a nonempty database ledger, then persisted receipts, then legacy model-call events. Source coverage, duplicate identities and unknown metrics stay visible. Detached child usage isn't assigned to an invented parent turn.
 - SDK archives with recorded image companions now show the existing privacy warning. Text redaction doesn't inspect image pixels.

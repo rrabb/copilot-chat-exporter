@@ -13,6 +13,7 @@
 //     This is how you cover a conversation containing a shape neither committed fixture has.
 
 import { createHash } from 'node:crypto';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ParsedSession, ToolNode, TurnNode } from '../types.ts';
@@ -22,13 +23,75 @@ const PKG = path.basename(moduleDir) === 'verify'
   ? path.resolve(moduleDir, '..', '..')
   : path.resolve(moduleDir, '..');
 
-// fixtures/ holds the saved artifacts a check compares against; baseline/ holds generated output.
+// fixtures/ holds the saved artifacts a check compares against.
 const GOLDEN_DIR = path.join(PKG, 'test', 'fixtures', 'golden');
 
 export const GOLDEN_FIXTURE_PATH = path.join(GOLDEN_DIR, '00000000-0000-4000-8000-000000000000.jsonl');
 export const GOLDEN_DIGEST_PATH = path.join(GOLDEN_DIR, 'golden-session.digest.json');
 export const GOLDEN_EXPECTED_RENDER_PATH = path.join(GOLDEN_DIR, 'golden-session.expected.md');
-export const GOLDEN_SCRATCH_OUTPUT = path.join(PKG, 'test', 'baseline', 'golden.render.md');
+
+export interface GoldenScratchRun {
+  directory: string;
+  outputPath: string;
+  cleanup: (files: readonly string[]) => Promise<void>;
+}
+
+/** Each Local golden operation owns one new folder, never an old baseline or report. */
+export async function createGoldenScratchRun (): Promise<GoldenScratchRun> {
+  const root = path.join(PKG, 'temp-tool-output');
+  await fs.mkdir(root, { recursive: true });
+  const rootInfo = await fs.lstat(root);
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink())
+    throw new Error('Local golden scratch root must be a directory, not a symlink.');
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const stamp = `${pad(now.getFullYear() % 100)}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const directory = await fs.mkdtemp(path.join(root, `${stamp}-local-golden-`));
+  const identity = await fs.lstat(directory);
+  const outputPath = path.join(directory, 'golden.render.md');
+  return {
+    directory, outputPath,
+    cleanup: async (files) => {
+      const current = await fs.lstat(directory);
+      if (!current.isDirectory() || current.isSymbolicLink() || current.dev !== identity.dev || current.ino !== identity.ino)
+        throw new Error('Local golden scratch directory changed. Nothing was deleted.');
+      const ownedFiles = new Set(files);
+      const folders = new Set<string>();
+      for (const file of ownedFiles) {
+        const parent = path.dirname(file);
+        if (file !== outputPath) {
+          if (path.dirname(parent) !== directory || !/^golden\.render_assets_\d{6}_\d{6}(?:_\d+)?$/u.test(path.basename(parent)))
+            throw new Error('Local golden cleanup received a file outside its archive bundle.');
+          folders.add(parent);
+        }
+      }
+      // Check the whole manifest before unlinking anything. Never follow links or remove unknown entries.
+      for (const folder of folders) {
+        const info = await fs.lstat(folder);
+        if (!info.isDirectory() || info.isSymbolicLink())
+          throw new Error('Local golden assets directory changed. Nothing was deleted.');
+        for (const name of await fs.readdir(folder))
+          if (!ownedFiles.has(path.join(folder, name)))
+            throw new Error('Local golden assets contain an unowned file. Nothing was deleted.');
+      }
+      for (const name of await fs.readdir(directory)) {
+        const entry = path.join(directory, name);
+        if (!ownedFiles.has(entry) && !folders.has(entry))
+          throw new Error('Local golden scratch contains an unowned entry. Nothing was deleted.');
+      }
+      for (const file of ownedFiles) {
+        const info = await fs.lstat(file);
+        if (!info.isFile() || info.isSymbolicLink())
+          throw new Error('Local golden archive file changed. Nothing was deleted.');
+      }
+      for (const file of ownedFiles)
+        await fs.unlink(file);
+      for (const folder of folders)
+        await fs.rmdir(folder);
+      await fs.rmdir(directory);
+    },
+  };
+}
 
 // Machine-local, and gitignored: a snapshot names one of *your* sessions and is only meaningful
 // beside the storage it was taken from.

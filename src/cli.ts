@@ -38,10 +38,10 @@ import {
   GOLDEN_DIGEST_PATH,
   GOLDEN_EXPECTED_RENDER_PATH,
   GOLDEN_FIXTURE_PATH,
-  GOLDEN_SCRATCH_OUTPUT,
   GOLDEN_SYNTHETIC_NOTES,
   SNAPSHOT_DIR,
   buildDigest,
+  createGoldenScratchRun,
   diffDigest,
   normalizeRender,
   snapshotPath,
@@ -280,7 +280,7 @@ const goldenMode = goldenAction != null;
 const firstArgument = goldenMode ? GOLDEN_FIXTURE_PATH : positionalArgs[0];
 const firstIsSource = looksLikeSessionArgument(firstArgument);
 const sourceArgument = firstIsSource && !currentMode ? firstArgument : undefined;
-const outputArgument = goldenMode ? GOLDEN_SCRATCH_OUTPUT : (firstIsSource ? positionalArgs[1] : firstArgument);
+const outputArgument = goldenMode ? undefined : (firstIsSource ? positionalArgs[1] : firstArgument);
 if (!listMode && !goldenMode && ((!currentMode && !firstIsSource) || (currentMode && firstIsSource))) {
   console.error('Export/verify/snapshot requires an explicit session UUID, unique short UUID prefix, or .jsonl path, or --current [outputPath].');
   process.exit(1);
@@ -465,7 +465,11 @@ if (snapshotAction) {
   process.exit(0);
 }
 
-let outputPath = resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
+let goldenRun: Awaited<ReturnType<typeof createGoldenScratchRun>> | undefined;
+let goldenFiles: string[] = [];
+try {
+goldenRun = goldenMode ? await createGoldenScratchRun() : undefined;
+let outputPath = goldenRun?.outputPath ?? resolveOutputPath(outputArgument, session, location, loaded.host.outDir);
 let rendered = '';
 const exportFenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
 
@@ -524,6 +528,7 @@ try {
   companionCount = written.companionPaths.length;
   assetsPath = written.assetsPath;
   outputPath = written.outputPath;
+  goldenFiles = [written.outputPath, ...written.companionPaths];
   exportFailure = written.verificationFailure;
   if (exportFailure) {
     console.error(failureDetails(exportFailure));
@@ -533,6 +538,8 @@ try {
   }
   written.olderFailedArchive && console.log(`An older .verify-failed.md archive exists: ${written.olderFailedArchive}. It was not deleted.`);
 } catch (error) {
+  if (goldenMode)
+    throw error;
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
@@ -593,7 +600,6 @@ if (goldenMode) {
     await fs.writeFile(GOLDEN_EXPECTED_RENDER_PATH, freshRender, 'utf8');
     console.log(`Golden digest updated: ${workspacePath(GOLDEN_DIGEST_PATH)}`);
     console.log(`Golden render updated: ${workspacePath(GOLDEN_EXPECTED_RENDER_PATH)}`);
-    process.exitCode = 0;
   } else {
     let committed;
     try {
@@ -634,11 +640,28 @@ if (goldenMode) {
           console.log(`    expected: ${clip(entry.expected ?? '<missing>', 150)}`);
           console.log(`    actual:   ${clip(entry.actual ?? '<missing>', 150)}`);
         }
-        console.log(`  Full render kept at ${workspacePath(GOLDEN_SCRATCH_OUTPUT)} for a real diff.`);
         process.exitCode = 2;
       } else {
         console.log(`Golden check: render matches the committed baseline exactly (${thousands(expectedLines.length)} normalized lines).`);
       }
     }
+  }
+}
+} catch (error) {
+  if (!goldenMode)
+    throw error;
+  console.error(errorLabel(error));
+  process.exitCode = 1;
+} finally {
+  if (goldenRun) {
+    if (!process.exitCode) {
+      try {
+        await goldenRun.cleanup(goldenFiles);
+      } catch (error) {
+        console.error(`Local golden scratch cleanup failed: ${errorLabel(error)}`);
+        process.exitCode = 1;
+      }
+    }
+    process.exitCode && console.error(`Golden scratch run kept at: ${goldenRun.directory}`);
   }
 }

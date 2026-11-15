@@ -996,6 +996,8 @@ file (exit 2 with a field-level diff on mismatch). `--golden update` recomputes 
 committed digest - a deliberate, reviewed action gated by the PR diff, the same way a snapshot-test
 update is.
 
+Each Local golden check or update writes its synthetic archive and companions into a new `temp-tool-output/YYMMDD-HHmmss-local-golden-<suffix>/` folder. The local timestamp and exclusive suffix distinguish concurrent runs. Success removes the files recorded by that run's writer, then its empty folders. Cleanup refuses symlinks, changed run directories and unowned entries. A verification mismatch, write/update error or cleanup error keeps the remaining run and prints its absolute path. An update doesn't clear an earlier verification failure. Older reports, machine-local baselines, SDK golden candidates, snapshots and ordinary exports keep their existing retention rules. The archive basename stays `golden.render.md`, so existing timestamped companion-name and artifact-path normalization still applies.
+
 **Why it catches what A/B/C miss.** A `flattenItems` change that silently drops a nested tool call
 still makes Layer A and Layer B agree with each other (both derive from the same, now-wrong, parse of
 the live session). The committed digest, taken from the old and correct parse of the same frozen fixture

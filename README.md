@@ -356,6 +356,8 @@ Export provenance shows the package version beside the Git build identity. `pnpm
 
 Tests, golden checks and baselines run under isolated cache roots and remove them afterward. The runner fails if the real default cache or legacy receipt/capture stores change. For selected tests, use `node scripts/test.mjs test/source-snapshot.test.ts test/cli.test.ts`, not bare `node --test`.
 
+Local `--golden check` and `--golden update` write each synthetic archive into a unique `temp-tool-output/YYMMDD-HHmmss-local-golden-<suffix>/` folder. Successful operations remove their own archive, companions and run folder. A mismatch or error keeps that run and prints its absolute path. Older reports, `test/baseline/`, SDK golden candidates and ordinary exports aren't cleaned up.
+
 Layer D verification fails on partial as well as absent text, even without `--strict`. Schema drift and early fence repairs remain additional strict checks. There are no approved partial-cause exceptions. A future exception needs a named cause and evidence for that individual piece, not an exemption for a whole category.
 
 Flags without a dedicated script go through `export`:
