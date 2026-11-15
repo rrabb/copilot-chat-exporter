@@ -14,7 +14,7 @@ Canonical entry: [WI-054](../work-log.md#wi-054).
 - **Scope:** Agent Host and Copilot CLI event sources covered by WI-053. Report discovery limits rather than claim coverage of inaccessible machines or stores. Local journal compatibility and broader listing/filter design remain outside this child.
 - **Ownership:** one implementation worker at a time for scripts, tests and product docs. Coordinator reviews, runs independent checks and maintains tracking. Workers share this working tree, not isolated copies.
 - **Estimate:** proposed size L for the complete follow-up. Allow roughly 2-4 hours for a first census/tooling pass. Fixture count, remaining effort and runtime are unknown until discovery.
-- **Acceptance:** developer acceptance is required to close this child. WI-053's completed four-phase implementation has its own acceptance, independent of this follow-up.
+- **Accepted and closed, 261115:** the developer accepted WI-054, its three completed children and WI-053's original four-phase implementation. Recorded coverage and retention limits remain unchanged.
 
 ## Original goal
 
@@ -48,7 +48,7 @@ Create synthetic Fusion golden fixtures based on the unique recorded structures,
 
 ## Work tree
 
-Progress as of 261115: 0 of 3 child items done. All three implementations passed independent review. Child closure still requires developer acceptance.
+Progress as of 261115: 3 of 3 child items done. WI-055, WI-056 and WI-057 passed independent review and were accepted and closed by the developer.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -324,6 +324,8 @@ The active [SDK golden generation](../test/fixtures/sdk-golden/active.json) sele
 
 Review the [fixture guide and maintenance commands](../test/fixtures/sdk-golden/README.md), [semantic/negative tests](../test/sdk-golden.test.ts), prefix migration and the bounded mapping limits before acceptance. The final projection covers 389 rows: 205 have scoped evidence and 184 remain unknown. It maps all 60 reviewed catalog descendants and seven WI-056 fields without claiming full corpus semantics. The full inventory still needs available unchanged originals for replay. Persisted-resource clipping and broader per-call Markdown archival remain outside this profile.
 
+**Acceptance and completion check, 261115:** the developer accepted WI-053 through WI-057. Their dashboard rows, topic outcomes and parent progress are reconciled. The last full verification passed 768 tests, both typechecks and the unchanged Local golden; frozen built-CLI checks and no-accumulation evidence remain recorded above. No new runtime claims were made during this documentation-only closure. WI-042's broader research and unrelated acceptance gates remain open.
+
 Final evidence: `coordinator-verify-final.log`, `coordinator-build-01.log`, `coordinator-built-261114-213342.private.json`, `correction-04.private.md`, `bounded-evidence-map-04.private.json` and `ownership-evidence-audit-04.private.json` under the C folder. No native session data or Git history was changed. Earlier staged content was left intact; approved working-tree extensions remain unstaged. Implementation completion doesn't close WI-054, its children or WI-053.
 
 Private evidence: `sources.private.json`, `observations.private.json`, `configuration-followup.private.json`, `representative-findings.private.json`, `policy-and-scenarios.private.json`, `review-corrections.private.json` and `validation.private.json` under `temp-tool-output/261114-1612-fusion-representatives/`. The independent `coordinator-review.mjs` and `coordinator-review.private.json` verify the raw prefix reads and targeted observations. At that research checkpoint, all 25 protected implementation files matched their earlier hashes. `coordinator-corrections-check.mjs` and its result independently check the final saved-evidence amendment without more native reads.
@@ -336,7 +338,7 @@ The worker changed the Local golden CLI and helper, added six regression tests, 
 
 Independent coordinator review and full verification passed 768 tests, both typechecks and the unchanged Local expected render/digest. Two additional successful golden checks left no new retained run folders. The four baseline files and Local fixture files kept identical hashes. The retained failed archive and image also matched the worker's recorded hashes. Worker build and built-CLI checks passed. Evidence is under `temp-tool-output/261115-0013-local-golden-prevention/`: `coordinator-verify.log`, `coordinator-repeat-1.log`, `coordinator-repeat-2.log`, `proof.json`, `build.log` and `built-golden.log`.
 
-The staged file count remains 41 after the approved 14-entry removal. New implementation and tracking edits weren't staged. `git diff --check` passes for these working-tree edits. The separate cached check reports trailing spaces in the unchanged active SDK golden text; those fixture bytes weren't altered to silence the check. Review the success/failure retention behavior for acceptance. WI-057 is Waiting, not developer-closed.
+At the implementation checkpoint, the staged file count remained 41 after the approved 14-entry removal. New implementation and tracking edits weren't staged. `git diff --check` passed for those working-tree edits. The separate cached check reported trailing spaces in the unchanged active SDK golden text; those fixture bytes weren't altered to silence the check. **WI-057 accepted and closed, 261115:** the developer accepted the success/failure retention behavior and verified no-accumulation result.
 
 ### Storage correction and independent validation
 
@@ -379,6 +381,6 @@ Native preflight found one distinct accessible SDK root. Its 71 event logs total
 
 The inventory-only option and storage correction are independently reviewed and validated on the captured native inventory. Phase 1 is complete. Phase 2 produced all 12,198 matrix rows and the bounded 293-row Fusion/receipt audit. Other fields remain labelled unknown. The coordinator independently checked counts, correlations and new field gaps, and accepted the worker's scenario-wording addendum. No source/test changes or fixture creation occurred during this matrix pass.
 
-The approved representative reads, focused compatibility and synthetic goldens are complete and independently reviewed. Final verification/build, actual saved-file companion checks and frozen built-CLI positive/negative checks pass. The developer next reviews the guide, active artifacts and limits for separate WI-054/WI-055/WI-056 acceptance. Keep the optional prefix representation, financial selection and active fixture. The two inactive candidates were removed with approval on 261115. The accepted 30-file B2 boundary is under `temp-tool-output/261114-1719-fusion-implementation/slice-b2/`. No full native copies were created.
+The approved representative reads, focused compatibility and synthetic goldens are complete, independently reviewed and developer-accepted on 261115. WI-054 and its three children are closed. Final verification/build, actual saved-file companion checks and frozen built-CLI positive/negative checks pass. Keep the optional prefix representation, financial selection and active fixture. The two inactive candidates were removed with approval on 261115. The accepted 30-file B2 boundary is under `temp-tool-output/261114-1719-fusion-implementation/slice-b2/`. No full native copies were created.
 
 The approved profile may extend the listed WI-053 files while keeping prior work. Other edits and the unrelated instruction file stay untouched. The coordinator owns this topic, the dashboard and the parent's work tree.

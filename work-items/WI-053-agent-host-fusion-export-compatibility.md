@@ -14,7 +14,7 @@ Part of WI-042, found while working on: understanding Fusion mode and its record
 - **Separate baseline loss:** seven Fusion phase records contained text that the old verifier didn't check.
 - **Implemented:** the existing SDK path keeps Fusion content and recorded attribution, renders identifiable children without parent calls, and accounts for persisted usage without combining incompatible sources.
 - **Placement decision, 261113:** keep identifiable children without recorded parent calls in a clearly labelled separate section.
-- **Next:** developer review and acceptance. All four phases are independently reviewed. Full verification passes after the approved public-link cleanup. No item closure or Git actions are approved.
+- **Status, 261115:** developer-accepted and closed, along with WI-054 through WI-057. All four phases are independently reviewed. Full verification passes after the approved public-link cleanup. This acceptance doesn't authorize Git actions.
 - **Estimate:** 14-24 hours for implementation and validation, excluding a new capture or broader listing changes.
 
 ## Original goal
@@ -36,15 +36,17 @@ The developer identifies Fusion as a new Copilot Agent Host chat mode. Determine
 
 ## Current understanding
 
+**Accepted and closed, 261115:** the developer accepted this session's completed work, including WI-053 and its follow-up WI-054. The four-phase export implementation, frozen-source verification, usage reconciliation and documented limits are accepted. Broader labels, filters and future-mode research remain in WI-042.
+
 ### Work tree
 
-Progress as of 261114: 0 of 1 child items done. This follow-up doesn't reopen the four completed implementation phases or make their acceptance depend on the child.
+Progress as of 261115: 1 of 1 child items done. WI-054 and the original WI-053 implementation are developer-accepted and closed.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
 | 1 | [WI-054 Fusion census and golden fixtures](WI-054-fusion-census-and-golden-fixtures.md) | [build] | L | - |
 
-The developer approved recording the public research and revised plan in this child and starting its census implementation on 261114. Its census, selected compatibility work and synthetic goldens now passed independent review and final checks. This follow-up has its own developer acceptance and doesn't close WI-053.
+The developer approved recording the public research and revised plan in this child and starting its census implementation on 261114. Its census, selected compatibility work and synthetic goldens passed independent review and final checks. The developer accepted both items on 261115.
 
 ### Observed here, 261113
 
@@ -240,7 +242,7 @@ Start with `pnpm test test\sdk-session.test.ts test\sdk-usage.test.ts test\listi
 
 **Implementation and independent review complete, 261113.** All four approved phases are reviewed. The coordinator picked up the existing `gpt-6.1-sol` worker's five product-documentation updates and build, checked the nullable public types and unmatched-usage label, and found no further corrections needed. The worker remains idle. No source/test changes were taken over by the coordinator.
 
-Next, the developer reviews [the built-CLI frozen export](../temp-tool-output/261113-1515-fusion-review/final-built-2233/S017.md), its child section and usage figures, and the documented evidence limits. [The final built-CLI report](../temp-tool-output/261113-1515-fusion-review/final-built-2233/review.json) confirms strict export and saved-file verification, rejection of removed handoff text and a corrupted required companion, successful restoration, and unchanged source bytes. Keep all edits and evidence. No more implementation is proposed unless review finds a specific issue.
+Accepted and closed on 261115. [The built-CLI frozen export](../temp-tool-output/261113-1515-fusion-review/final-built-2233/S017.md), its child section, usage figures and documented evidence limits remain the review evidence. [The final built-CLI report](../temp-tool-output/261113-1515-fusion-review/final-built-2233/review.json) confirms strict export and saved-file verification, rejection of removed handoff text and a corrupted required companion, successful restoration, and unchanged source bytes. Keep the evidence. No implementation remains for this item; broader research remains in WI-042.
 
 `pnpm run verify` now passes generated-file checks, both typechecks, the complete test suite and golden checks. The developer approved replacing the identifying public link and renaming its ignored failure report on 261113. The report's SHA-256 is unchanged. The privacy test wasn't weakened. Earlier verification logs still document the pre-cleanup failure.
 

@@ -56,7 +56,7 @@ Evidence belongs under `temp-tool-output/261114-1719-fusion-implementation/slice
 
 The combined B2 product documentation has since passed independent review. It covers separate rule labels, six typed websocket fields, source priority and the per-call archive limit. Bounded matrix refresh and final integration still precede acceptance. See [WI-055's B2 review](WI-055-new-agent-event-families.md#b2-independent-review-261114).
 
-The subsequent bounded mapping links all seven fields to current source/tests. Integrated goldens, full verification and generated build passed independent checks. Review separate rule IDs, literal telemetry values and the per-call archive limit before accepting this item. See [WI-054's final handoff](WI-054-fusion-census-and-golden-fixtures.md#final-integration-and-acceptance-handoff-261114).
+The subsequent bounded mapping links all seven fields to current source/tests. Integrated goldens, full verification and generated build passed independent checks. **Accepted and closed, 261115:** the developer accepted separate rule IDs, literal telemetry values and the per-call archive limit. These results complete the Done-when criteria. See [WI-054's final handoff](WI-054-fusion-census-and-golden-fixtures.md#final-integration-and-acceptance-handoff-261114).
 
 ## Options and tradeoffs
 

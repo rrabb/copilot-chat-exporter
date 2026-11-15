@@ -94,7 +94,7 @@ B2 is accepted for integration, not closure or global schema completeness. Evide
 
 The subsequent SDK core/edge goldens, bounded mapping and final verification/build passed independent review. Exact saved-file companion checks now use the disk reader, not a manually supplied replacement. Full reason/error/instruction evidence, distinct retries and unknown financial counters remain checked. See [WI-054's acceptance handoff](WI-054-fusion-census-and-golden-fixtures.md#final-integration-and-acceptance-handoff-261114).
 
-Review the new notes, complete catalog groups, SDK prefix migration and bounded coverage limits before accepting this item. No default catalog exclusion or new financial source was added.
+**Accepted and closed, 261115:** the developer accepted the notes, complete reviewed catalog groups, SDK prefix migration and bounded coverage limits. Independent integrated checks completed the Done-when criteria. No default catalog exclusion or new financial source was added.
 
 ## Evidence and reproduction
 
