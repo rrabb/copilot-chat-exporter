@@ -135,7 +135,21 @@ test('system prompts, skills and images become linked companion files; unchanged
   ].sort());
   assert.equal(companions.find((item) => item.kind === 'image')!.mediaType, 'image/png');
   const titles = session.turns[0]!.body.filter((node) => node.type === 'note').map((node) => node.type === 'note' ? node.title : '');
-  assert.equal(titles.filter((title) => title.startsWith('🧭 System prompt version')).length, 2);
+  const prefixVersions = (session.prePromptNotes ?? []).filter((node) => node.title.startsWith('🧭 System prompt version'));
+  const turnVersions = session.turns[0]!.body.filter((node) => node.type === 'note').filter((node) => node.title.startsWith('🧭 System prompt version'));
+  assert.equal(prefixVersions.length, 1, 'the first version precedes the recorded prompt');
+  assert.equal(turnVersions.length, 1, 'the later version stays in the first turn');
+  assert.deepEqual([...prefixVersions, ...turnVersions].map((node) => node.title), [
+    '🧭 System prompt version 1 in effect (0 KB)', '🧭 System prompt version 2 in effect (0 KB)',
+  ]);
+  const versionPaths = [...prefixVersions, ...turnVersions].map((node) => node.link?.href);
+  assert.deepEqual(versionPaths, companions.filter((item) => /\/system-prompt-[12]-/u.test(item.relativePath)).map((item) => item.relativePath).sort());
+  assert.equal(new Set(versionPaths).size, 2, 'neither version is duplicated or lost');
+  assert.deepEqual(versionPaths.map((href) => {
+    const artifact = companions.find((item) => item.relativePath === href);
+    assert.ok(artifact);
+    return Buffer.from(artifact.bytes).toString('utf8');
+  }), ['You are an assistant. Rule one.', 'You are an assistant. Rule two.']);
   assert.ok(titles.some((title) => title.startsWith('🧩 Skill used: My Skill (prompt)')));
   assert.ok(titles.some((title) => title.startsWith('📎 Attachment not exported: file application/zip')));
   assert.equal(session.turns[0]!.scalar.injectedContext, '<current_datetime>now</current_datetime>Use the skill');

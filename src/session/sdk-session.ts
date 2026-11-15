@@ -19,6 +19,7 @@ import type { Census, NoteNode, ParsedSession, ToolNode, Turn, TurnNode, TurnSca
 import { childScopes, isRecord } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import { fusionNote } from './sdk-fusion.ts';
+import { eventNote } from './sdk-event-notes.ts';
 import { parseUsageRecords } from './sdk-usage-record.ts';
 import type { SdkEventSource } from './sources.ts';
 
@@ -45,11 +46,12 @@ const HANDLED = new Set([
   'session.start', 'session.resume', 'session.shutdown', 'session.model_change', 'session.mode_changed', 'session.auto_mode_resolved',
   'session.compaction_complete', 'session.plan_changed', 'session.task_complete', 'session.error', 'session.info',
   'session.context_changed', 'session.workspace_file_changed', 'session.truncation', 'abort',
-  'session.fusion_resolved', 'assistant.fusion_phase_completed', 'session.fusion_commit_started',
+  'session.fusion_resolved', 'assistant.fusion_phase_completed', 'assistant.fusion_phase_failed', 'session.fusion_commit_started',
   'session.fusion_change_checkpoint', 'session.fusion_completed', 'session.fusion_handoff', 'session.usage_record',
   'user.message', 'assistant.message', 'tool.execution_start', 'tool.execution_complete',
   'system.message', 'system.notification', 'skill.invoked', 'skill.invoked_ref', 'skill.context_delivered_ref',
   'session.binary_asset',
+  'instruction.update', 'session.mode_notice_delivered', 'model.turn_retry',
 ]);
 
 export interface SdkSessionOptions {
@@ -79,6 +81,7 @@ export interface OrphanChildConversation {
   title: string;
   startedAt: number | null;
   turns: Turn[];
+  prePromptNotes?: NoteNode[];
 }
 
 const text = (value: unknown): string => typeof value === 'string' ? value : '';
@@ -206,11 +209,11 @@ function subagentMeta (events: readonly SdkEvent[], verifiedAgentIds: ReadonlyMa
 }
 
 /** Build one conversation scope. A delegated agent is built the same way, with its task as the opening prompt. */
-function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { prompt: string; ts: number | null } | null, depth: number): Turn[] {
+function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { prompt: string; ts: number | null } | null, depth: number): { turns: Turn[]; prePromptNotes?: NoteNode[] } {
   const { seen, dropped, unhandled, leftOut, options, companions } = ctx;
   const turns: Turn[] = [];
   let current: Turn | null = null;
-  let pendingNotes: NoteNode[] = [];
+  const prePromptNotes: NoteNode[] = [];
   let lastSystemHash = '';
   const startedAt = new Map<string, number>();
   const nodesById = new Map<string, ToolNode>();
@@ -232,7 +235,7 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
     unhandled.set(key, (unhandled.get(key) ?? 0) + 1);
     note({ type: 'note', title: `⚠️ ${eventType} has an unsupported payload.`, text: reason });
   };
-  const note = (node: NoteNode) => (current ? current.body.push(node) : pendingNotes.push(node));
+  const note = (node: NoteNode) => (current ? current.body.push(node) : prePromptNotes.push(node));
   if (implicit) {
     current = {
       requestId: 'delegated-task', ts: implicit.ts, prompt: implicit.prompt, reasoning: [], prose: [], body: [],
@@ -291,8 +294,6 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
           requestId: text(data.messageId) || event.id || `line:${event.line}`, ts: stamp, prompt: typed,
           reasoning: [], prose: [], body: [], toolNodes: [], todos: [], filesTouched: [], scalar, number: turns.length + 1,
         };
-        current.body.push(...pendingNotes);
-        pendingNotes = [];
         turns.push(current);
         break;
       }
@@ -403,11 +404,20 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
         break;
       case 'session.fusion_resolved':
       case 'assistant.fusion_phase_completed':
+      case 'assistant.fusion_phase_failed':
       case 'session.fusion_commit_started':
       case 'session.fusion_change_checkpoint':
       case 'session.fusion_completed':
       case 'session.fusion_handoff': {
         const normalized = fusionNote(type, data);
+        note(normalized.note);
+        normalized.issues.length && unsupported(type, normalized.issues.join('\n'));
+        break;
+      }
+      case 'instruction.update':
+      case 'session.mode_notice_delivered':
+      case 'model.turn_retry': {
+        const normalized = eventNote(type, data);
         note(normalized.note);
         normalized.issues.length && unsupported(type, normalized.issues.join('\n'));
         break;
@@ -514,8 +524,6 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
     }
   }
   // Notes recorded before any prompt (resume, system prompt) are kept in front of the first turn.
-  if (!turns.length && pendingNotes.length)
-    turns.push({ requestId: 'session-notes', ts: null, prompt: '(no user prompt recorded)', reasoning: [], prose: [], body: pendingNotes, toolNodes: [], todos: [], filesTouched: [], scalar: { agentTurn: true }, number: 1 });
 
   // A call that started a delegated agent carries that agent's whole conversation.
   const renderedTools = new Set(turns.flatMap((turn) => turn.toolNodes));
@@ -528,10 +536,10 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
     const task = node.promptText || (isRecord(node.toolSpecificData) ? text(node.toolSpecificData.description) : '');
     const begun = scopeEvents.find((event) => millis(event.timestamp) !== null);
     node.subagent = {
-      ...info, turns: processScope(ctx, scopeEvents, { prompt: task, ts: begun ? millis(begun.timestamp) : null }, depth + 1),
+      ...info, ...processScope(ctx, scopeEvents, { prompt: task, ts: begun ? millis(begun.timestamp) : null }, depth + 1),
     };
   }
-  return turns;
+  return { turns, ...(prePromptNotes.length ? { prePromptNotes } : {}) };
 }
 
 /** The selected conversation, with verified descendants nested at their recorded calls. */
@@ -581,7 +589,8 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
     seen: new Map(), dropped: new Map(), unhandled: new Map(),
     leftOut: new Map(), companions: [], systemFiles: new Map(), copilotVersion: 'unknown', producer: null, creationDate: null, workingDirectory: '',
   };
-  const turns = processScope(ctx, scoped, null, 0);
+  const conversation = processScope(ctx, scoped, null, 0);
+  const turns = conversation.turns;
   const scopeStartOrder = new Map<string, number>();
   all.forEach((event, index) => event.agentId && !scopeStartOrder.has(event.agentId) && scopeStartOrder.set(event.agentId, index));
   // A missing parent call cannot establish that an unrelated child belongs to a selected child.
@@ -599,7 +608,7 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
       parentToolCallId: scope.parentToolCallId,
       title: ctx.meta.get(scope.parentToolCallId)?.displayName || ctx.meta.get(scope.parentToolCallId)?.name || `agent ${scope.agentId}`,
       startedAt,
-      turns: processScope(ctx, scopeEvents, null, 0),
+      ...processScope(ctx, scopeEvents, null, 0),
     });
   }
   // Count children without a renderable parent call, including descendants beyond the nesting limit.
@@ -629,7 +638,7 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
   };
   const session: ParsedSession = {
     title: options.title, customTitle: '', defaultTitle: options.title, creationDate: ctx.creationDate, responderUsername: 'GitHub Copilot',
-    initialLocation: 'agent', workingDirectory: ctx.workingDirectory, turns, rawRequests: [], census, editedFiles: [], errors,
+    initialLocation: 'agent', workingDirectory: ctx.workingDirectory, ...conversation, rawRequests: [], census, editedFiles: [], errors,
     ...(orphanChildren.length ? { detachedSubagents: orphanChildren.map(({ startedAt: _startedAt, ...child }) => child) } : {}),
   };
   return {

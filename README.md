@@ -251,7 +251,7 @@ passing silently - for example `Schema drift: 1 unhandled node kind(s)` or `Laye
 2 of 9 render checks FAILED`, with each failed check named. `--strict` turns any of those into a
 non-zero exit code, and `--verify` prints the full schema census.
 
-`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Partial or absent text fails even without `--strict`. Order and repeated occurrences are checked for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent/Fusion phase/handoff streams grouped by agent scope. SDK text companions contribute at their live links. This checks text coverage, not every text companion's checksum. Other text is presence-only. See [SPEC section 9](docs/SPEC.md) for its limits.
+`--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Partial or absent text fails even without `--strict`. Order and repeated occurrences are checked for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent/Fusion phase/handoff, failed-phase reason/error, instruction-content and retry-reason streams grouped by agent scope. SDK text companions contribute at their live links. This checks text coverage, not every metadata value or text companion checksum. Other text is presence-only. See [SPEC section 9](docs/SPEC.md) for its limits.
 
 ### Historical verification limitations
 
@@ -264,17 +264,23 @@ non-zero exit code, and `--verify` prints the full schema census.
 pnpm run export <chat id | backing id | prefix of 8+ characters> [outputPath] [--user-data-root <path>]
 ```
 
-The selector is matched against the verified agent chats of the selected root. The command exports prompts, readable reasoning, assistant messages, tool calls with arguments, outputs, errors and diffs, compaction summaries and model changes. Encrypted reasoning is counted but cannot be read. Observed Fusion records add ordered notes for selection, phases, model roles and effort, changes, completion and handoff content. Unknown variants are diagnosed. The exporter doesn't infer Fusion from model switches or reconstruct missing history.
+The selector is matched against the verified agent chats of the selected root. The command exports prompts, readable reasoning, assistant messages, tool calls with arguments, outputs, errors and diffs, compaction summaries and model changes. Encrypted reasoning is counted but cannot be read. Seven reviewed Fusion families add ordered notes for selection, completed/failed phases, model roles/effort, changes, completion and handoff content. Unknown variants are diagnosed. The exporter doesn't infer execution from model switches or reconstruct missing history.
+
+Instruction updates keep complete recorded text and metadata; mode notices and retries remain distinct notes. Retries keep the reviewed model catalog as readable configuration, not charges or producer identity. **Rule ID** and **Selected rule ID** remain separate. Early notes render before real prompts without inventing requests; notes-only SDK archives have zero questions. Library callers must also inspect each scope's optional `prePromptNotes`. See [the note/prefix policy](docs/SPEC.md#recorded-instruction-notice-and-retry-notes) and [consumer migration](docs/UPGRADING.md#sdk-prefix-model-migration).
 
 Sub-agent conversations are nested at their recorded delegation point, collapsed and labelled. Identifiable children whose parent calls are absent appear under **Recorded child conversations - parent call missing**, without an invented parent turn. Ambiguous mappings still omit the child with a warning.
 
-System prompts, skill files and images use linked files in a sibling `_assets_<timestamp>` folder. Tool and Fusion text over 300 lines AND over 15 KiB shows its first 10 lines and links the full text. Library callers without a text companion sink keep the full text inline. Persisted-resource clipping is a separate known limit. Permission prompts, hooks and model request copies are counted under "Left out of this export".
+System prompts, skill files and images use linked files in a sibling `_assets_<timestamp>` folder. Tool and SDK note text over 300 lines AND over 15 KiB shows its first 10 lines and links the full text. Library callers without a text companion sink keep the full text inline. Persisted-resource clipping is a separate known limit. Permission prompts, hooks and model request copies are counted under "Left out of this export".
 
 Usage uses one per-call source: a nonempty CLI database ledger, otherwise persisted `session.usage_record` receipts, otherwise legacy model-call events. Partial ledgers still win. The Cost section reports source availability, coverage, unknown metrics and the separate last running total. Credits are recorded nano-AIU divided by 1,000,000,000, never estimated from tokens. Running-total differences can supply turn costs, labelled with any covered turn range. Detached children keep their own usage without assigning it to an invented parent turn. The exporter never changes native session data. See [the agent policy and usage rules](docs/SPEC.md#agent-chat-export-policy-approved-october-14).
+
+Six websocket fallback fields are kept as typed receipt telemetry. This doesn't print every per-call field in Markdown or change source priority. Configured model prices and phase summaries never add billed calls. Malformed and unknown fields diagnose while valid siblings remain readable. Support is bounded to reviewed records, not all producer/catalog variants. See [receipt compatibility and archive limits](docs/SPEC.md#receipt-telemetry-compatibility).
 
 ### Package shortcuts
 
 These are this package's own `package.json` scripts. Run them with pnpm from the repo root. Don't add `--` before CLI flags: pnpm passes it on and the CLI rejects it as an unknown option.
+
+Normal tests also check the portable synthetic SDK/Fusion goldens. Run `pnpm test test\sdk-golden.test.ts` for their exact Markdown/companion checks. `pnpm run golden` remains the Local fixture check. SDK expected updates are opt-in and require review after semantic checks pass. See the [SDK fixture guide](test/fixtures/sdk-golden/README.md) for check/update commands, evidence limits and retained generations.
 
 | Script | Runs | Purpose |
 |---|---|---|

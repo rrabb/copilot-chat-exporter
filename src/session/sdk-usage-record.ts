@@ -7,13 +7,18 @@ import { USAGE_METRICS } from './usage-figures.ts';
 const STRING_TELEMETRY = [
   'modelDisplayName', 'cacheExpiresAt', 'initiator', 'interactionType', 'transport', 'requestBodyEncoding',
   'apiCallId', 'providerCallId', 'serviceRequestId', 'apiEndpoint', 'reasoningSummary', 'frontierSource', 'finishReason',
+  'websocketFallbackErrorKind', 'websocketFallbackReason',
 ];
 const NUMBER_TELEMETRY = [
   'cost', 'timeToFirstTokenMs', 'outputTtftMs', 'interTokenLatencyMs', 'maxPromptTokens', 'maxOutputTokens',
   'requestBodyBytes', 'requestBodyWireBytes', 'availableToolCount', 'toolTokenCount', 'customToolCallCount',
   'unmatchedToolResultCount', 'orphanToolCallCount', 'cacheTtlSeconds', 'cachePolicyTtlSeconds', 'numToolCalls', 'thinkingDroppedBlocks',
+  'websocketFallbackAfterMs', 'websocketFallbackStatusCode',
 ];
-const BOOLEAN_TELEMETRY = ['isByok', 'isAuto', 'rte', 'cacheDetailsReported', 'contentFilterTriggered'];
+const BOOLEAN_TELEMETRY = [
+  'isByok', 'isAuto', 'rte', 'cacheDetailsReported', 'contentFilterTriggered',
+  'websocketFallbackReconnectAttempted', 'websocketFallbackStartedThisCall',
+];
 const FUSION_FIELDS = ['fusionId', 'syntheticModel', 'policy', 'pattern', 'phaseId', 'phaseKind', 'role', 'conversationScope', 'sourceModel'] as const;
 const FIELDS = new Set([
   'accounting', 'model', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'reasoningTokens',

@@ -31,6 +31,96 @@ const source = (scope: SdkEventSource['scope'] = { kind: 'main' }): SdkEventSour
 });
 const exportOptions = { title: 'Synthetic usage', assetsDirectory: 'assets', outputPath: 'out.md', generatedAt: '2026-10-14T12:00:00Z' };
 
+test('websocket receipt telemetry keeps all six exact keys, zero, future strings and both booleans', () => {
+  const cases = [
+    {
+      websocketFallbackErrorKind: 'future-error', websocketFallbackReason: 'future-reason',
+      websocketFallbackAfterMs: 0, websocketFallbackStatusCode: 0,
+      websocketFallbackReconnectAttempted: false, websocketFallbackStartedThisCall: true,
+    },
+    {
+      websocketFallbackErrorKind: '', websocketFallbackReason: '',
+      websocketFallbackAfterMs: 12.5, websocketFallbackStatusCode: 700.25,
+      websocketFallbackReconnectAttempted: true, websocketFallbackStartedThisCall: false,
+    },
+  ];
+  for (const fields of cases) {
+    const record = receipt(fields);
+    const parsed = parseUsageRecords([record]);
+    assert.equal(parsed.diagnostics.size, 0);
+    assert.equal(parsed.calls.length, 1);
+    assert.deepEqual(parsed.calls[0]?.provenance?.telemetry?.toSorted((a, b) => a.field.localeCompare(b.field)),
+      Object.entries(fields).map(([field, value]) => ({ field, value })).sort((a, b) => a.field.localeCompare(b.field)));
+    assert.equal(parsed.calls[0]?.nanoAiu, 10_000_000);
+    assert.equal(parsed.calls[0]?.inputTokens, 100);
+    const all = [prompt(), record];
+    assert.deepEqual(buildSdkSession(all, all, { title: 'Websocket metadata', assetsDirectory: 'assets' }).session.census.unhandled, []);
+  }
+});
+
+test('absent websocket telemetry creates no entry, including an absent status code', () => {
+  const fields: Record<string, unknown> = {
+    websocketFallbackErrorKind: 'future-error', websocketFallbackReason: 'future-reason',
+    websocketFallbackAfterMs: 42, websocketFallbackStatusCode: 401,
+    websocketFallbackReconnectAttempted: false, websocketFallbackStartedThisCall: true,
+  };
+  for (const omitted of Object.keys(fields)) {
+    const remaining = Object.fromEntries(Object.entries(fields).filter(([field]) => field !== omitted));
+    const parsed = parseUsageRecords([receipt(remaining)]);
+    assert.equal(parsed.diagnostics.size, 0);
+    assert.deepEqual(parsed.calls[0]?.provenance?.telemetry?.toSorted((a, b) => a.field.localeCompare(b.field)),
+      Object.entries(remaining).map(([field, value]) => ({ field, value })).sort((a, b) => a.field.localeCompare(b.field)));
+  }
+  const absent = parseUsageRecords([receipt()]);
+  assert.equal(absent.diagnostics.size, 0);
+  assert.equal(absent.calls[0]?.provenance?.telemetry, undefined);
+});
+
+test('malformed websocket fields diagnose without erasing valid telemetry or financial amounts', () => {
+  const groups = [
+    { fields: ['websocketFallbackErrorKind', 'websocketFallbackReason'], invalid: [null, false, 0, {}, []], expected: 'a string' },
+    { fields: ['websocketFallbackAfterMs', 'websocketFallbackStatusCode'], invalid: [null, '0', true, -1, NaN, Infinity, -Infinity, {}, []], expected: 'a finite nonnegative number' },
+    { fields: ['websocketFallbackReconnectAttempted', 'websocketFallbackStartedThisCall'], invalid: [null, 'false', 0, 1, {}, []], expected: 'a boolean' },
+  ];
+  const valid: Record<string, unknown> = {
+    websocketFallbackErrorKind: 'future-error', websocketFallbackReason: 'future-reason',
+    websocketFallbackAfterMs: 0, websocketFallbackStatusCode: 401,
+    websocketFallbackReconnectAttempted: false, websocketFallbackStartedThisCall: true,
+  };
+  for (const group of groups) {
+    for (const field of group.fields) {
+      for (const invalid of group.invalid) {
+        const record = receipt({ ...valid, [field]: invalid });
+        const parsed = parseUsageRecords([record]);
+        assert.deepEqual(parsed.diagnostics.get(record), [`usage.${field}: expected ${group.expected}`]);
+        assert.equal(parsed.calls.length, 1);
+        assert.equal(parsed.conflicts, 0);
+        assert.equal(parsed.calls[0]?.nanoAiu, 10_000_000);
+        assert.equal(parsed.calls[0]?.inputTokens, 100);
+        const expected = Object.entries(valid).filter(([key]) => key !== field).map(([field, value]) => ({ field, value }));
+        assert.deepEqual(parsed.calls[0]?.provenance?.telemetry?.toSorted((a, b) => a.field.localeCompare(b.field)),
+          expected.sort((a, b) => a.field.localeCompare(b.field)));
+        const all = [prompt(), record];
+        assert.deepEqual(buildSdkSession(all, all, { title: 'Malformed websocket metadata', assetsDirectory: 'assets' }).session.census.unhandled,
+          [['session.usage_record:unsupported', 1]]);
+      }
+    }
+  }
+});
+
+test('future websocket fields stay diagnostic while the six known fields and money remain available', () => {
+  const record = receipt({
+    websocketFallbackErrorKind: 'future-error', websocketFallbackReason: 'future-reason',
+    websocketFallbackAfterMs: 0, websocketFallbackStatusCode: 401,
+    websocketFallbackReconnectAttempted: false, websocketFallbackStartedThisCall: true,
+    websocketFallbackFutureMetric: 1,
+  });
+  const parsed = parseUsageRecords([record]);
+  assert.deepEqual(parsed.diagnostics.get(record), ['usage.websocketFallbackFutureMetric: unknown field']);
+  assert.equal(parsed.calls[0]?.provenance?.telemetry?.length, 6);
+  assert.equal(parsed.calls[0]?.nanoAiu, 10_000_000);
+});
+
 test('persisted receipts keep accounting, phase, effort and parent-call provenance and pass census', () => {
   const record = receipt({
     reasoningEffort: null, parentToolCallId: 'parent-call',

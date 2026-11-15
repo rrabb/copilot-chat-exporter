@@ -1,123 +1,39 @@
 import type { NoteNode } from '../types.ts';
 import { isRecord } from './sdk-events.ts';
+import { EventFields } from './sdk-event-fields.ts';
 
 type FusionEventType =
   | 'session.fusion_resolved'
   | 'assistant.fusion_phase_completed'
+  | 'assistant.fusion_phase_failed'
   | 'session.fusion_commit_started'
   | 'session.fusion_change_checkpoint'
   | 'session.fusion_completed'
   | 'session.fusion_handoff';
-
-/** Validate the observed Fusion fields without discarding valid siblings of an unsupported field. */
-class FusionFields {
-  private readonly read = new Set<string>();
-  private readonly data: Record<string, unknown>;
-  private readonly issues: string[];
-  private readonly path: string;
-
-  constructor (data: Record<string, unknown>, issues: string[], path = '') {
-    this.data = data;
-    this.issues = issues;
-    this.path = path;
-  }
-
-  string (key: string, nullable = false, required = false): string | null | undefined {
-    this.read.add(key);
-    if (!Object.hasOwn(this.data, key)) {
-      required && this.issues.push(`Expected ${this.path}${key} string.`);
-      return undefined;
-    }
-    const value = this.data[key];
-    if (typeof value === 'string' || (nullable && value === null))
-      return value;
-    this.issues.push(`Expected ${this.path}${key} string${nullable ? ' or null' : ''}.`);
-    return undefined;
-  }
-
-  number (key: string, nonNegative = false): number | undefined {
-    this.read.add(key);
-    if (!Object.hasOwn(this.data, key))
-      return undefined;
-    const value = this.data[key];
-    if (typeof value === 'number' && Number.isFinite(value) && (!nonNegative || value >= 0))
-      return value;
-    this.issues.push(`Expected ${this.path}${key} finite${nonNegative ? ', non-negative' : ''} number.`);
-    return undefined;
-  }
-
-  counter (key: string): number | undefined {
-    return this.number(key, true);
-  }
-
-  flag (key: string): boolean | undefined {
-    this.read.add(key);
-    if (!Object.hasOwn(this.data, key))
-      return undefined;
-    const value = this.data[key];
-    if (typeof value === 'boolean')
-      return value;
-    this.issues.push(`Expected ${this.path}${key} boolean.`);
-    return undefined;
-  }
-
-  record (key: string, nullable = false, required = false): FusionFields | undefined {
-    this.read.add(key);
-    if (!Object.hasOwn(this.data, key)) {
-      required && this.issues.push(`Expected ${this.path}${key} object.`);
-      return undefined;
-    }
-    const value = this.data[key];
-    if (nullable && value === null)
-      return undefined;
-    if (isRecord(value))
-      return new FusionFields(value, this.issues, `${this.path}${key}.`);
-    this.issues.push(`Expected ${this.path}${key} object${nullable ? ' or null' : ''}.`);
-    return undefined;
-  }
-
-  list (key: string): unknown[] | undefined {
-    this.read.add(key);
-    if (!Object.hasOwn(this.data, key))
-      return undefined;
-    const value: unknown = this.data[key];
-    if (Array.isArray(value))
-      return value;
-    this.issues.push(`Expected ${this.path}${key} array.`);
-    return undefined;
-  }
-
-  finish (): void {
-    for (const key of Object.keys(this.data)) {
-      if (!this.read.has(key))
-        this.issues.push(`Unrecognized field ${this.path}${key}.`);
-    }
-  }
-}
 
 const usageLabels: ReadonlyArray<readonly [string, string]> = [
   ['requestCount', 'Request count'], ['inputTokens', 'Input tokens'], ['outputTokens', 'Output tokens'],
   ['cachedTokens', 'Cached tokens'], ['cacheWriteTokens', 'Cache write tokens'], ['totalNanoAiu', 'Total nano-AIU'],
 ];
 
-/** Normalize the six observed event families to readable notes, not raw event dumps. */
+/** Normalize the reviewed Fusion event families to readable notes, not raw event dumps. */
 export function fusionNote (type: FusionEventType, data: Record<string, unknown>): { note: NoteNode; issues: string[] } {
   const issues: string[] = [];
-  const fields = new FusionFields(data, issues);
+  const fields = new EventFields(data, issues);
   const details: string[] = [];
   let title: string;
   const add = (label: string, value: string | number | boolean | null | undefined) => {
     value !== undefined && details.push(`${label}: ${value === null ? 'null' : value}`);
   };
-  const strings = (reader: FusionFields, labels: ReadonlyArray<readonly [string, string]>) => {
+  const strings = (reader: EventFields, labels: ReadonlyArray<readonly [string, string]>) => {
     for (const [key, label] of labels)
       add(label, reader.string(key));
   };
-  const counters = (reader: FusionFields) => {
+  const counters = (reader: EventFields) => {
     for (const [key, label] of usageLabels)
       add(label, reader.counter(key));
   };
-  const duration = (reader: FusionFields, key: string, label: string) => {
+  const duration = (reader: EventFields, key: string, label: string) => {
     const value = reader.counter(key);
     add(label, value === undefined ? undefined : `${value} ms`);
   };
@@ -132,7 +48,8 @@ export function fusionNote (type: FusionEventType, data: Record<string, unknown>
         issues.push('Unsupported contractVersion. Expected version 1.');
       strings(fields, [
         ['fusionId', 'Fusion ID'], ['turnId', 'Turn ID'], ['policy', 'Policy'], ['policyVersion', 'Policy version'],
-        ['routeSource', 'Route source'], ['planVersion', 'Plan version'], ['ruleId', 'Rule ID'], ['hint', 'Hint'],
+        ['routeSource', 'Route source'], ['planVersion', 'Plan version'], ['ruleId', 'Rule ID'],
+        ['selectedRuleId', 'Selected rule ID'], ['hint', 'Hint'],
         ['primaryModel', 'Primary model'], ['fallbackModel', 'Fallback model'], ['followUpModel', 'Follow-up model'],
         ['judgeModel', 'Judge model'], ['repairModel', 'Repair model'],
       ]);
@@ -146,7 +63,7 @@ export function fusionNote (type: FusionEventType, data: Record<string, unknown>
             issues.push(`Expected phasePlan[${index}] object.`);
             continue;
           }
-          const phase = new FusionFields(item, issues, `phasePlan[${index}].`);
+          const phase = new EventFields(item, issues, `phasePlan[${index}].`);
           const values: string[] = [];
           for (const key of ['kind', 'role', 'scope']) {
             const value = phase.string(key);
@@ -169,6 +86,25 @@ export function fusionNote (type: FusionEventType, data: Record<string, unknown>
         values.length && add('Scores', values.join(', '));
         scores.finish();
       }
+      break;
+    }
+    case 'assistant.fusion_phase_failed': {
+      const phase = fields.string('phaseKind', false, true);
+      title = `🧪 Fusion phase failed${phase ? `: ${phase}` : ''}`;
+      add('Phase kind', phase);
+      strings(fields, [
+        ['fusionId', 'Fusion ID'], ['phaseId', 'Phase ID'], ['model', 'Model'], ['reasoningEffort', 'Reasoning effort'],
+        ['role', 'Role'], ['conversationScope', 'Scope'], ['status', 'Status'], ['reason', 'Reason'],
+        ['degradedToPhaseId', 'Degraded to phase'],
+      ]);
+      duration(fields, 'durationMs', 'Duration');
+      const usage = fields.record('usage');
+      if (usage) {
+        add('Phase usage', 'Summary metadata (not billed calls)');
+        counters(usage);
+        usage.finish();
+      }
+      add('Error message', fields.string('errorMessage'));
       break;
     }
     case 'assistant.fusion_phase_completed': {

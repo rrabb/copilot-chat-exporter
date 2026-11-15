@@ -283,6 +283,8 @@ export interface SubagentInfo {
   usage?: UsageFigures;
   /** Its own conversation. The first turn's prompt is the delegated task. */
   turns: Turn[];
+  /** Recorded notes before any prompt in this scope, not user requests. */
+  prePromptNotes?: NoteNode[];
 }
 
 /**
@@ -431,6 +433,8 @@ export interface ParsedSession {
   workingDirectory?: string;
   turns: Turn[];
   rawRequests: RawRequest[];
+  /** Recorded notes before any prompt in this scope, not user requests. */
+  prePromptNotes?: NoteNode[];
   /** Agent chats: recorded model usage; unset when none was recorded. */
   usage?: SessionUsage;
   /** Agent chats: delegated child conversations whose parent call was not recorded. */
@@ -439,6 +443,7 @@ export interface ParsedSession {
     parentToolCallId: string;
     title: string;
     turns: Turn[];
+    prePromptNotes?: NoteNode[];
     usage?: UsageFigures;
   }>;
   census: Census;

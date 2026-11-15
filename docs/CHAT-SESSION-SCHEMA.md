@@ -50,18 +50,29 @@ The inventory distinguishes Local content version 3, chat index version 1 and SD
 
 ### Observed Fusion records and persisted usage
 
-**Observed here, 261113:** Agent Host event-format version 1 logs contain six Fusion event families. These are private recorded fields, not a published Fusion specification. [sdk-fusion.ts](../src/session/sdk-fusion.ts) validates the observed variants before building ordered notes.
+**Observed here, 261114:** Agent Host event-format version 1 logs contain seven reviewed Fusion event families, including a failed-phase record. These are private recorded fields, not a universal published Fusion specification. [sdk-fusion.ts](../src/session/sdk-fusion.ts) validates the observed variants before building ordered notes.
 
 | Record | Observed fields relevant to interpretation |
 | --- | --- |
-| `session.fusion_resolved` | `syntheticModel`, `pattern`, `contractVersion`, policy/routing fields, top-level model roles and `phasePlan` records with `kind`, `role`, `scope`, `conditional` |
+| `session.fusion_resolved` | `syntheticModel`, `pattern`, `contractVersion`, policy/routing fields, top-level model roles and `phasePlan` records with `kind`, `role`, `scope`, `conditional`. Reviewed `ruleId`/`selectedRuleId` pairs coexist and differ; they aren't aliases. |
 | `assistant.fusion_phase_completed` | Phase/model/effort/role/scope/status, `content`, optional `projectionMessage.content` and usage summary |
+| `assistant.fusion_phase_failed` | `fusionId`, `phaseId`, `phaseKind`, `role`, `conversationScope`, `model`, `status`, `reason`, `durationMs`, `usage`, `reasoningEffort`, `errorMessage`, `degradedToPhaseId`. Usage has six numeric summary counters, not independent billing receipts. |
 | `session.fusion_commit_started` | Commit ID, source phase/model, `kind` and nullable tool-call ID. "Commit" belongs to the Fusion protocol here, not Git. |
 | `session.fusion_change_checkpoint` | `codeChanges.filesModified`, `linesAdded`, `linesRemoved` |
 | `session.fusion_completed` | Outcome, final source phase/model, follow-up model, counts, timing and totals |
 | `session.fusion_handoff` | Source/target phase, target model and `message.role`/`message.content` |
 
 Equal phase and projection text occurs within one event. The exporter accounts for that exact equality once. It doesn't merge distinct equal-text events. Unknown fields, malformed values and unsupported versions produce diagnostics while valid sibling fields remain usable. No general raw-event JSON dump substitutes for interpretation.
+
+**Observed here:** two `instruction.update` payloads contain string `content`, `authority`, `lifetime`, `boundary`, `fallback` and `name`. Two `session.mode_notice_delivered` payloads contain string `mode` and boolean `instructionUpdatePersisted`, without a notice body. They are distinct evidence records; adjacency doesn't establish prompt application or UI viewing.
+
+**Observed here:** three of 33 census `model.turn_retry` records have string `kind`/`model`/`reason`, numeric local `turn`/`timestampMs` and object `modelInfo`. The local index is zero in those representatives. The catalogs have identical SHA-256 hashes of compact JSON reserialization and measure 1,409 bytes each by `Buffer.byteLength(JSON.stringify(parsed modelInfo))`. These aren't measured on-disk substrings or rendered Markdown sizes. Broader sizes and producer variants remain unmeasured.
+
+The reviewed catalog contains identity/provider metadata, availability/endpoints, capabilities and configured billing. All 60 observed descendant path/type rows are handled through those groups, not an arbitrary metadata subset. `adaptive_thinking` is a string. Endpoints, restricted plans, media types and effort choices are string arrays. Model/catalog `version` isn't the recorded producer build. Prices and batch-size configuration aren't charged usage. The [owning policy](SPEC.md#recorded-instruction-notice-and-retry-notes) defines readable retention and diagnostics; it doesn't establish the producer's execution algorithm.
+
+**Observed here:** 37 selected receipts carry typed websocket fallback fields. Status is present in 16 and absent in 21. Both started-this-call booleans occur; reconnect-attempted is false throughout that sample. Zero/null and true reconnect boundaries are synthetic test cases, not claimed native observations. The [receipt policy](SPEC.md#receipt-telemetry-compatibility) keeps the six keys through typed telemetry, without changing billing or promising field-by-field Markdown archival.
+
+**Exporter-owned model:** `prePromptNotes` is optional on root sessions, nested subagents and detached conversations. It holds notes before recorded prompts, not reconstructed user turns. Consumers must inspect prefixes as well as turn bodies. Notes-only exports have zero requests, while recorded delegated task input remains whole. Unknown/malformed field diagnostics and the independent raw-field content checks are separate from schema-envelope validation. Version-specific public SDK definitions aren't a universal schema for older stored logs.
 
 **Observed here:** some child scopes have unambiguous `subagent.started` tool-call-to-agent mappings but no recorded parent call. The mapping establishes a child identity, not a delegation position. Main exports keep these conversations separately. The source of sparse ordinary history remains **unknown**. These observations don't establish Fusion as its cause.
 

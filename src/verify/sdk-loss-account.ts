@@ -117,6 +117,16 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
       case 'session.error':
         add('session-error', str(data.message), event);
         break;
+      case 'assistant.fusion_phase_failed':
+        add('fusion-phase-failure-reason', str(data.reason), event, true);
+        add('fusion-phase-error', str(data.errorMessage), event, true);
+        break;
+      case 'instruction.update':
+        add('instruction-update', str(data.content), event, true);
+        break;
+      case 'model.turn_retry':
+        add('model-turn-retry-reason', str(data.reason), event, true);
+        break;
       case 'assistant.fusion_phase_completed': {
         const content = str(data.content);
         add('fusion-phase', content, event, true);

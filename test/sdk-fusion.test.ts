@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { renderSdkExport } from '../src/session/sdk-export.ts';
 import { buildSdkSession } from '../src/session/sdk-session.ts';
+import { fusionNote } from '../src/session/sdk-fusion.ts';
 import { usageFromEvents } from '../src/session/sdk-usage.ts';
 import { buildSdkLossAccount, sdkLossPieces } from '../src/verify/sdk-loss-account.ts';
 import { buildSdkVerifyJson } from '../src/verify/json-report.ts';
@@ -58,6 +59,53 @@ const exportSdk = (events: SdkEvent[]) => renderSdkExport(events, source(), {
 });
 
 const count = (text: string, needle: string): number => text.split(needle).length - 1;
+
+test('routing notes keep rule IDs independently with exact labels, including empty strings', () => {
+  const cases: { fields: Record<string, unknown>; details: string[] }[] = [
+    { fields: { ruleId: 'routing-rule', selectedRuleId: 'selected-rule' }, details: ['Rule ID: routing-rule', 'Selected rule ID: selected-rule'] },
+    { fields: { ruleId: 'same-rule', selectedRuleId: 'same-rule' }, details: ['Rule ID: same-rule', 'Selected rule ID: same-rule'] },
+    { fields: { ruleId: 'routing-only' }, details: ['Rule ID: routing-only'] },
+    { fields: { selectedRuleId: 'selected-only' }, details: ['Selected rule ID: selected-only'] },
+    { fields: {}, details: [] },
+    { fields: { ruleId: '', selectedRuleId: '' }, details: ['Rule ID: ', 'Selected rule ID: '] },
+    { fields: { ruleId: '', selectedRuleId: 'selected-rule' }, details: ['Rule ID: ', 'Selected rule ID: selected-rule'] },
+    { fields: { ruleId: 'routing-rule', selectedRuleId: '' }, details: ['Rule ID: routing-rule', 'Selected rule ID: '] },
+  ];
+  for (const [index, item] of cases.entries()) {
+    const data = { fusionId: `routing-${index}`, syntheticModel: 'future-model', pattern: 'single', ...item.fields };
+    const expected = [`Fusion ID: routing-${index}`, ...item.details].join('\n\n');
+    const parsed = fusionNote('session.fusion_resolved', data);
+    assert.deepEqual(parsed.issues, [], `case ${index}`);
+    assert.equal(parsed.note.text, expected, `case ${index}`);
+    const out = exportSdk([prompt('Inspect routing', 1), event('session.fusion_resolved', data, 2)]);
+    const notes = out.session.turns[0]!.body.filter(node => node.type === 'note');
+    assert.equal(notes.length, 1, `case ${index}`);
+    assert.equal(notes[0]?.text, expected, `case ${index}`);
+    assert.equal(count(out.markdown, 'Selected rule ID:'), Object.hasOwn(item.fields, 'selectedRuleId') ? 1 : 0);
+    assert.deepEqual(out.session.census.unhandled, []);
+  }
+});
+
+test('malformed routing IDs diagnose their own field and keep the valid sibling in the same note', () => {
+  for (const invalid of [null, 0, false, {}, []]) {
+    for (const field of ['ruleId', 'selectedRuleId']) {
+      const selectedInvalid = field === 'selectedRuleId';
+      const data = {
+        fusionId: 'routing-invalid', syntheticModel: 'future-model', pattern: 'single',
+        ruleId: 'valid-routing', selectedRuleId: 'valid-selection', [field]: invalid,
+      };
+      const expected = `Fusion ID: routing-invalid\n\n${selectedInvalid ? 'Rule ID: valid-routing' : 'Selected rule ID: valid-selection'}`;
+      const parsed = fusionNote('session.fusion_resolved', data);
+      assert.deepEqual(parsed.issues, [`Expected ${field} string.`]);
+      assert.equal(parsed.note.text, expected);
+      const out = exportSdk([prompt('Keep valid routing evidence', 1), event('session.fusion_resolved', data, 2)]);
+      const notes = out.session.turns[0]!.body.filter(node => node.type === 'note').filter(node => node.title.startsWith('🧪 Fusion resolved'));
+      assert.equal(notes.length, 1);
+      assert.equal(notes[0]?.text, expected);
+      assert.deepEqual(out.session.census.unhandled, [['session.fusion_resolved:unsupported', 1]]);
+    }
+  }
+});
 
 test('single fusion phase keeps same-record projection once and keeps equal assistant text as a separate record', () => {
   const phaseText = 'Shared phase output.';
@@ -513,7 +561,7 @@ test('fusion and assistant stream order is checked in one order group', () => {
   assert.equal(reordered.order.outOfOrder, 1);
 });
 
-test('notes-only main logs keep fusion content in a synthetic first turn', () => {
+test('notes-only main logs keep Fusion content without inventing a user request', () => {
   const out = exportSdk([
     event('assistant.fusion_phase_completed', {
       fusionId: 'f-note',
@@ -524,7 +572,9 @@ test('notes-only main logs keep fusion content in a synthetic first turn', () =>
       content: 'Fusion content without a user prompt.',
     }, 1),
   ]);
-  assert.match(out.markdown, /\(no user prompt recorded\)/u);
+  assert.equal(out.session.turns.length, 0);
+  assert.match(out.markdown, /\*\*User requests:\*\* 0/u);
+  assert.doesNotMatch(out.markdown, /Q\d+:|USER QUESTION \/ REQUEST|no user prompt recorded/u);
   assert.match(out.markdown, /Fusion content without a user prompt\./u);
 });
 

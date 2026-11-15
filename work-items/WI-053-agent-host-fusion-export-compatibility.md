@@ -14,7 +14,7 @@ Part of WI-042, found while working on: understanding Fusion mode and its record
 - **Separate baseline loss:** seven Fusion phase records contained text that the old verifier didn't check.
 - **Implemented:** the existing SDK path keeps Fusion content and recorded attribution, renders identifiable children without parent calls, and accounts for persisted usage without combining incompatible sources.
 - **Placement decision, 261113:** keep identifiable children without recorded parent calls in a clearly labelled separate section.
-- **Next:** developer review and acceptance. All four phases are independently reviewed. Full verification still reports the unchanged pre-existing privacy failure. No item closure or Git actions are approved.
+- **Next:** developer review and acceptance. All four phases are independently reviewed. Full verification passes after the approved public-link cleanup. No item closure or Git actions are approved.
 - **Estimate:** 14-24 hours for implementation and validation, excluding a new capture or broader listing changes.
 
 ## Original goal
@@ -35,6 +35,16 @@ The developer identifies Fusion as a new Copilot Agent Host chat mode. Determine
 - Report remaining evidence limits and request developer acceptance before closing.
 
 ## Current understanding
+
+### Work tree
+
+Progress as of 261114: 0 of 1 child items done. This follow-up doesn't reopen the four completed implementation phases or make their acceptance depend on the child.
+
+| # | Item | Type | Size | Do after |
+| --- | --- | --- | --- | --- |
+| 1 | [WI-054 Fusion census and golden fixtures](WI-054-fusion-census-and-golden-fixtures.md) | [build] | L | - |
+
+The developer approved recording the public research and revised plan in this child and starting its census implementation on 261114. Its census, selected compatibility work and synthetic goldens now passed independent review and final checks. This follow-up has its own developer acceptance and doesn't close WI-053.
 
 ### Observed here, 261113
 
@@ -66,7 +76,7 @@ The questions above are investigation targets inferred from the names, not verif
 
 The official Copilot SDK event reference distinguishes durable events from ephemeral live events, and concise tool-result content from detailed and structured content. The checked reference is newer than several sampled logs. It is not proof of the meaning or availability of these private Fusion records.
 
-Public Auto-routing types are not a Fusion specification. Neither model switching nor multiple answering models proves Fusion or model ensembling. The online pass did not establish Fusion's execution algorithm.
+Public Auto-routing types are not a Fusion specification. Neither model switching nor multiple answering models proves Fusion or model ensembling. The initial online pass did not establish Fusion's execution algorithm. The later [public reference check](WI-042-fusion-and-future-modes.md#public-fusion-reference-check-261113) found official workflow descriptions, SDK definitions and VS Code replay tests. [WI-054](WI-054-fusion-census-and-golden-fixtures.md) combines those references with a version-aware native census and synthetic fixture plan.
 
 **Unknown:** which intermediate phases the live UI showed, the complete projection protocol, whether a mode-level effort exists independently of the selected model ID, and whether every usage summary is cumulative. The findings below establish recorded fields, not a stable upstream specification.
 
@@ -232,7 +242,7 @@ Start with `pnpm test test\sdk-session.test.ts test\sdk-usage.test.ts test\listi
 
 Next, the developer reviews [the built-CLI frozen export](../temp-tool-output/261113-1515-fusion-review/final-built-2233/S017.md), its child section and usage figures, and the documented evidence limits. [The final built-CLI report](../temp-tool-output/261113-1515-fusion-review/final-built-2233/review.json) confirms strict export and saved-file verification, rejection of removed handoff text and a corrupted required companion, successful restoration, and unchanged source bytes. Keep all edits and evidence. No more implementation is proposed unless review finds a specific issue.
 
-`pnpm run verify` passes generated-file checks and both typechecks, then fails on the same pre-existing privacy check. The final suite reports no other failures. The privacy test and dashboard UUID set are unchanged from `HEAD`. A separate golden check passes because full verification stops before that step. Keep the failure visible and don't weaken its test or alter the unrelated link.
+`pnpm run verify` now passes generated-file checks, both typechecks, the complete test suite and golden checks. The developer approved replacing the identifying public link and renaming its ignored failure report on 261113. The report's SHA-256 is unchanged. The privacy test wasn't weakened. Earlier verification logs still document the pre-cleanup failure.
 
 Receipt duration remains inferred from the official SDK millisecond field, not matched to ledger rows. Text checks assess coverage, order and repeated occurrences, not every text companion's checksum. The cause of sparse native history remains unknown. Existing persisted-resource clipping and broader mode/filter research remain outside this work. Neither implementation completion nor this handoff closes the item or approves Git actions.
 
@@ -251,6 +261,8 @@ The [first saved-artifact review](../temp-tool-output/261113-1515-fusion-review/
 **Final independent review, 261113:** the five documentation changes match the implemented rules and evidence limits. The [final verification log](../temp-tool-output/261113-2233-fusion-final-review/verify.log) contains the unchanged privacy failure and no other test failures. [Comparison with HEAD](../temp-tool-output/261113-2233-fusion-final-review/privacy-head-comparison.log) confirms that baseline without printing identifiers. [Build](../temp-tool-output/261113-2233-fusion-final-review/build.log) and [normalized golden](../temp-tool-output/261113-2233-fusion-final-review/golden.log) checks pass. [Frozen-source checks](../temp-tool-output/261113-1515-fusion-review/final-source-2233/review.json) keep nine root turns, three detached children and twelve linked companions, with no unsupported events or lost text. [Usage assertions](../temp-tool-output/261113-2233-fusion-final-review/usage-assertions.log) confirm 233 receipts counted once: 222 root-matched and 11 detached/unmatched. The available legacy success isn't added. [Built-CLI checks](../temp-tool-output/261113-1515-fusion-review/final-built-2233/review.json) pass positive, negative and restored-artifact cases. No native session data was changed.
 
 ## Scope and guardrails
+
+**Approved privacy cleanup, 261113:** renamed the referenced ignored report to `fusion-export-failure-261112-193453.log` and updated the dashboard link. [Full verification](../temp-tool-output/261113-2325-privacy-link/verify.log) passes. Existing staged changes were kept; the new tracking edits weren't staged.
 
 | In scope | Not included without another decision |
 | --- | --- |

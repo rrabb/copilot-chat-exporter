@@ -23,10 +23,10 @@ Re-read the source for export and compare its identity/integrity to the selectio
 
 ### Fusion and persisted usage regressions
 
-Observed Fusion support covers six private event families, not a published upstream protocol. Start with [the recorded fields and evidence limits](CHAT-SESSION-SCHEMA.md#observed-fusion-records-and-persisted-usage). Don't infer Fusion from model switches, treat protocol commits as Git commits, or infer mode-level effort from a synthetic model ID.
+Observed Fusion support covers seven reviewed private event families, not a universal upstream protocol. Instruction updates, mode notices and retries use the same SDK note path. Start with [the recorded fields and evidence limits](CHAT-SESSION-SCHEMA.md#observed-fusion-records-and-persisted-usage). Don't infer execution from model switches, treat protocol commits as Git commits, or infer mode-level effort from a synthetic model ID.
 
 1. Freeze the motivating event log using the existing capture workflow. Keep native stores read-only. Diagnose unsupported fields, missing exported content and absent source history separately.
-2. Extend validated variants in `src/session/sdk-fusion.ts` or `src/session/sdk-usage-record.ts`. Keep valid sibling fields. Diagnose unknown fields, malformed values and unsupported versions rather than ignoring them.
+2. Extend the relevant Fusion, event-note, model-catalog or receipt reader in `src/session/`. Reuse `sdk-event-fields.ts` validation. Keep valid siblings and valid array members; diagnose unknown fields, malformed/indexed values and unsupported variants rather than ignoring them.
 3. Add synthetic cases for the new variant before changing behavior. Include distinct projection text, repeated equal-text events, missing optional fields and malformed/future values. A `phasePlan` entry is a record, not a string.
 4. Check child identity separately from parent-call availability. Identifiable children without parent calls belong in the labelled separate section. Ambiguous identities still use omission and warning. Test nested ownership and selected-child isolation without inventing calls or turns.
 5. Test receipt identity conflicts, unknown counters and all three source choices. A partial nonempty ledger must still win before child filtering. An empty child ledger subset must not switch to receipts. Never add cumulative summaries or copied histories.
@@ -35,6 +35,20 @@ Observed Fusion support covers six private event families, not a published upstr
 For focused usage regressions, run `pnpm test test\sdk-usage-record.test.ts test\sdk-usage.test.ts test\listing-sdk-usage.test.ts`. Run the Fusion content and loss-account tests when those handlers change. Then run `pnpm run verify`, rebuild with `pnpm run build`, and check the built CLI against the same frozen source and saved Markdown. Keep positive and negative results.
 
 Text verification checks coverage, order and repeated occurrences, not every text companion's checksum. Corrupting a redundant companion can still pass if required content appears elsewhere. Use a body containing required source text for a loss probe. Image byte hashes are a separate guarantee. Existing persisted-resource clipping remains a separate limit.
+
+Portable SDK/Fusion goldens run through `test\sdk-golden.test.ts` in normal tests and final verification. They compare complete Markdown, exact companion bytes and the file set, with separate semantic and negative checks. Use `pnpm test --command test\fixtures\sdk-golden\update.ts --check` to check. Deliberate `--update` first checks semantics, then creates an immutable expected generation for review. It doesn't modify the Local fixture or delete earlier generations. Follow the [fixture guide](../test/fixtures/sdk-golden/README.md); don't bless output after a semantic failure.
+
+Failed-phase errors/reasons, instruction content and retry reasons have independent raw-field checks. Catalog and notice metadata need exact labelled field/type/value assertions as well. Only three retry catalogs supplied the reviewed groups; don't treat a passing family-name check or newer public SDK definition as complete older-log compatibility.
+
+### SDK prefix model migration
+
+Read optional `prePromptNotes` on `ParsedSession`, `SubagentInfo` and each detached conversation before that scope's `turns`. A consumer scanning only `turn.body` now misses early system/image notes and other metadata. Prefixes use full note rendering with redaction, fence handling, companions and image warnings.
+
+SDK notes-only exports no longer fabricate a user turn. Expect zero requests and no Q heading. With real prompts, numbering, start time and financial ownership follow those prompts. Keep recorded delegated task input whole. Don't assign child prefixes to parent turns or infer relationships from catalog IDs/timestamps. Local output is unchanged when the optional field is absent.
+
+Routing now keeps optional `selectedRuleId` under **Selected rule ID**, independently of **Rule ID**, including equal/empty strings. Receipts keep the six `websocketFallback*` fields through existing typed telemetry. Retry catalogs keep all four reviewed groups as readable configuration, not usage or producer identity. No catalog/retry deduplication is applied.
+
+Preserve ledger > receipts > legacy, unknown counters and nano-AIU credit conversion. The compatibility fields don't make the cost table a full per-call archive. See [the note policy](SPEC.md#recorded-instruction-notice-and-retry-notes) and [receipt limitations](SPEC.md#receipt-telemetry-compatibility).
 
 Receipt duration currently uses milliseconds by inference from the official SDK usage type. Check a matching persisted receipt and ledger row before changing that evidence label. Sparse native history doesn't by itself establish Fusion as the cause.
 

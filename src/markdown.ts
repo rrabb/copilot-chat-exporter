@@ -435,11 +435,11 @@ function renderSubagent (node: ToolNode, byCall: Map<string, Resource[]>) {
   const returned = node.resultText || node.output;
   returned && block('Summary returned to the main chat', returned);
   node.detailText && block('Detailed result', node.detailText);
-  const conversation = sub.turns.flatMap((turn, index) => [
+  const conversation = [...renderPrePromptNotes(sub.prePromptNotes), ...sub.turns.flatMap((turn, index) => [
     ...(index > 0 ? ['**Follow-up prompt:**', '', ...(() => { const fence = fenceFor(turn.prompt, 'text'); return [fence.open, redact(turn.prompt), fence.close]; })(), ''] : []),
     ...renderTurnBody(turn, byCall, '', { heading: false }),
     '',
-  ]);
+  ])];
   body.push(
     `<details><summary>${mutedSummary(`📜 Full sub-agent conversation (${sub.turns.length} message${sub.turns.length === 1 ? '' : 's'}, ${thousands(toolCalls)} tool call${toolCalls === 1 ? '' : 's'})`)}</summary>`,
     '', ...indentBlock(conversation, NESTED_INDENT), '', '</details>', '',
@@ -571,6 +571,15 @@ function renderNote (node: NoteNode) {
     'text',
     { kind: 'metadata', label: `note-${createHash('sha256').update(`${node.title}\n${text}`).digest('hex').slice(0, 8)}` },
   ), ...image];
+}
+
+function renderPrePromptNotes (notes: readonly NoteNode[] = []): string[] {
+  return notes.length ? [
+    '### Recorded events without a preceding user prompt',
+    '',
+    ...notes.flatMap(renderNote),
+    '',
+  ] : [];
 }
 
 // Warnings a markdownVuln record attached to its text. Written after the text run, never inside it.
@@ -1157,12 +1166,12 @@ function subagentSummaryLine (toolNodes: ToolNode[]): string[] {
   return agents ? [`- **Sub-agents:** ${agents} (${thousands(calls)} tool calls inside them, shown nested at the call that started each)`] : [];
 }
 
-function hasLinkedImageNote (turns: readonly Turn[]): boolean {
-  return turns.some((turn) => turn.body.some((node) => {
+function hasLinkedImageNote (turns: readonly Turn[], notes: readonly NoteNode[] = []): boolean {
+  return notes.some(node => Boolean(node.image)) || turns.some((turn) => turn.body.some((node) => {
     if (node.type === 'note')
       return Boolean(node.image);
     if (node.type === 'tool' && node.subagent)
-      return hasLinkedImageNote(node.subagent.turns);
+      return hasLinkedImageNote(node.subagent.turns, node.subagent.prePromptNotes);
     return false;
   }));
 }
@@ -1188,14 +1197,18 @@ function renderPrompt (turn: Turn): string[] {
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
   overflow = context.overflow ?? null;
   fenceRepairs = context.fenceRepairs ?? null;
-  const collect = (turns: Turn[]): RecordedImage[] => turns.flatMap((turn) => [
-    ...(turn.promptImages ?? []),
-    ...turn.body.flatMap((node) => node.type === 'tool'
-      ? [...(node.images ?? []), ...(node.subagent ? collect(node.subagent.turns) : [])]
-      : node.type === 'note' ? node.images ?? [] : []),
-  ]);
+  const collect = (turns: Turn[], notes: readonly NoteNode[] = []): RecordedImage[] => [
+    ...notes.flatMap(node => node.images ?? []),
+    ...turns.flatMap((turn) => [
+      ...(turn.promptImages ?? []),
+      ...turn.body.flatMap((node) => node.type === 'tool'
+        ? [...(node.images ?? []), ...(node.subagent ? collect(node.subagent.turns, node.subagent.prePromptNotes) : [])]
+        : node.type === 'note' ? node.images ?? [] : []),
+    ]),
+  ];
   const imageTurns = [...session.turns, ...(session.detachedSubagents ?? []).flatMap((child) => child.turns)];
-  imageReplacements = [...new Map(collect(imageTurns).filter((image) => image.bytes).map((image) => [
+  const imageNotes = [...(session.prePromptNotes ?? []), ...(session.detachedSubagents ?? []).flatMap(child => child.prePromptNotes ?? [])];
+  imageReplacements = [...new Map(collect(imageTurns, imageNotes).filter((image) => image.bytes).map((image) => [
     Buffer.from(image.bytes!).toString('base64'),
     `[recorded image saved separately; SHA-256 ${createHash('sha256').update(image.bytes!).digest('hex').slice(0, 12)}]`,
   ])).entries()].map(([encoded, label]) => ({ encoded, label }));
@@ -1211,7 +1224,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
 function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
   const { location, resources, versions, memory, outputPath, gitStatus, generatedAt } = context;
   const sdk = context.source === 'sdk-events';
-  const usageHidden = sdk && session.turns.length > 0 && session.turns.every((turn) => turn.scalar.agentTurn) && !session.usage;
+  const usageHidden = sdk && session.turns.every((turn) => turn.scalar.agentTurn) && !session.usage;
   const usage = sdk ? session.usage : undefined;
   const usageCell = (value: string | number) => usageHidden ? 'not recorded' : typeof value === 'number' ? thousands(value) : value;
   const turns = session.turns;
@@ -1259,8 +1272,8 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     sdk
       ? '> Conversation archive sourced from the Copilot SDK event log (Agent Host / Copilot CLI): prompts, readable reasoning, assistant messages, tool calls with inputs, outputs and errors, code blocks and timing.'
       : '> Full visible conversation archive sourced from the native VS Code chat journal: prompts, agent reasoning, tool calls, code blocks, token cost, and timing.',
-    ...(imageReplacements.length || hasLinkedImageNote(turns)
-      || session.detachedSubagents?.some((child) => hasLinkedImageNote(child.turns))
+    ...(imageReplacements.length || hasLinkedImageNote(turns, session.prePromptNotes)
+      || session.detachedSubagents?.some((child) => hasLinkedImageNote(child.turns, child.prePromptNotes))
       || context.overflow?.companions.some((item) => item.kind === 'image')
       ? ['', '> Images bypass text redaction and may contain private information. Review image companions before sharing.'] : []),
     '',
@@ -1411,6 +1424,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     '',
   ];
 
+  lines.push(...renderPrePromptNotes(session.prePromptNotes));
   for (const turn of turns) {
     const badge = esc(clip(turn.prompt, 90));
     lines.push(
@@ -1440,6 +1454,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       const childPreviousTools = new Map<string, PreviousTool[]>();
       lines.push(`### Child ${index + 1}: ${esc(child.title)} (\`${esc(child.agentId)}\`)`, '');
       child.usage && lines.push(`Recorded usage of this child alone: ${fmtAiCredits(child.usage.nanoAiu)} credits in ${thousands(child.usage.calls)} call${child.usage.calls === 1 ? '' : 's'}. Its missing parent call doesn't establish ownership by a main turn.`, '');
+      lines.push(...renderPrePromptNotes(child.prePromptNotes));
       for (const turn of child.turns) {
         const badge = esc(clip(turn.prompt, 90));
         lines.push(

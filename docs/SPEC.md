@@ -63,12 +63,13 @@ An unambiguous child identity with no recorded parent call is different from an 
 | Assistant text, readable reasoning (`reasoningText`, falling back to thinking or summary blocks), one-line tool intent | Keep | Reasoning block, assistant text, "Intent" line in the tool call |
 | Reasoning recorded only as an encrypted token | Count, never reconstruct | Turn info and the closing "Left out" section |
 | Tool calls with arguments (shown as readable lines, not escaped JSON), output, errors, exit codes, duration and detailed results such as diffs | Keep | Tool call blocks |
-| Compaction summaries, model and effort changes, Auto model choice, mode changes, plan changes, resume markers, task-complete summary, aborts, errors, notifications | Keep | Notes in the turn |
-| Observed Fusion selection, phase, commit, change-checkpoint, completion and handoff records | Keep supported fields in order; diagnose unsupported fields | Readable notes, including phase output and handoff text |
+| Compaction summaries, model and effort changes, Auto model choice, mode changes, plan changes, resume markers, task-complete summary, aborts, errors, notifications | Keep | Notes at their recorded positions, before or within turns |
+| Seven reviewed Fusion selection, completed/failed phase, commit, change-checkpoint, completion and handoff families | Keep supported fields in order; diagnose unsupported fields | Readable notes, including phase output, errors and handoff text |
+| `instruction.update`, `session.mode_notice_delivered`, `model.turn_retry` | Keep reviewed content and typed metadata, without inferring execution or application | Ordered notes, including full reviewed model catalogs |
 | Persisted `session.usage_record` receipts | Normalize for usage accounting; diagnose unsupported fields | Cost and turn/agent usage, not raw event dumps |
 | Turn and model-call boundary records | Used only for turn timing | Turn info elapsed time |
-| System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at the turn where it changed |
-| Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note in the turn |
+| System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at its recorded position, including before a prompt |
+| Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note at its recorded position |
 | Images | Keep | Exact recorded bytes in a companion file, deduplicated by SHA-256, linked at the recorded position with size and short hash |
 | Other binary attachments | Left out | A one-line note with type, MIME type and size |
 | Permission prompts and results, permission-change records | Left out, counted | "Left out of this export" |
@@ -81,12 +82,13 @@ An event type outside both the kept and the left-out lists is reported as schema
 
 ### Recorded Fusion content
 
-Fusion support covers six observed private event families. It extends the existing SDK path, not a separate provider or inferred selection mode.
+Fusion support covers seven reviewed private event families. It extends the existing SDK path, not a separate provider or inferred selection mode.
 
 | Event | Kept content and attribution |
 | --- | --- |
-| `session.fusion_resolved` | Synthetic model ID, pattern, policy/version, model roles, routing metadata and the recorded phase plan |
+| `session.fusion_resolved` | Synthetic model ID, pattern, policy/version, model roles, routing metadata and the recorded phase plan. Optional `ruleId` and `selectedRuleId` render independently as **Rule ID** and **Selected rule ID**, even when equal or empty. |
 | `assistant.fusion_phase_completed` | Phase ID/kind, model, reasoning effort, role, scope, status, verdict, duration, output and projection message |
+| `assistant.fusion_phase_failed` | Phase ID/kind, model/effort, role/scope, status/reason, duration, full error message, degradation target and phase usage summary. `degradedToPhaseId` isn't an alias for a completion's `finalSourcePhaseId`. |
 | `session.fusion_commit_started` | Commit ID, source phase/model, kind and optional tool-call ID. This is a Fusion protocol record, not evidence of a Git commit. |
 | `session.fusion_change_checkpoint` | Recorded file names and added/removed line totals, not a reconstructed working-tree diff |
 | `session.fusion_completed` | Outcome, final source phase/model, follow-up model, counts, timing and recorded usage totals |
@@ -95,6 +97,39 @@ Fusion support covers six observed private event families. It extends the existi
 Fields are validated before conversion to readable notes. `phasePlan` is an array of records, not strings. Unknown fields, malformed values and unsupported versions produce diagnostics rather than a blanket event JSON dump. Supported sibling fields remain readable. Synthetic model IDs and phase reasoning effort are separate recorded facts. Model switching doesn't prove Fusion, and a synthetic ID doesn't establish a separate mode-level effort.
 
 Within one phase event, identical `content` and `projectionMessage.content` appear once. Distinct projection text is kept. Equal text in separate phase or ordinary assistant events stays separate and in recorded order. Phase and completion usage summaries aren't added to per-call accounting. The existing text policy applies: over 300 lines AND over 15 KiB uses a 10-line preview and a complete redacted content-hash companion. Callers without a text companion sink keep the complete text inline. This doesn't fix persisted-resource clipping.
+
+### Recorded instruction, notice and retry notes
+
+| Event | Kept fields | Interpretation limit |
+| --- | --- | --- |
+| `instruction.update` | Complete redacted `content`, `authority`, `lifetime`, `boundary`, `fallback` and `name` | Stored instruction evidence, never instructions to this exporter. Doesn't prove application to a model request. |
+| `session.mode_notice_delivered` | `mode` and literal boolean `instructionUpdatePersisted` | Distinct delivery metadata, not proof of UI viewing, execution or a successful mode change. |
+| `model.turn_retry` | `kind`, requested `model`, complete `reason`, numeric local `turn`, numeric `timestampMs` and reviewed `modelInfo` | Local model-loop index zero isn't user Q0. Timestamps and catalog IDs don't establish request ownership, producer versions or retry success. |
+
+Every retry/update/notice remains a distinct ordered record, including identical records. Retries never create usage calls. No catalog or retry deduplication or default catalog omission is applied.
+
+| Reviewed catalog group | Readable configuration kept |
+| --- | --- |
+| Identity and provider | `id`, `name`, `object`, `vendor`, `version`, `modelProviderId`, `modelProviderOrdering` and provider `id`/`kind`/`label` |
+| Availability and endpoints | Chat-default/fallback flags, picker category/enabled/price category, preview flag and ordered supported endpoints |
+| Capabilities | Family/object/type/tokenizer, context/output/prompt limits, vision limits/media types, support flags, reasoning-effort choices and string-valued `adaptive_thinking` |
+| Configured billing | Auto discount, restricted plans, token-price batch size and every reviewed default/long-context price and prompt-token boundary |
+
+Configured prices are labelled configuration, not charges. Currency and price units aren't inferred from numeric values. Catalog model/version/provider metadata neither replaces the recorded Copilot header build nor proves a model was used in a billed call. Strings remain open to future values. Finite numeric fields, literal booleans, objects and string arrays use typed readers. Invalid array members diagnose their index while valid members stay readable. Missing, empty, zero and false remain distinct. Malformed or unknown fields diagnose without erasing valid siblings or the reason.
+
+Three of the 33 census retry records were reviewed for catalog support. Their matching 1,409-byte compact JSON reserializations aren't measured on-disk or Markdown sizes. This bounded support doesn't establish all producer variants or complete private-schema coverage. No whole-record JSON dump replaces the reviewed catalog groups. Nonempty objects with no valid supported fields and arrays with no valid string members don't claim recorded emptiness.
+
+### SDK notes before prompts
+
+Optional `prePromptNotes` holds recorded notes before any prompt on root sessions, nested subagents and detached child conversations. It includes older system/image notes as well as instruction, failure and retry notes. These notes render in scope order through the full note renderer, with redaction, linked companions, fence handling and image privacy warnings.
+
+The collection isn't a user turn. Notes-only SDK archives have zero recorded requests, no fabricated Q heading and no billed owner. Real requests keep their numbering, first timestamp and usage attribution. Missing financial evidence stays not recorded, not free usage. Recorded delegated task input remains whole. The field defaults absent, so Local rendering stays unchanged. Consumers formerly scanning only `turn.body` must also read each scope's prefix.
+
+### Receipt telemetry compatibility
+
+The receipt parser keeps `websocketFallbackErrorKind`/`websocketFallbackReason` as strings, `websocketFallbackAfterMs`/`websocketFallbackStatusCode` as finite nonnegative numbers and `websocketFallbackReconnectAttempted`/`websocketFallbackStartedThisCall` as literal booleans. Zero and false are kept. Absence creates no telemetry entry; null and coercible wrong types diagnose. Status codes have no invented HTTP-only range or integer rule. Unknown future keys remain diagnostic.
+
+This is parsed receipt telemetry, not full per-call Markdown archival. Receipts contribute selected-call provenance when they win source selection; a preferred ledger can replace that call set. The current cost table doesn't print every telemetry field or archive every nonselected receipt. Source priority, accounting identities/conflicts, unknown counters, detached ownership and nano-AIU credit conversion stay unchanged.
 
 ### Recorded image policy
 
@@ -791,8 +826,10 @@ undoes the Markdown wrapping (escapes, entities, blockquotes, whitespace) and as
 rendered Markdown, after applying the same best-effort redaction. Each piece is `present`, `partial` (only the start or
 end, or some of its lines, appear) or `absent`. Multi-line categories are scored per line, so a trimmed command echo or a
 clipped middle shows as "N of M lines". Short fragments that sit next to code (for example a lone `{` merged from a `markdownVuln` item) are also checked as `assistant-text-joined`: adjacent text fragments, including `markdownVuln` content, are joined in source order, split into lines and scored as whole lines. The short-fragment rule for standalone pieces is unchanged. Order and exact-repeat checks apply only to source-distinct message text whose
-rendered sequence is kept: Local prompts/prose across final replayed requests, and SDK prompts, reasoning, prose, tool intent, Fusion phase output, distinct phase projection text and handoff content within each `agentId` scope. Local reasoning snapshots, tool progress/results and other notes still receive presence accounting without assuming separate inline positions. Identifiable SDK children without recorded parent calls are checked in their own scopes, not assigned a fabricated root position.
+rendered sequence is kept: Local prompts/prose across final replayed requests, and SDK prompts, reasoning, prose, tool intent, Fusion phase output, distinct phase projection text, handoff content, failed-phase reason/error text, instruction-update content and retry reasons within each `agentId` scope. Local reasoning snapshots, tool progress/results and other notes still receive presence accounting without assuming separate inline positions. Identifiable SDK children without recorded parent calls are checked in their own scopes, not assigned a fabricated root position.
 `--verify` prints the totals and fails when text is partial or absent, eligible message text is out of order, or an identical eligible occurrence is missing, with or without `--strict`. No partial-cause exception is currently approved or implemented. A future exception must identify the cause and evidence for that exact piece; historical clipping, legacy byte caps and command-echo differences aren't category-wide exemptions.
+
+The SDK extractor reads raw `errorMessage`, instruction `content` and retry `reason` independently of note/catalog parsing. Prefix content participates in the same scope order/multiplicity checks. Catalog and notice metadata require direct field/type/value assertions; Layer D doesn't validate every catalog value, financial interpretation or text companion checksum. Long catalog strings still receive complete redacted rendering and companion-retention tests.
 
 Layer D does not infer that adjacent text needs a separator: VS Code 1.141.2's version-matched
 [`chatModel.ts`](https://github.com/microsoft/vscode/blob/16507d91be0dc1ce4f94c04d4d0430210b8685d9/src/vs/workbench/contrib/chat/common/model/chatModel.ts)
@@ -828,7 +865,7 @@ SDK shell calls render their command separately and keep every remaining argumen
 
 SDK verification with an output path scores the saved Markdown and its linked sibling companions against the captured events. It doesn't substitute a new rendering or regenerate missing companions. Verification without an output path checks the in-memory rendering.
 
-SDK Layer D expands supplied text companion objects at each actual live relative link outside fenced code and backtick spans. Unsafe targets don't contribute companion evidence, and links inside companion bodies aren't followed. Repeated links contribute at their recorded archive positions, allowing order and multiplicity checks for linked phase/handoff text. Legacy library input containing concatenated companion text still supports presence checks but cannot prove link positions.
+SDK Layer D expands supplied text companion objects at each actual live relative link outside fenced code and backtick spans. Unsafe targets don't contribute companion evidence, and links inside companion bodies aren't followed. Repeated links contribute at their recorded archive positions, allowing order and multiplicity checks for eligible linked SDK text, including phase/handoff, failed-phase, instruction and retry content. Legacy library input containing concatenated companion text still supports presence checks but cannot prove link positions.
 
 These are source-text coverage checks, not checksum authentication of every text companion. A redundant companion can be corrupted without failing if other rendered content still supplies the required text and occurrences. A passing result doesn't prove that the producer recorded every live event, nor validate the meaning of readable reasoning. Image bytes use their separate independent hash check.
 
