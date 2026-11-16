@@ -1,12 +1,12 @@
 # Work dashboard
 
-Updated 261115. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
+Updated 261116. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
 🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
 ## Start here
 
-**Do now:** WI-053 through WI-057 were accepted and closed on 261115. Their export, fixture and cleanup limits remain documented. WI-052 still waits for review of its LOD notes. WI-049 and WI-051 keep their existing acceptance checks. Broader Fusion labels, filters and future-mode research remain in WI-042.
+**Do now:** Review [WI-059](#wi-059)'s [writing rules](.github/instructions/writing-style.instructions.md) and [examples](.github/instructions/writing-style-reference.md#simplify-without-changing-meaning). Fully quit VS Code (all windows), then check a new chat. WI-053 through WI-057 were accepted and closed on 261115. Their export, fixture and cleanup limits remain documented. WI-052 still waits for review of its LOD notes. WI-049 and WI-051 keep their existing acceptance checks. Broader Fusion labels, filters and future-mode research remain in WI-042.
 
 **Decisions you owe:** no acceptance decisions remain for WI-053 through WI-057. See the `[question]` lines in the [Inbox](#inbox) and the existing WI-052/WI-049/WI-051 review gates. Lines marked "due when ..." can wait.
 
@@ -95,6 +95,7 @@ Updated 261115. New here? Read the [handbook](work-items/README.md) first. Produ
 | <a name="wi-046"></a>**WI-046** Focused test guidance | Added `pnpm test <file...>` as the default and kept a file URL fallback with the wrapper's cache checks. Accepted 261104. | ✅ Done | [build] | - | - | - | [Commands](AGENTS.md#commands) |
 | <a name="wi-050"></a>[WI-050 Portable work-tracking kit](work-items/WI-050-portable-work-tracking-kit.md) | Build and pilot a copy-in kit. Real install/import ran 261112: 20 WI rows and 12 Inbox entries filed. Results, findings K1-K5 and evidence limits are in the topic. Next: about 2 weeks of normal use, then acceptance review. | 🔨 Active · Medium | [build] | both | L | - | [WI-040](#wi-040); [Kit topic](../work-tracking-system/work-tracking/items/WI-001-portable-kit.md) |
 | <a name="wi-051"></a>[WI-051 Prompt-to-skill migration](work-items/WI-051-prompt-to-skill-migration.md) | Migrated `exporter-status` and `exporter-critique-prompt` to manual skills. Generic repo prompts, packaged export and installer unchanged. Static checks and verify passed. Waits for fresh Local/Copilot command checks and your acceptance. | ⏳ Waiting · Medium | [build] | you | S | - | [Status](.github/skills/exporter-status/SKILL.md), [Critique](.github/skills/exporter-critique-prompt/SKILL.md), [Backups](docs/notes/) |
+| <a name="wi-059"></a>**WI-059** Writing-style guidance | The core rules now explain how to write for newcomers without changing technical meaning. The reference has examples adapted from the SDK/Fusion fixture README. The effect of the shorter core is unmeasured. Waits for your review and a fresh-chat check after fully quitting VS Code. | ⏳ Waiting · Medium | [build] | you | S | - | [Core](.github/instructions/writing-style.instructions.md), [Examples](.github/instructions/writing-style-reference.md#simplify-without-changing-meaning) |
 
 ## Inbox
 
@@ -119,6 +120,7 @@ Format: `YYMMDD [tag] text (from: you|agent)`. Append only. Reread before adding
 - 261112 [build] Export of `2c407ad4` failed Layer D with 125 reported gaps and 7 unhandled event types: `session.usage_record` (222) and 6 fusion types (see [WI-042](#wi-042)). Diagnose the verification failure and event handling separately from the sparse conversation records above; a shared cause isn't established. [Saved failure](temp-tool-output/261112-1935-codebase-context-pilot/fusion-export-failure-261112-193453.log) (from: agent)
 - 261112 [idea] Kit K6: pilot install and import cost ~1,356 credits. Astra primary and repair calls and Opus primary calls account for most recorded per-call credits. Cheap subagents cost ~0.2% of that recorded total. Decide whether the kit should give cost guidance (single model or lower Fusion effort, fresh import chat, compact subagent results). See [WI-050 credit use](work-items/WI-050-portable-work-tracking-kit.md#credit-use-in-the-real-pilot) (from: you)
 - 261115 [build] Prevent repeated Local golden checks from accumulating timestamped asset folders. Resolved and accepted 261115 in [WI-057](#wi-057). Successful owned runs are cleaned; failures and ordinary exports keep their evidence. (from: you)
+- 261116 [idea] Agent chats load the [writing-style rules](.github/instructions/writing-style.instructions.md), but agent text still breaks them: semicolon chains, long sentences and words from the Avoid list. Add a small prose check script to the Completion check? (from: agent) Outcome 261116: you chose to trim the always-loaded file instead, filed as [WI-059](#wi-059).
 
 
 ## Closed lookup

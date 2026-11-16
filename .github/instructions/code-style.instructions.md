@@ -83,7 +83,7 @@ Choose the precise term that matches the code:
 | Serialized data | format or wire format |
 | One case in a union | variant or union member |
 
-Reserve `shape` for array or tensor dimensions, JavaScript engine object layouts when that exact concept is under discussion, quoted external API terminology, or an established public identifier that cannot be renamed within the task. Follow the broader replacement table in [writing-style.instructions.md](writing-style.instructions.md).
+Reserve `shape` for array or tensor dimensions, JavaScript engine object layouts when that exact concept is under discussion, quoted external API terminology, or an established public identifier that cannot be renamed within the task. Follow the broader replacement table in [writing-style-reference.md](writing-style-reference.md).
 
 ## Keep Side Effects At The Boundary
 
