@@ -68,8 +68,99 @@ The originals remain unchanged in the ignored [research run](../../../temp-tool-
 
 The private copies keep the original Markdown and all companions, but not the source databases/captures. Exact source-based reruns still require those private inputs. The tracked research cannot reconstruct a real conversation.
 
+## LOD format workbench
+
+Added 261115 under [WI-058](../../../work-log.md#wi-058). A searchable page lists every tool, event, response and question kind. Each row expands to show recorded evidence and how the Copilot GUI draws it. Two editable boxes hold the short and medium format. Your edits save to JSON. Research only: no exporter code reads the choices file.
+
+Findings, counts and evidence limits are in the [WI-052 topic](../../WI-052-markdown-level-of-detail-research.md#format-workbench-261115).
+
+Public source metadata records the platform and Node version, not the hostname or a hostname-derived identifier. Recorded examples and the built HTML stay private and need separate backup.
+
+### Run it
+
+| Step | Command |
+| --- | --- |
+| Sanitize an older derived scan | `node work-items\notes\WI-052\catalogue\sanitize-scan.mjs` |
+| Recover complete evidence for an older shortened scan | `node --max-old-space-size=8192 work-items\notes\WI-052\catalogue\scan-sessions.mjs --recover` |
+| Rebuild the catalogue | `node work-items\notes\WI-052\catalogue\build-catalogue.mjs` |
+| Rebuild the page | `node work-items\notes\WI-052\catalogue\build-page.mjs` |
+| Start the helper server | `node work-items\notes\WI-052\catalogue\serve.mjs [--port N]`, then open `http://127.0.0.1:5252/` |
+| Check the page | `node work-items\notes\WI-052\catalogue\validate-workbench.mjs` |
+| Test choice saving and recovery | `pnpm test test\lod-workbench.test.ts` |
+| Rescan chats (read-only) | `node --max-old-space-size=8192 work-items\notes\WI-052\catalogue\scan-sessions.mjs --exclude <session id>` |
+
+Without the helper server, open the built page from disk. Save then downloads the JSON and the file picker loads one. That path is inferred, not browser-tested.
+
+### Saving your choices
+
+Formats and notes have no per-field character limit. Imports and server saves allow choices files up to 5 MiB, measured as UTF-8 bytes. Larger files trigger an interactive warning and leave your current choices unchanged. Use **Download copy** to keep oversized edits. Reduce their size before importing or saving through the server.
+
+You can keep editing during a server save. The Save button stays disabled until the request finishes. Edits made during that request stay marked as unsaved. The page also updates their browser recovery draft without waiting for the normal typing delay.
+
+Browser recovery storage can be unavailable or full. The page reports storage failures. Use **Download copy** rather than relying on a recovery draft.
+
+Backup names include a sequence number, so saves within one second don't overwrite each other's backups. Every backup is kept. The server never deletes older backups. Back up this folder separately and watch its disk use.
+
+### Complete recorded evidence
+
+The HTML embeds complete redacted values for the selected examples. They stay collapsed until opened. Large evidence panels have no text display cap. This works offline without companion files or the helper server.
+
+Complete means the selected example, not its whole chat. Short and medium suggestions still use the same saved previews. Restoring complete evidence doesn't change those suggestions or your review marks.
+
+The page labels omitted base64-like data and reports each field's path and character count. This detection is a heuristic, not proof that the value is binary. Redaction still masks matching text. Whole military-domain examples still become labelled synthetic replacements.
+
+Older scans may contain only shortened previews. Make a private backup of the derived scan before running `--recover`. Recovery reads only the selected source chats, bounded by the recorded source sizes. It keeps counts and selected examples. It checks each original value against its saved hash before keeping a complete redacted copy. Missing or changed evidence stays labelled unavailable, with the old preview shown. New scans keep complete evidence when first recording an example.
+
+Observed here: all 84 shortened examples were recovered. There were no unavailable matches or new privacy replacements. The self-contained HTML grew from 2.85 MiB to 6.40 MiB. An offline Chromium check opened a complete example containing over two million rendered characters without shortening it. These files remain private and need publication review.
+
+### Reviewing formats and counts
+
+Each row has a Review dropdown:
+
+| State | Meaning |
+| --- | --- |
+| Not reviewed | You haven't marked the current formats and show/hide setting as examined |
+| Reviewed | You've examined them but haven't approved them |
+| Accepted | You've examined and approved them |
+
+Edited is a separate badge, not a review state. An edited row can also be reviewed or accepted. The Not accepted filter includes both unreviewed rows and reviewed rows without approval. Reviewed, not accepted shows only examined rows awaiting approval.
+
+Changing an effective short format, medium format or show/hide setting resets review to Not reviewed. A group edit resets only affected rows. Notes don't reset review. Saved review marks include a fingerprint of those formats and settings. Changed suggestions or older imported marks without a fingerprint need another review. The page warns when loading resets marks.
+
+Seen sorts by the number of scanned chats containing each name. Groups rank by their most widely seen member. Occurrence counts keep their separate units. SDK requests and starts aren't added together. Counts describe the scanned sample, not all chats.
+
+The page shows scan warnings above the table, separately from file-loading messages. Warnings mean counts or examples may be incomplete. The refreshed snapshot has no parse or replay errors. This doesn't prove complete coverage of every chat.
+
+The scanner reads LF-delimited JSON records and supports CRLF. Unicode line separators inside strings aren't record boundaries. An earlier reader split one valid result into three invalid fragments. [WI-066](../../WI-052-markdown-level-of-detail-research.md#scanner-record-boundaries-261117) records the repair and measured count changes.
+
+Short shell suggestions show a nonzero recorded exit code even when the tool reports success. Tool success and command exit status are separate evidence.
+
+### Files
+
+| Path | Holds | In Git |
+| --- | --- | --- |
+| [catalogue/](catalogue/) scripts | Scanner, public-source collector, template engine, suggestions, page builder, helper server, validator | ✅ |
+| [catalogue/catalogue-index.json](catalogue/catalogue-index.json) | Names, groups, counts, suggested formats, source links. No chat text. | ✅ |
+| [catalogue/lod-format-choices.json](catalogue/lod-format-choices.json) | Your saved short and medium formats | ✅ |
+| `private-examples/catalogue/format-workbench.html` | The built page with redacted examples embedded | ❌ ignored |
+| `private-examples/catalogue/examples.private.json`, `scan.private.json` | Recorded examples and raw scan output | ❌ ignored |
+| `private-examples/catalogue/choices-backups/` | Every earlier choices version, written before each save. No automatic deletion. | ❌ ignored |
+
+The page needs the private folder because the examples come from real chats. Back that folder up separately. The redaction masks user-home paths and project paths under `_DATA`, so other local paths can remain in examples.
+
+### Military domain examples
+
+Approved 261116: replace entire examples containing military domain references with labelled synthetic examples. Replacements keep field structure, tool identity and failure flags. They replace text, numbers and source metadata, including surrounding browser titles and answers.
+
+The scanner applies this rule before clipping. The catalogue builder also applies it when reading older snapshots. Run `sanitize-scan.mjs` to update an older derived snapshot, then rebuild the catalogue and page. The command doesn't change original chat journals.
+
+The current snapshot has eight replacements. Its other 507 recorded examples and observed counts are unchanged. The validator checks all four generated artifacts for domain references. It also checks replacement labels and matching tool call references.
+
+These changes don't approve publication. The files remain ignored by Git. Other real conversation excerpts and cross-project paths still need review.
+
 ## Work items
 
+- [WI-058](../../../work-log.md#wi-058) owns the format workbench.
 - [WI-052](../../WI-052-markdown-level-of-detail-research.md) owns research decisions and the next review.
 - [WI-004](../../WI-004-fidelity-policy-research.md) owns the broader deferred metadata/redaction policy.
 - [WI-053](../../WI-053-agent-host-fusion-export-compatibility.md) owns the Fusion compatibility follow-up.
