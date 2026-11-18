@@ -6,7 +6,7 @@
 - **Default:** keep the current detailed Markdown export unchanged.
 - **Direction:** individual include/exclude switches, with short, medium and complete detail available per tool. No named whole-export profiles.
 - **Evidence:** compare official documentation and public source with a bounded sample of Local and Agent Host/CLI chats.
-- **Deliverables:** an HTML research report, an interactive offline [LOD casebook](../temp-tool-output/261115-0224-wi052-lod-casebook/presentation.html), an offline [format workbench](#format-workbench-261115) ([WI-058](../work-log.md#wi-058)), reproducible type inventories and several current-format Markdown exports.
+- **Deliverables:** an HTML research report, an interactive offline [LOD casebook](notes/WI-052/private-examples/casebook/presentation.html), an offline [format workbench](#format-workbench-261115) ([WI-058](../work-log.md#wi-058)), reproducible type inventories and several current-format Markdown exports.
 - **Boundary:** record proposals, not approved CLI syntax or new rendering behavior.
 - **Produced:** a searchable HTML report, 24 public sources, 56 online type entries, 41 candidate controls and six current-default exports. The casebook adds 11 scenarios and 18 tool comparisons: 14 real examples and four labelled synthetic fallbacks.
 - **Preserved:** [full research bundle](notes/WI-052/README.md) includes the searchable HTML, original proposals/public-source notes, complete sanitized census/findings, scripts and synthetic examples. Six real export bundles have separate ignored private copies.
@@ -63,6 +63,7 @@ Progress as of 261117: 0 of 6 descendant items done. WI-058 has five repair chil
 ## Decisions and tradeoffs
 
 - **Developer direction, 261113:** individual switches rather than named whole-export levels.
+- **Developer clarification, 261117:** allow optional named CLI presets alongside individual controls. Apply the preset first, then individual overrides. Without either, keep current output unchanged. See [WI-067's decision and examples](WI-067-exporter-lod-config.md#cli-decision-261117). Format model and implementation remain unapproved.
 - **Developer constraint, 261113:** keep current Markdown as the detailed default.
 - Lower detail must be labelled as intentional exclusion or shortening. It must not be reported as complete source coverage.
 - Collapsing content changes presentation, not what the archive contains. Excluding content must also consider linked companion files.
@@ -173,7 +174,7 @@ Use recorded descriptions and deterministic field extraction, not another model 
 
 The developer approved an interactive offline presentation using real examples from recent retained captures. Synthetic examples fill gaps where suitable real examples weren't selected. This extends the research, not the exporter.
 
-Open the [LOD casebook](../temp-tool-output/261115-0224-wi052-lod-casebook/presentation.html). Start with the developer's scenario, then compare the tool formats and recent fixture lessons. The file embeds its data and doesn't load network resources automatically. Evidence links need the original local files.
+Open the [LOD casebook](notes/WI-052/private-examples/casebook/presentation.html). Start with the developer's scenario, then compare the tool formats and recent fixture lessons. The file embeds its data and doesn't load network resources automatically. Evidence links use saved inputs under WI-052, including the shared frozen private corpus.
 
 | Part | What it demonstrates |
 | --- | --- |
@@ -186,9 +187,18 @@ Open the [LOD casebook](../temp-tool-output/261115-0224-wi052-lod-casebook/prese
 | Overflow | The retained threshold checks require both more than 300 lines and more than 15 KiB. The complete redacted companion remains distinct from its ten-line preview. This doesn't fix persisted-resource clipping. |
 | Privacy | The HTML still embeds its full selected examples after targeted presentation redaction. Hiding content doesn't remove those bytes or certify safe publication. The file and its private source captures need separate backup. |
 
-Source hashes and selected-record hashes are locked in the [private evidence manifest](../temp-tool-output/261115-0224-wi052-lod-casebook/evidence-manifest.private.json). Mining, building and validation scripts remain beside the presentation. The original [research bundle](notes/WI-052/README.md) is unchanged.
+Source hashes and selected-record hashes are locked in the [private evidence manifest](notes/WI-052/private-examples/casebook/evidence-manifest.private.json). Mining, building and validation scripts live beside the presentation. The original research and casebook archive remain unchanged.
 
-Validation checks source order, inventories, source links, escaping and script/style hashes. Browser checks cover scenario controls, overrides, question preservation, all full input/result pairs, format choices and searches. Desktop and a measured 390-pixel viewport passed. Restrictive-CSP fallback reading keeps all comparisons and source links. An isolated engine-disabled browser context wasn't available. The settings-download payload matched the displayed recipe, but actual file saving wasn't tested. Results are in [final browser checks](../temp-tool-output/261115-0224-wi052-lod-casebook/browser-final-checks.json), [view checks](../temp-tool-output/261115-0224-wi052-lod-casebook/browser-view-checks.json) and [static validation](../temp-tool-output/261115-0224-wi052-lod-casebook/static-validation.json). Repository verification passed in the [saved log](../temp-tool-output/261115-0224-wi052-lod-casebook/repository-verify.log).
+**Migrated 261117:** `temp-tool-output\261115-0224-wi052-lod-casebook\` → `work-items\notes\WI-052\private-examples\casebook\`. Unchanged originals and validation reports are saved in sibling folder [casebook-261115-0224](notes/WI-052/private-examples/casebook-261115-0224/). Dependencies are saved locally and mapped in the working casebook's [inputs.private.json](notes/WI-052/private-examples/casebook/inputs.private.json).
+
+Three captures use the shared corpus. Thirteen smaller inputs have frozen copies beside the working scripts.
+The fixture guide's historical bytes were recovered from Git and match the original hash.
+Restricted-filesystem rebuilding passes without access to original temporary files.
+Only source links changed in the generated data. The eighteen examples, eleven scenarios and selected content match the archive.
+Browser checks covered scenario selection, detail controls, search and repaired link targets.
+See the [working casebook guide](notes/WI-052/README.md#working-private-casebook-261117) for commands, validation and privacy limits.
+
+Validation checks source order, inventories, source links, escaping and script/style hashes. Browser checks cover scenario controls, overrides, question preservation, all full input/result pairs, format choices and searches. Desktop and a measured 390-pixel viewport passed. Restrictive-CSP fallback reading keeps all comparisons and source links. An isolated engine-disabled browser context wasn't available. The settings-download payload matched the displayed recipe, but actual file saving wasn't tested. Original results are archived in [final browser checks](notes/WI-052/private-examples/casebook-261115-0224/browser-final-checks.json), [view checks](notes/WI-052/private-examples/casebook-261115-0224/browser-view-checks.json) and [static validation](notes/WI-052/private-examples/casebook-261115-0224/static-validation.json). Repository verification passed in the archived [saved log](notes/WI-052/private-examples/casebook-261115-0224/repository-verify.log).
 
 No exporter behavior, default, CLI flag, fixture or native session store changed. The presentation doesn't fix the recorded Local question-answer export gap.
 
@@ -336,4 +346,4 @@ WI-066 fixes the reported scan warning. Reload the page and check that the warni
 
 ## Next review
 
-Start with the [format workbench](notes/WI-052/README.md#lod-format-workbench) ([WI-058](../work-log.md#wi-058)): browse the kinds, edit the short and medium formats you want, and save. Then open the [interactive casebook](../temp-tool-output/261115-0224-wi052-lod-casebook/presentation.html), especially the developer's scenario, decision ledger and failure investigation. Compare the question formats and error behavior before choosing controls. Consult the [preserved findings](notes/WI-052/findings.md), [controls](notes/WI-052/controls.md) and long Local/Agent Host exports for the wider evidence. Then accept the research or request specific gaps. Implementation scope, medium limits and exclusion rules need separate approval. No switch implementation or item closure is approved.
+Start with the [format workbench](notes/WI-052/README.md#lod-format-workbench) ([WI-058](../work-log.md#wi-058)): browse the kinds, edit the short and medium formats you want, and save. Then open the [interactive casebook](notes/WI-052/private-examples/casebook/presentation.html), especially the developer's scenario, decision ledger and failure investigation. Compare the question formats and error behavior before choosing controls. Consult the [preserved findings](notes/WI-052/findings.md), [controls](notes/WI-052/controls.md) and long Local/Agent Host exports for the wider evidence. Then accept the research or request specific gaps. Implementation scope, medium limits and exclusion rules need separate approval. No switch implementation or item closure is approved. The possible build that follows, including the format model choice (slots, templates or both), is in [WI-067](WI-067-exporter-lod-config.md).

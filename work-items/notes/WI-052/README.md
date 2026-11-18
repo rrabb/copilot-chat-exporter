@@ -2,7 +2,95 @@
 
 Saved and expanded 261113. This folder keeps the original research deliverables as well as concise notes. Start with the [searchable HTML report](report.html), [preservation inventory](PRESERVATION.md), or [findings](findings.md).
 
-Research only. No switches are implemented or approved here. Keep the current detailed Markdown export as the default. The developer chose independent controls rather than named whole-export profiles.
+Research only. No switches are implemented here. Keep the current detailed Markdown export as the default. On 261117 the developer approved optional named presets alongside independent controls. Individual overrides win. See [WI-067's decision](../../WI-067-exporter-lod-config.md#cli-decision-261117).
+
+## Working private casebook, 261117
+
+Open the [LOD scenario casebook](private-examples/casebook/presentation.html).
+Its scripts and all sixteen direct source dependencies now resolve inside WI-052's private examples folder.
+Three full captures come from the shared corpus. Thirteen smaller dependencies have frozen copies under the working casebook's `inputs/`.
+No full captures are duplicated inside the casebook.
+
+The [input manifest](private-examples/casebook/inputs.private.json) maps historical source identities to these saved files.
+The historical fixture guide was recovered from Git with CRLF line endings. Its hash matches the original evidence.
+Current working-tree documentation wasn't substituted or changed.
+
+```powershell
+node work-items\notes\WI-052\private-examples\casebook\mine-evidence.mjs
+node work-items\notes\WI-052\private-examples\casebook\build-casebook.mjs
+node work-items\notes\WI-052\private-examples\casebook\validate-casebook.mjs
+node work-items\notes\WI-052\private-examples\casebook\verify-portability.mjs
+```
+
+The final command rebuilds with filesystem access restricted to the working casebook and shared corpus.
+It checks all sixteen source hashes and compares generated content against the unchanged archive.
+Only source links differ from the archived data. Examples, scenarios, source descriptions and selected content match.
+The [portability result](private-examples/casebook/portability-validation.private.json) records the checks.
+
+Browser checks confirmed eleven scenario buttons, working detail controls and gallery search.
+Searching for `question` showed three examples. Clearing restored all eighteen. Rendered evidence links no longer point into temporary output.
+
+Original temporary files and the archive below remain unchanged. The working casebook, its inputs and corpus stay Git-ignored.
+Whether to commit reviewed code or a synthetic version is a separate Inbox decision.
+
+## Private casebook copy, 261117
+
+The [casebook bundle](private-examples/casebook-261115-0224/) now has a private copy outside temporary output.
+All 16 original files match by relative path, byte count and SHA-256. The original bundle stayed unchanged.
+The [copy verification record](private-examples/casebook-261115-0224/copy-verification.private.json) records the source, destination and file hashes.
+
+The copy keeps the presentation, selected data, evidence manifest, scripts, template and validation results.
+It remains ignored by Git and still needs a separate private backup.
+### Link portability check, 261117
+
+The [private link audit](private-examples/casebook-261115-0224/link-portability.private.json) compares the original and copied locations.
+
+| Check | Result |
+| --- | --- |
+| Internal anchors | All 14 checked anchors resolve across the two HTML files. |
+| Copied evidence links | All 16 distinct source targets are missing at the copied location. They account for 48 link checks across both HTML files and the data. |
+| Original evidence links | All 16 targets still exist at their original locations. |
+| Source content hashes | Fifteen targets match the recorded hashes. The SDK fixture guide differs. Its README currently has uncommitted edits. |
+| Copied validator | Fails at the first missing source link. Earlier embedded-data and script/style checks passed before that assertion. |
+| Mining script | Assumes the repository root is two directories above itself. That assumption fails in the copy. |
+
+The archive keeps the embedded presentation but isn't a portable evidence bundle.
+Use the working casebook above for repaired evidence links.
+Rebasing links would restore access on this machine, but wouldn't save their targets outside temporary output.
+A portable bundle needs selected dependency copies and adapted paths. The working casebook above now has both.
+Don't rerun the archive's mining script. Reusable code hasn't been reviewed for publication or moved into tooling.
+
+A separate private backup means another protected storage location, not another folder in this checkout.
+Git doesn't back up these ignored files. Both local copies can be lost together if this drive fails.
+No separate backup destination has been chosen or checked.
+
+### Shared private frozen corpus, 261117
+
+The developer chose one shared corpus rather than duplicate complete captures inside each casebook.
+The [private corpus](private-examples/corpus/) now keeps these three existing frozen inputs:
+
+| Sample label | Recorded family | Bytes |
+| --- | --- | ---: |
+| S026 | Agent events | 29,610,189 |
+| S019 | Agent events | 53,016,742 |
+| S001 | Local journal | 700,690 |
+| **Total** | **Three captures** | **83,327,621** |
+
+These are copies of the original research run's frozen files, not new captures from live chat stores.
+The casebook describes them as captured on 261113. That isn't their conversation date or this copy's date.
+Each file matches its casebook source hash. The original files stayed unchanged.
+
+The [private corpus manifest](private-examples/corpus/manifest.private.json) records hashes, byte sizes, original locations and casebook source mappings.
+Filenames use the full SHA-256 hash plus `.jsonl`, so future tools can reuse identical content without another copy.
+Treat these captures as read-only. Add new content under its own hash instead of replacing existing files.
+
+Future tools should resolve inputs through this manifest, not hard-code the original temporary paths.
+The working casebook's input manifest maps its source identities to these hash-based corpus filenames.
+Its miner reads those mapped files, not the original temporary paths.
+Only the three JSONL dependencies live in the shared corpus. The thirteen smaller dependencies live under the working casebook's `inputs/`.
+
+The corpus is ignored by Git and isn't approved for publication. It still needs a separate private backup.
+Casebook integration is complete. Reusable-tool structure and publication remain separate decisions.
 
 ## What is kept
 
