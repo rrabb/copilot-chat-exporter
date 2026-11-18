@@ -160,7 +160,7 @@ export interface ToolNode {
 }
 
 /** Where a question to the user came from. */
-export type QuestionSource = 'ask_user' | 'vscode_askQuestions' | 'mcp-form' | 'mcp-confirmation';
+export type QuestionSource = 'ask_user' | 'vscode_askQuestions' | 'mcp-form' | 'mcp-confirmation' | 'guessed';
 
 /**
  * How the question ended. `unanswered` means no answer was recorded, which can be a skip, a cancel,
@@ -174,6 +174,8 @@ export interface QuestionOption {
   value: string;
   label: string;
   isDefault?: boolean;
+  /** Guessed records only: the tool marked this option `recommended`, which isn't a default. */
+  isRecommended?: boolean;
 }
 
 export interface QuestionAnswer {
@@ -214,6 +216,8 @@ export interface QuestionRecord {
   parseWarning?: string;
   /** MCP server label, when the question came from one. */
   server?: string;
+  /** `guessed` records only: the unrecognized tool whose fields were guessed into this layout. */
+  toolName?: string;
   /** The recorded question and answer payloads, for a fail-safe JSON view. */
   raw: { question: unknown; answer: unknown };
 }
@@ -477,6 +481,24 @@ export interface Census {
   unhandled: Array<[string, number]>;
   /** Payload kinds neither lifted into fields nor reviewed as generic. Content still renders. */
   unrecognizedToolData: Array<[string, number]>;
+  /**
+   * Questions to the user that weren't fully read: `<source>:<problem>` and count. A known question
+   * format that changed shows as `parse-warning`, and an unrecognized question tool as `guessed`.
+   */
+  questionWarnings?: Array<[string, number]>;
+  /** Where each warning came from, so a reviewer can find the box and see what was guessed. */
+  questionWarningDetails?: QuestionWarningDetail[];
+}
+
+export interface QuestionWarningDetail {
+  key: string;
+  /** 1-based top-level turn number. Questions inside a sub-agent use their parent turn. */
+  turn: number;
+  title: string;
+  /** What the exporter read or guessed, for example "2 fields, 3 options, answered". */
+  summary: string;
+  /** Top-level argument names of a guessed tool, to help write a real parser. */
+  argumentKeys: string[];
 }
 
 export interface ParsedSession {

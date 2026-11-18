@@ -14,6 +14,7 @@ import type { FenceRepairs } from './index.ts';
 import { formatExportSummary } from './export-summary.ts';
 import { getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
 import { looksLikeSessionArgument } from './session/locate.ts';
+import { questionWarningLines } from './session/questions.ts';
 import { resolveUserDataRoot } from './session/roots.ts';
 import { inventorySessions } from './session/inventory.ts';
 import { formatSessionListing, formatSessionListingHtml } from './session/listing.ts';
@@ -144,6 +145,22 @@ function printCensusReport (census: Census) {
   } else {
     console.log('- Unhandled kinds: none');
   }
+  printQuestionWarnings(census);
+}
+
+/** Questions the exporter couldn't fully read. Strict verification fails on them, like unhandled kinds. */
+function printQuestionWarnings (census: Census) {
+  const warnings = census.questionWarnings ?? [];
+  if (!warnings.length) {
+    console.log('- Questions not fully read: none');
+    return;
+  }
+  console.log(`- QUESTIONS NOT FULLY READ (strict verification fails until reviewed): ${warnings.length}`);
+  for (const [key, count] of warnings)
+    console.log(`    ${key}: ${thousands(count)} occurrence(s)`);
+  for (const line of questionWarningLines(census.questionWarningDetails ?? []))
+    console.log(`      ${line}`);
+  console.log('    The boxes still render, with a warning and the recorded data. See docs/UPGRADING.md, "Questions to the user".');
 }
 
 function printJournalCrossCheck (report: ReturnType<typeof buildJournalCrossCheck>) {
@@ -558,7 +575,14 @@ if (session.census.unhandled.length) {
   if (strictMode)
     process.exitCode = 2;
 }
-printFenceRepairs(exportFenceRepairs);
+const questionWarnings = session.census.questionWarnings ?? [];
+if (questionWarnings.length) {
+  console.log(`Questions not fully read: ${questionWarnings.map(([key, count]) => `${key}=${count}`).join(', ')}. Their boxes show a warning and the recorded data. Run --verify for details.`);
+  for (const line of questionWarningLines(session.census.questionWarningDetails ?? [], 5))
+    console.log(`  ${line}`);
+  if (strictMode)
+    process.exitCode = 2;
+}
 if (strictMode && exportFenceRepairs.early.length)
   process.exitCode = 2;
 

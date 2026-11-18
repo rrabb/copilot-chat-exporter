@@ -64,6 +64,8 @@ const censusJson = (census: Census) => ({
   seen: Object.fromEntries(census.seen),
   unhandled: Object.fromEntries(census.unhandled),
   unrecognizedToolData: Object.fromEntries(census.unrecognizedToolData),
+  questionWarnings: Object.fromEntries(census.questionWarnings ?? []),
+  questionWarningDetails: census.questionWarningDetails ?? [],
   representationCounts: census.representationCounts ?? {},
 });
 
@@ -97,6 +99,7 @@ export function buildLocalVerifyJson (input: {
   if (strict) {
     census.unhandled.length && reasons.push('unhandled-kind');
     census.unrecognizedToolData.length && reasons.push('unrecognized-tool-data');
+    census.questionWarnings?.length && reasons.push('question-not-read');
   }
   loss.failed && reasons.push('layer-d');
   strict && fenceRepairs.early.length && reasons.push('early-fence-close');
@@ -147,6 +150,7 @@ export function buildSdkVerifyJson (input: {
   input.parser.failed && reasons.push('parser-check');
   input.images?.failed && reasons.push('image-loss');
   strict && census.unhandled.length && reasons.push('unhandled-kind');
+  strict && census.questionWarnings?.length && reasons.push('question-not-read');
   loss.failed && reasons.push('layer-d');
   strict && input.fenceRepairs.early.length && reasons.push('early-fence-close');
   return {

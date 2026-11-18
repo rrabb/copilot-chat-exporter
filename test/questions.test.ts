@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseAskUser, parseCarousel, parseElicitation } from '../src/session/questions.ts';
+import { isQuestionLikeTool, parseAskUser, parseCarousel, parseElicitation, parseGuessedQuestion, questionCensus, questionWarningDetails, questionWarningLines } from '../src/session/questions.ts';
 import { buildSdkSession } from '../src/session/sdk-session.ts';
 import { parseChatSession } from '../src/session/journal.ts';
 import type { SdkEvent } from '../src/session/sdk-events.ts';
@@ -172,6 +172,34 @@ test('the decision index lists each top-level question with a link to its box', 
   });
   assert.match(output, /^\| 1 \| 1 \| \[Ship it\?\]\(#question-1\) \| Ship \|$/mu);
   assert.match(output, /^<a id="question-1"><\/a>$/mu);
+  assert.doesNotMatch(output, /question-warning/u);
+});
+
+const renderIndexOnly = (question: ReturnType<typeof parseGuessedQuestion>) => buildDocument(testSession({ turns: [testTurn({ number: 1, body: [testTool({ question })] })] }), {
+  location: { sessionId: 'a0a0a0a0-1111-4111-8111-111111111111', sessionPath: 'session.jsonl', hashRoot: '.' },
+  resources: { resources: [], byCall: new Map(), resourceRoot: '.' },
+  versions: { copilotVersion: 'unknown', vscodeVersion: 'unknown' },
+  memory: { session: [], repo: [], user: [] },
+  outputPath: 'export.md', gitStatus: '', generatedAt: '2026-01-01T00:00:00.000Z',
+});
+
+test('guessed questions get a top warning, an index marker and a bottom list linking to each box', () => {
+  const guessed = parseGuessedQuestion('ask_followup_question', { question: 'Which DB?', options: ['A', 'B'] }, done('A'));
+  const output = buildDocument(testSession({ turns: [testTurn({ number: 1, body: [testTool({ toolId: 'ask_followup_question', question: guessed })] })] }), {
+    location: { sessionId: 'a0a0a0a0-1111-4111-8111-111111111111', sessionPath: 'session.jsonl', hashRoot: '.' },
+    resources: { resources: [], byCall: new Map(), resourceRoot: '.' },
+    versions: { copilotVersion: 'unknown', vscodeVersion: 'unknown' },
+    memory: { session: [], repo: [], user: [] },
+    outputPath: 'export.md', gitStatus: '', generatedAt: '2026-01-01T00:00:00.000Z',
+  });
+  assert.match(output, /^> \*\*1 question to the user was guessed or not fully read\.\*\* .*\[See the list\]\(#question-warnings\)\.$/mu);
+  assert.match(output, /\| ℹ️ Guessed · A \|$/mu);
+  const cancelled = parseGuessedQuestion('ask_followup_question', { question: 'Go?' }, done('User cancelled'));
+  const cancelledOutput = renderIndexOnly(cancelled);
+  assert.match(cancelledOutput, /\| ℹ️ Guessed · .*Cancel/mu);
+  assert.match(output, /^<a id="question-warnings"><\/a>$/mu);
+  assert.match(output, /^1\. \[Which DB\?\]\(#question-warning-1\) · turn 1 · unrecognized tool `ask_followup_question`/mu);
+  assert.match(output, /^<a id="question-warning-1"><\/a>$/mu);
 });
 
 test('a Local MCP confirmation renders as a question box with the implied buttons and the chosen one', () => {
@@ -182,4 +210,57 @@ test('a Local MCP confirmation renders as a question box with the implied button
   assert.match(output, /^- ✅ \*\*Accept\*\* ← chosen$/mu);
   assert.match(output, /^- Reject or no answer$/mu);
   assert.doesNotMatch(output, /couldn't fully read/u);
+});
+
+test('question-like tool names are detected by whole words, and known question tools are excluded', () => {
+  for (const name of ['ask_followup_question', 'askClarifyingQuestion', 'mcp_forms_elicit', 'get_user_input', 'survey.run'])
+    assert.ok(isQuestionLikeTool(name), name);
+  for (const name of ['ask_user', 'vscode_askQuestions', 'run_task', 'mask_secrets', 'confirm_deploy', 'read_file'])
+    assert.ok(!isQuestionLikeTool(name), name);
+});
+
+test('an unrecognized question tool renders as a guessed box with its options, the chosen one and the answer', () => {
+  const question = parseGuessedQuestion('ask_followup_question', { question: 'Which **database**?', options: ['Postgres', { label: 'SQLite', recommended: true }] },
+    done('User selected: SQLite'));
+  assert.equal(question.outcome, 'answered');
+  const output = renderTool(testTool({ toolId: 'ask_followup_question', resultText: 'User selected: SQLite', question }));
+  assert.match(output, /^### ❓ Agent asked · Which \*\*database\*\*\?$/mu);
+  assert.match(output, /Unrecognized question tool `ask_followup_question`/u);
+  assert.match(output, /^- Postgres$/mu);
+  assert.match(output, /^- ✅ \*\*SQLite\*\* ⭐ \*\(recommended\)\* ← chosen$/mu);
+  assert.doesNotMatch(output, /Typed answer allowed/u);
+  assert.match(output, /<code[^>]*>ask_followup_question<\/code>/u);
+  assert.deepEqual(question.raw.answer, 'User selected: SQLite');
+  assert.match(output, /\*\*✅ You answered:\*\* SQLite/u);
+  assert.doesNotMatch(output, /couldn't fully read/u);
+});
+
+test('a guessed MCP question keeps its full tool name and claims typed answers only when the tool allows them', () => {
+  const question = parseGuessedQuestion('mcp_survey_tool', { message: 'Pick', choices: ['A', 'B'], allowFreeformInput: true }, done('A'));
+  const output = renderTool(testTool({ toolId: 'mcp_survey_tool', question }));
+  assert.match(output, /<code[^>]*>mcp_survey_tool<\/code>/u);
+  assert.match(output, /Typed answer allowed/u);
+});
+
+test('question warning details name the turn, title, what was read and the argument names', () => {
+  const guessed = parseGuessedQuestion('ask_followup_question', { question: 'Which DB?', options: ['A', 'B'] }, done('A'));
+  const turns = [testTurn({ body: [] }), testTurn({ body: [testTool({ question: guessed })] })];
+  const details = questionWarningDetails(turns);
+  assert.deepEqual(details, [{ key: 'guessed:ask_followup_question', turn: 2, title: 'Which DB?', summary: '1 field(s), 2 option(s), answered', argumentKeys: ['question', 'options'] }]);
+  assert.deepEqual(questionWarningLines(details), ['guessed:ask_followup_question · turn 2 · "Which DB?" · 1 field(s), 2 option(s), answered. Arguments: question, options']);
+});
+
+test('a guessed question with several fields keeps the whole answer as text', () => {
+  const question = parseGuessedQuestion('ask_questions', { questions: [{ header: 'Scope', options: ['A', 'B'] }, { header: 'Notes' }] }, done('Scope: A\nNotes: none'));
+  assert.equal(question.fields.length, 2);
+  const output = renderTool(testTool({ toolId: 'ask_questions', question }));
+  assert.match(output, /^### ❓ Agent asked · 2 questions: Scope, Notes$/mu);
+  assert.match(output, /\*\*✅ You answered:\*\*\n\nScope: A\nNotes: none/u);
+});
+
+test('the question census counts guessed tools and known formats that no longer parse', () => {
+  const guessed = parseGuessedQuestion('ask_followup_question', { question: 'Go?' }, done('yes'));
+  const broken = parseAskUser({ question: 'Run it?', choices: ['Yes'] }, done('Something new: 42'));
+  const turns = [testTurn({ body: [testTool({ question: guessed }), testTool({ question: broken }), testTool({})] })];
+  assert.deepEqual(questionCensus(turns), [['guessed:ask_followup_question', 1], ['ask_user:parse-warning', 1]]);
 });

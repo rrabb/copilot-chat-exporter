@@ -18,6 +18,7 @@ import type { AutoModelResolution, ParsedSession, QuestionRecord, TurnNode } fro
 import { COLLATOR, parseJson } from '../text.ts';
 import { workspacePath } from '../host.ts';
 import { collectRecordedImages } from '../images.ts';
+import { isQuestionLikeTool, parseGuessedQuestion, questionCensus, questionWarningDetails } from './questions.ts';
 import {
   GENERIC_TOOL_PAYLOAD_KINDS, HANDLED_RESPONSE_KINDS, HANDLED_TOOL_PAYLOAD_KINDS,
   GENERIC_RESPONSE_KINDS, IGNORED_RESPONSE_KINDS, classifyNode, fileOperation, thinkingText,
@@ -319,6 +320,24 @@ export function parseChatSession (
         paired.add(node.toolCallId);
       }
       paired.size && nodes.splice(0, nodes.length, ...nodes.filter((node) => !paired.has(carouselNotes.get(node) ?? '')));
+      for (const node of nodes) {
+        if (node.type !== 'tool' || node.question || !isQuestionLikeTool(node.toolId))
+          continue;
+        const payload = node.toolSpecificData as { rawInput?: unknown } | null;
+        const details = node.resultDetails as { input?: unknown } | null;
+        let args: unknown = payload?.rawInput ?? details?.input ?? node.inputText;
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args);
+          } catch {
+            args = { message: args };
+          }
+        }
+        node.question = parseGuessedQuestion(node.toolId, args, {
+          isComplete: node.isComplete, content: node.resultText, detailed: '', raw: node.resultDetails,
+          ...(node.resultError ? { error: node.resultError } : {}),
+        });
+      }
 
       const scalar: Record<string, unknown> = {};
       for (const field of SCALAR_FIELDS)
@@ -431,6 +450,8 @@ export function parseChatSession (
       unrecognizedToolData: [...census.toolData.entries()]
         .filter(([kind]) => !HANDLED_TOOL_PAYLOAD_KINDS.has(kind) && !GENERIC_TOOL_PAYLOAD_KINDS.has(kind))
         .sort((left, right) => right[1] - left[1]),
+      questionWarnings: questionCensus(turns),
+      questionWarningDetails: questionWarningDetails(turns),
     },
     editedFiles: [...editedFiles].sort((left, right) => COLLATOR.compare(left, right)),
     errors,

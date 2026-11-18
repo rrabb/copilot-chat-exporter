@@ -462,6 +462,57 @@ const ANSWER_BOX = 'border-left:6px solid #3fb950;padding:2px 12px;background:rg
 
 // Numbers each top-level question for the decision index. Set by buildDocument for one export.
 let questionNumbers = new Map<QuestionRecord, number>();
+/** Questions that were guessed or not fully read, numbered in document order, with their top-level turn. */
+let warnedQuestions = new Map<QuestionRecord, { number: number; turn: number }>();
+
+function collectWarnedQuestions (turns: readonly Turn[], detached: ReadonlyArray<{ turns: readonly Turn[] }>) {
+  const found: Array<[QuestionRecord, number]> = [];
+  const walk = (scope: readonly Turn[], parentTurn: number | null) => {
+    for (const turn of scope) {
+      for (const node of turn.body) {
+        const record = (node.type === 'tool' || node.type === 'note') ? node.question : undefined;
+        record && (record.source === 'guessed' || record.parseWarning) && found.push([record, parentTurn ?? turn.number]);
+        node.type === 'tool' && node.subagent && walk(node.subagent.turns, parentTurn ?? turn.number);
+      }
+    }
+  };
+  walk(turns, null);
+  for (const child of detached)
+    walk(child.turns, null);
+  return new Map(found.map(([record, turn], index) => [record, { number: index + 1, turn }]));
+}
+
+function questionWarningReason (record: QuestionRecord) {
+  return record.source === 'guessed'
+    ? `unrecognized tool \`${esc(record.toolName ?? '?')}\`, layout guessed from its field names`
+    : `couldn't read the ${esc(record.source)} format: ${esc(record.parseWarning ?? 'unknown format')}`;
+}
+
+// A short banner near the top, so a reader of the file alone can't miss guessed questions.
+function questionWarningBanner (): string[] {
+  if (!warnedQuestions.size)
+    return [];
+  const count = warnedQuestions.size;
+  return [
+    '> [!WARNING]',
+    `> **${count} question${count === 1 ? '' : 's'} to the user ${count === 1 ? 'was' : 'were'} guessed or not fully read.** Check ${count === 1 ? 'its box' : 'their boxes'} against the recorded data. [See the list](#question-warnings).`,
+    '',
+  ];
+}
+
+function questionWarningList (): string[] {
+  if (!warnedQuestions.size)
+    return [];
+  return [
+    '',
+    '<a id="question-warnings"></a>',
+    '',
+    '**Questions guessed or not fully read:**',
+    '',
+    ...[...warnedQuestions].map(([record, { number, turn }]) =>
+      `${number}. [${esc(clip(questionTitle(record).split('\n')[0] ?? '', 90)).replaceAll('[', '\\[').replaceAll(']', '\\]')}](#question-warning-${number}) · turn ${turn} · ${questionWarningReason(record)}`),
+  ];
+}
 
 const OUTCOME_LINES: Partial<Record<QuestionOutcome, string>> = {
   unanswered: '🚫 **No answer was recorded.** The question may have been skipped, or the response ended first.',
@@ -515,15 +566,16 @@ function answerValues (field: QuestionField): string[] {
 
 /** One line per question for the decision index. */
 function questionAnswerSummary (record: QuestionRecord) {
+  const guessed = record.source === 'guessed' ? 'ℹ️ Guessed · ' : '';
   if (record.parseWarning || record.outcome !== 'answered')
-    return OUTCOME_LABELS[record.outcome] ?? (record.parseWarning ? '⚠️ Not parsed' : record.outcome);
+    return guessed + (OUTCOME_LABELS[record.outcome] ?? (record.parseWarning ? '⚠️ Not parsed' : record.outcome));
   const parts = record.fields.flatMap((field) => {
     const values = answerValues(field);
     if (!values.length)
       return [];
     return record.fields.length > 1 ? [`${field.title}: ${values.join(', ')}`] : [values.join(', ')];
   });
-  return parts.join('; ') || OUTCOME_LABELS.unanswered!;
+  return guessed + (parts.join('; ') || clip(record.answerText.split('\n')[0] ?? '', 100) || OUTCOME_LABELS.unanswered!);
 }
 
 function renderQuestionField (field: QuestionField, record: QuestionRecord): string[] {
@@ -534,7 +586,8 @@ function renderQuestionField (field: QuestionField, record: QuestionRecord): str
   const chosen = new Set(field.answer?.selected ?? []);
   for (const option of field.options) {
     const label = esc(option.label);
-    const star = option.isDefault ? (/recommend/iu.test(option.label) ? ' ⭐' : ' ⭐ *(default)*') : '';
+    const star = option.isRecommended ? (/recommend/iu.test(option.label) ? ' ⭐' : ' ⭐ *(recommended)*')
+      : option.isDefault ? (/recommend/iu.test(option.label) ? ' ⭐' : ' ⭐ *(default)*') : '';
     lines.push(chosen.has(option.value) ? `- ✅ **${label}**${star} ← chosen` : `- ${label}${star}`);
   }
   field.options.length && field.allowFreeform && lines.push('- ✏️ *Typed answer allowed*');
@@ -545,6 +598,8 @@ function renderQuestionField (field: QuestionField, record: QuestionRecord): str
 function renderAnswerBlock (record: QuestionRecord): string[] {
   if (record.outcome !== 'answered')
     return [];
+  if (!record.fields.some((field) => field.answer) && record.answerText)
+    return [`<div style="${ANSWER_BOX}">`, '', '**✅ You answered:**', '', questionMarkdown(record.answerText), '', '</div>', ''];
   if (record.fields.length > 1) {
     const hasDefaults = record.fields.some((field) => field.options.some((option) => option.isDefault));
     const rows = record.fields.map((field) => {
@@ -574,6 +629,7 @@ function renderAnswerBlock (record: QuestionRecord): string[] {
  */
 function renderQuestion (record: QuestionRecord, recorded: string[] = [], badge = '') {
   const number = questionNumbers.get(record);
+  const warned = warnedQuestions.get(record);
   const failSafe = Boolean(record.parseWarning) || record.outcome === 'unknown';
   const ended = !['answered', 'accepted', 'unknown'].includes(record.outcome);
   const server = record.server ? ` *(from MCP server ${esc(record.server)})*` : '';
@@ -581,10 +637,12 @@ function renderQuestion (record: QuestionRecord, recorded: string[] = [], badge 
     `<div style="${ended ? QUESTION_ENDED_BOX : QUESTION_BOX}">`,
     '',
     ...(number ? [`<a id="question-${number}"></a>`, ''] : []),
+    ...(warned ? [`<a id="question-warning-${warned.number}"></a>`, ''] : []),
     `### ❓ Agent asked · ${esc(questionTitle(record))}`,
     '',
   ];
   failSafe && lines.push(`> ⚠️ **The exporter couldn't fully read this question or answer.** ${esc(record.parseWarning ?? 'The answer text has an unknown format.')} The recorded data is shown below as recorded.`, '');
+  record.source === 'guessed' && lines.push(`> ℹ️ **Unrecognized question tool \`${esc(record.toolName ?? '?')}\`.** The exporter guessed this layout from the tool's field names. Check the recorded data at the bottom of the box.`, '');
   record.message && lines.push(questionMarkdown(record.message) + server, '');
   !record.message && server && lines.push(server.trim(), '');
   for (const field of record.fields)
@@ -720,7 +778,7 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, contin
     Object.keys(detailsSource).length && body.push(`<details><summary>${mutedSummary('⚙️ Tool details')}</summary>`, '', ...indentBlock([fence.open, json, fence.close], NESTED_INDENT), '', '</details>', '');
   }
   if (question)
-    return renderQuestion(question, body, `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: `);
+    return renderQuestion(question, body, `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(question.source === 'guessed' ? String(node.toolId ?? 'tool') : toolFriendly(node.toolId))}</code>: `);
   return [
     `<details><summary>${mutedSummary(head)}</summary>`,
     '<div aria-hidden="true" style="height:0.35rem"></div>',
@@ -1388,6 +1446,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     `[recorded image saved separately; SHA-256 ${createHash('sha256').update(image.bytes!).digest('hex').slice(0, 12)}]`,
   ])).entries()].map(([encoded, label]) => ({ encoded, label }));
   questionNumbers = new Map(topLevelQuestions(session.turns).map(({ record }, index) => [record, index + 1]));
+  warnedQuestions = collectWarnedQuestions(session.turns, session.detachedSubagents ?? []);
   try {
     return buildDocumentBody(session, context);
   } finally {
@@ -1395,6 +1454,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     fenceRepairs = null;
     imageReplacements = [];
     questionNumbers = new Map();
+    warnedQuestions = new Map();
   }
 }
 
@@ -1526,6 +1586,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     ...turns.map((turn) => `${turn.number}. 🔷 [Q${turn.number}: ${clip(turn.prompt, 130).replaceAll('[', '\\[').replaceAll(']', '\\]')}](${userMessageHref(turn.number)}) - ${isoTimestamp(turn.ts).slice(0, 10)}`),
     '',
     ...decisionIndex(turns),
+    ...questionWarningBanner(),
     backToContents(),
     '',
     sectionAnchor(MARK.sectionCostTiming),
@@ -1719,6 +1780,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       : '- Reasoning shown is the journal\'s recorded `thinking` text (the agent\'s own notes); no hidden model chain-of-thought is reconstructed.',
     ...(sdk ? [] : [`- Parse validated against: ${VALIDATED_AGAINST}.`]),
     ...session.errors.map((error) => `- Parse warning: ${redact(error)}`),
+    ...questionWarningList(),
     ...(session.census.unhandled.length
       ? [
         '',

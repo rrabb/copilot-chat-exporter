@@ -5,6 +5,7 @@ import { writeArchive } from './archive-writer.ts';
 import { createHostContext, resolveOutputPath, setWorkspaceRoot, workspacePath } from './host.ts';
 import { formatExportSummary } from './export-summary.ts';
 import { inventorySessions } from './session/inventory.ts';
+import { questionWarningLines } from './session/questions.ts';
 import { readSdkScope, readUsageForSource, renderSdkExport, selectSdkSession } from './session/sdk-export.ts';
 import type { SdkExport } from './session/sdk-export.ts';
 import { buildSdkLossAccount } from './verify/sdk-loss-account.ts';
@@ -194,6 +195,10 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     left && console.log(`Left out (counted, not exported): ${left}.`);
     const drift = result.session.census.unhandled;
     drift.length && console.log(`Schema drift: ${drift.length} unhandled SDK event type(s) - ${drift.map(([kind, count]) => `${kind}=${count}`).join(', ')}.`);
+    const questionWarnings = result.session.census.questionWarnings ?? [];
+    questionWarnings.length && console.log(`Questions not fully read: ${questionWarnings.map(([key, count]) => `${key}=${count}`).join(', ')}. Their boxes show a warning and the recorded data.`);
+    for (const line of questionWarningLines(result.session.census.questionWarningDetails ?? [], 5))
+      console.log(`  ${line}`);
     return exitCode;
   } catch (error) {
     console.error(errorLabel(error));
@@ -220,6 +225,10 @@ async function verifyReport (preview: SdkExport, strict: boolean, json: boolean,
   drift.length
     ? console.log(`- UNHANDLED event types: ${drift.map(([kind, count]) => `${kind}=${count}`).join(', ')}`)
     : console.log('- Unhandled event types: none');
+  const questionWarnings = preview.session.census.questionWarnings ?? [];
+  console.log(`- Questions not fully read: ${questionWarnings.map(([key, count]) => `${key}=${count}`).join(', ') || 'none'}${questionWarnings.length ? ' (fails --strict; see docs/UPGRADING.md, "Questions to the user")' : ''}`);
+  for (const line of questionWarningLines(preview.session.census.questionWarningDetails ?? []))
+    console.log(`    ${line}`);
   console.log(`- Left out on purpose: ${[...preview.leftOut].map(([name, count]) => `${name} ${count}`).join('; ') || 'nothing'}`);
   printLossAccount(account, savedArchive ? 'the given file and its linked companions' : 'the Markdown this build would write');
   console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved, ${images.referenceOnly} reference-only.`);

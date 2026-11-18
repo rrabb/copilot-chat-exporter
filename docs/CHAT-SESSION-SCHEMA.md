@@ -675,6 +675,7 @@ observed example is not the same as a promise that the kind will remain unchange
 - Typed answers can span several lines (seen here).
 - A real-corpus run on 261117 parsed 654 of 654 `ask_user` answers and 69 of 69 unique carousels with no warnings.
 - The agent `user_input.*` and `elicitation.*` events are never written to disk (documented in the SDK streaming-events reference).
+- **Unrecognized question tools:** a tool name with a question word gets a best-effort `guessed` record from common field names (WI-069). The census counts these, and parse warnings, in `questionWarnings`.
 
 ### `autoModeResolution`
 

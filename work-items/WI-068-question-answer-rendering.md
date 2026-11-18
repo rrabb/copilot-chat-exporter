@@ -145,6 +145,20 @@ Rejected: Mockup A alone (alert callout) and Mockup B alone (heading and rules).
 - Full verification passed with 800 of 800 tests before acceptance.
 - Real MCP elicitation and `ask_user` cancellation records remain unverified.
 
+### Known limits
+
+Some questions render from a guess, because the format isn't documented and no real sample exists here. Each guess shows the recorded data, so nothing is lost. [WI-069](WI-069-question-drift-and-unknown-tools.md) reports drift, and [WI-070](../work-log.md#wi-070) collects real samples.
+
+| Area | What's guessed | Evidence |
+| --- | --- | --- |
+| Local `elicitationSerialized` (MCP confirmation) | Whole layout. The Accept and Reject buttons are implied. "Rejected" can also mean "never answered". | Inferred from VS Code source. No real sample, and no online docs. |
+| Local MCP form (`questionCarousel` without a tool call) | The layout. The original field names are lost. | Inferred from VS Code source. No real sample. |
+| `ask_user` declined or cancelled | Inferred from words in the result text. The real text isn't known. | Only a third-party fixture shows "User cancelled". 0 of 343 calls here were declined. |
+| `ask_user` failure | Rendered as failed, but 1 failure seen in Phase 1 didn't show up in Phase 2 | Not investigated |
+| Password answers | Shown as hidden, because VS Code masks them | Inferred from source |
+| Agent `user_input.*` and `elicitation.*` events | Not exported. They're never written to disk. | Documented in the SDK |
+| A new question tool | A best-effort box from field names ([WI-069](WI-069-question-drift-and-unknown-tools.md)) | Built 261118 |
+
 ### Record design (approved 261117)
 
 - A shared `QuestionRecord` holds the source, message, fields, options, answers, outcome, the raw recorded answer and the raw record.

@@ -350,6 +350,23 @@ Not everything is a new kind. Match the symptom to the owner:
 
 Unknown response kinds now stay in order as collapsed, redacted JSON instead of disappearing. Keep strict verification failing while the kind is unreviewed. Add a semantic renderer, add a reviewed kind to `GENERIC_RESPONSE_KINDS` if JSON is sufficient, or add it to the ignored list only after confirming that it carries no needed content.
 
+## Questions to the user
+
+Questions get a special box (SPEC 5.1). When their format drifts, `--verify` lists "Questions not fully read", one line per question with its turn, title and argument names. `--strict` fails with `question-not-read`.
+
+| What changed | What you see | What to do |
+|---|---|---|
+| A handled question format changed | A ⚠️ box with the raw data, plus a `<source>:parse-warning` entry | Update the parser in `session/questions.ts` |
+| A new tool with a question word in its name | A guessed box with an ℹ️ line, plus a `guessed:<tool>` entry | Add a parser and the name to `KNOWN_QUESTION_TOOLS` |
+| A new question tool with no question word | An ordinary tool line, no warning | Known limit. Add the name to `KNOWN_QUESTION_TOOLS` when you find it |
+
+To add support:
+
+1. Add a parser in `session/questions.ts`.
+2. Add the tool name to `KNOWN_QUESTION_TOOLS`.
+3. Wire it in `session/sdk-session.ts` or `session/journal.ts`.
+4. Add a test in `test/questions.test.ts`, then run `pnpm run verify`.
+
 ## Traps that have actually bitten people here
 
 - **`transcripts/<id>.jsonl` is not the journal.** It is a different schema in the same folder

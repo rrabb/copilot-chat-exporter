@@ -443,6 +443,9 @@ A question the agent or an MCP server asked the user steers the rest of the chat
 - **Record:** a collapsed `🧾 Recorded question and answer` block holds the raw JSON and the tool's usual input and result blocks. Its summary keeps the 🛠️ tool badge.
 - **Fail-safe:** when an answer can't be parsed, the box shows a warning, the recorded answer text and the raw JSON in the open. The answer is never dropped.
 - **Duplicates:** a carousel note paired with its tool call isn't rendered again.
+- **Unrecognized question tools (WI-069):** a tool whose name has a question word (ask, question, elicit, choice, clarify, poll, survey, "user input") but no parser gets a best-effort box from its field names. An ℹ️ line says the layout was guessed.
+- **Drift reporting:** `--verify` lists questions that weren't fully read: parse warnings and guessed tools. `--strict` fails on them with the reason `question-not-read`. In the export, a `[!WARNING]` line under the decision index gives the count and links to a list in the "about this export" section. Each list item links to its box (`#question-warning-N`), and the index marks every guessed question "ℹ️ Guessed", whatever its outcome.
+- **Unverified:** the MCP confirmation and MCP form layouts, and `ask_user` decline and cancel wording, come from source or guesses, not real samples. See WI-068 "Known limits".
 
 ## 6. Formatting and visual design system
 
