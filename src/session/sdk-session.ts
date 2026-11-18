@@ -21,6 +21,7 @@ import type { SdkEvent } from './sdk-events.ts';
 import { fusionNote } from './sdk-fusion.ts';
 import { eventNote } from './sdk-event-notes.ts';
 import { parseUsageRecords } from './sdk-usage-record.ts';
+import { parseAskUser } from './questions.ts';
 import type { SdkEventSource } from './sources.ts';
 
 /** Event types left out of the export on purpose, with the group name shown in the omission line. */
@@ -120,6 +121,7 @@ export function argumentsText (value: unknown, indent = ''): string {
 }
 
 function applyArguments (node: ToolNode, args: unknown, name: string): void {
+  name === 'ask_user' && (node.question = parseAskUser(args, { isComplete: false, content: '', detailed: '' }));
   if (!isRecord(args)) {
     args !== undefined && args !== null && (node.inputText = argumentsText(args).trim());
     return;
@@ -385,6 +387,10 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
           const message = `${failure || 'The tool reported failure.'}${isRecord(data.error) && text(data.error.code) ? ` (code ${text(data.error.code)})` : ''}`;
           node.resultText = node.resultText ? `${node.resultText}\n\n[tool error] ${message}` : `[tool error] ${message}`;
         }
+        node.question && (node.question = parseAskUser(node.question.raw.question, {
+          isComplete: true, content, detailed, raw: { success: data.success, result: data.result, error: data.error },
+          ...(typeof data.success === 'boolean' ? { success: data.success } : {}), ...(failure ? { error: failure } : {}),
+        }));
         break;
       }
       case 'session.model_change':

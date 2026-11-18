@@ -22,7 +22,7 @@ import { sourceCopyNotice } from './session/source-snapshot.ts';
 import { sumKnown, sumUsageFigures } from './session/usage-figures.ts';
 import { exporterCommit, exporterVersion } from './version.ts';
 import type { SourceCopy } from './session/source-snapshot.ts';
-import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
+import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, QuestionField, QuestionOutcome, QuestionRecord, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
@@ -454,6 +454,176 @@ function renderSubagent (node: ToolNode, byCall: Map<string, Resource[]>) {
   ];
 }
 
+// --- questions to the user ---
+
+const QUESTION_BOX = 'border:1px solid #d29922;border-left:8px solid #d29922;border-radius:6px;padding:4px 16px;margin:12px 0;background:rgba(210,153,34,0.08)';
+const QUESTION_ENDED_BOX = 'border:1px solid #f85149;border-left:8px solid #f85149;border-radius:6px;padding:4px 16px;margin:12px 0;background:rgba(248,81,73,0.08)';
+const ANSWER_BOX = 'border-left:6px solid #3fb950;padding:2px 12px;background:rgba(63,185,80,0.10)';
+
+// Numbers each top-level question for the decision index. Set by buildDocument for one export.
+let questionNumbers = new Map<QuestionRecord, number>();
+
+const OUTCOME_LINES: Partial<Record<QuestionOutcome, string>> = {
+  unanswered: '🚫 **No answer was recorded.** The question may have been skipped, or the response ended first.',
+  declined: '🚫 **Declined.** The question was closed without an answer (inferred from the recorded wording).',
+  cancelled: '🚫 **Cancelled.** The question was cancelled before an answer (inferred from the recorded wording).',
+  rejected: '🚫 **Rejected or not answered.** VS Code saves a request that was still waiting as rejected.',
+  accepted: '✅ **Accepted.**',
+};
+
+const OUTCOME_LABELS: Partial<Record<QuestionOutcome, string>> = {
+  unanswered: '🚫 No answer', declined: '🚫 Declined', cancelled: '🚫 Cancelled', rejected: '🚫 Rejected',
+  accepted: '✅ Accepted', failed: '⚠️ Failed', unknown: '⚠️ Not parsed',
+};
+
+// Agent headings would compete with the question heading in the outline, so they move below it.
+function demoteHeadings (markdown: string) {
+  let inFence = false;
+  return markdown.split('\n').map((line) => {
+    if (/^\s*(?:```|~~~)/u.test(line))
+      inFence = !inFence;
+    return inFence ? line : line.replace(/^(#{1,6})(?=\s)/u, (hashes) => '#'.repeat(Math.min(6, hashes.length + 3)));
+  }).join('\n');
+}
+
+function questionMarkdown (markdown: string) {
+  return closeUnbalancedFences(neutralizeStructuralHtml(redact(demoteHeadings(markdown))));
+}
+
+const tableCell = (value: string) => esc(value).replaceAll('|', '\\|');
+
+function questionTitle (record: QuestionRecord) {
+  const single = record.fields.length === 1 ? record.fields[0]!.title : '';
+  const many = record.fields.length > 1 ? `${record.fields.length} questions: ${record.fields.map((field) => field.title || field.id).join(', ')}` : '';
+  const firstLine = stripMarkdown(record.message).split('\n').find((line) => line.trim())?.replace(/^(.{20,}?[.?!:])\s.*$/u, '$1') ?? '';
+  const fallback = record.source === 'mcp-confirmation' ? 'MCP confirmation' : 'Question';
+  return clip(record.title || single || firstLine || many || fallback, 100);
+}
+
+function selectedLabels (field: QuestionField): string[] {
+  return (field.answer?.selected ?? []).map((value) => field.options.find((option) => option.value === value)?.label || value);
+}
+
+function answerValues (field: QuestionField): string[] {
+  const answer = field.answer;
+  if (!answer)
+    return [];
+  if (answer.masked)
+    return ['🔒 hidden by the recorder'];
+  return answer.freeform ? [...selectedLabels(field), answer.freeform] : selectedLabels(field);
+}
+
+/** One line per question for the decision index. */
+function questionAnswerSummary (record: QuestionRecord) {
+  if (record.parseWarning || record.outcome !== 'answered')
+    return OUTCOME_LABELS[record.outcome] ?? (record.parseWarning ? '⚠️ Not parsed' : record.outcome);
+  const parts = record.fields.flatMap((field) => {
+    const values = answerValues(field);
+    if (!values.length)
+      return [];
+    return record.fields.length > 1 ? [`${field.title}: ${values.join(', ')}`] : [values.join(', ')];
+  });
+  return parts.join('; ') || OUTCOME_LABELS.unanswered!;
+}
+
+function renderQuestionField (field: QuestionField, record: QuestionRecord): string[] {
+  const lines: string[] = [];
+  const titled = record.fields.length > 1 || (field.title && field.title !== questionTitle(record) && field.title !== record.message);
+  titled && field.title && lines.push(`**${esc(field.title)}**`, '');
+  field.message && field.message !== record.message && lines.push(questionMarkdown(field.message), '');
+  const chosen = new Set(field.answer?.selected ?? []);
+  for (const option of field.options) {
+    const label = esc(option.label);
+    const star = option.isDefault ? (/recommend/iu.test(option.label) ? ' ⭐' : ' ⭐ *(default)*') : '';
+    lines.push(chosen.has(option.value) ? `- ✅ **${label}**${star} ← chosen` : `- ${label}${star}`);
+  }
+  field.options.length && field.allowFreeform && lines.push('- ✏️ *Typed answer allowed*');
+  field.options.length && lines.push('');
+  return lines;
+}
+
+function renderAnswerBlock (record: QuestionRecord): string[] {
+  if (record.outcome !== 'answered')
+    return [];
+  if (record.fields.length > 1) {
+    const hasDefaults = record.fields.some((field) => field.options.some((option) => option.isDefault));
+    const rows = record.fields.map((field) => {
+      const values = answerValues(field);
+      const defaults = field.options.filter((option) => option.isDefault).map((option) => option.label).join(', ');
+      const answer = values.length ? `**${tableCell(values.join(', '))}**` : '*(left blank)*';
+      return `| ${tableCell(field.title || field.id)} | ${answer} |${hasDefaults ? ` ${tableCell(defaults) || ' '} |` : ''}`;
+    });
+    const header = hasDefaults ? ['| Question | Your answer | Default |', '| --- | --- | --- |'] : ['| Question | Your answer |', '| --- | --- |'];
+    return [`<div style="${ANSWER_BOX}">`, '', '**✅ You answered:**', '', ...header, ...rows, '', '</div>', ''];
+  }
+  const field = record.fields[0];
+  const answer = field?.answer;
+  if (!field || !answer)
+    return [];
+  const labels = answer.masked ? answerValues(field) : selectedLabels(field);
+  const lines = [`<div style="${ANSWER_BOX}">`, ''];
+  labels.length && lines.push(`**✅ You answered:** ${esc(labels.join(', '))}`, '');
+  answer.freeform && !answer.masked && lines.push(`**✅ You answered${field.options.length ? ' (typed)' : ''}:**`, '', questionMarkdown(answer.freeform), '');
+  return [...lines, '</div>', ''];
+}
+
+/**
+ * The question box: a never-collapsed bordered block with a real heading, the agent's Markdown, the
+ * options and the answer. When parsing failed it still draws attention and shows the recorded data.
+ * `recorded` holds the call's usual input and result blocks, kept collapsed at the bottom.
+ */
+function renderQuestion (record: QuestionRecord, recorded: string[] = [], badge = '') {
+  const number = questionNumbers.get(record);
+  const failSafe = Boolean(record.parseWarning) || record.outcome === 'unknown';
+  const ended = !['answered', 'accepted', 'unknown'].includes(record.outcome);
+  const server = record.server ? ` *(from MCP server ${esc(record.server)})*` : '';
+  const lines = [
+    `<div style="${ended ? QUESTION_ENDED_BOX : QUESTION_BOX}">`,
+    '',
+    ...(number ? [`<a id="question-${number}"></a>`, ''] : []),
+    `### ❓ Agent asked · ${esc(questionTitle(record))}`,
+    '',
+  ];
+  failSafe && lines.push(`> ⚠️ **The exporter couldn't fully read this question or answer.** ${esc(record.parseWarning ?? 'The answer text has an unknown format.')} The recorded data is shown below as recorded.`, '');
+  record.message && lines.push(questionMarkdown(record.message) + server, '');
+  !record.message && server && lines.push(server.trim(), '');
+  for (const field of record.fields)
+    lines.push(...renderQuestionField(field, record));
+  if (record.source === 'mcp-confirmation') {
+    // VS Code keeps only the final state, so the two buttons are implied rather than recorded.
+    const mark = (chosen: boolean, label: string) => chosen ? `- ✅ **${label}** ← chosen` : `- ${label}`;
+    lines.push(mark(record.outcome === 'accepted', 'Accept'), mark(record.outcome === 'rejected', 'Reject or no answer'), '');
+  }
+  if (failSafe) {
+    if (record.answerText) {
+      const answer = redact(record.answerText);
+      const fence = fenceFor(answer, 'text');
+      lines.push('**Recorded answer text:**', '', fence.open, answer, fence.close, '');
+    }
+    const json = redact(JSON.stringify(record.raw, null, 2));
+    const fence = fenceFor(json, 'json');
+    lines.push('**Recorded question and answer:**', '', fence.open, json, fence.close, '');
+  } else
+    lines.push(...renderAnswerBlock(record));
+  const outcome = record.outcome === 'failed' ? `⚠️ **The question failed:** ${esc(record.answerText || 'no reason recorded')}` : OUTCOME_LINES[record.outcome];
+  outcome && lines.push(outcome, '');
+  const json = redact(JSON.stringify(record.raw, null, 2));
+  const fence = fenceFor(json, 'json');
+  const body = [...(failSafe ? [] : ['**Recorded question and answer:**', '', fence.open, json, fence.close, '']), ...recorded];
+  if (!body.length)
+    return [...lines, ...(badge ? [`- ${mutedSummary(`${badge}no input or output was recorded`)}`, ''] : []), '</div>'];
+  lines.push(
+    `<details><summary>${mutedSummary(`${badge}🧾 Recorded question and answer`)}</summary>`,
+    '',
+    ...indentBlock(body, NESTED_INDENT),
+    '',
+    '</details>',
+    '',
+    '</div>',
+  );
+  return lines;
+}
+
 function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, continuation = false) {
   if (node.subagent)
     return renderSubagent(node, byCall);
@@ -469,8 +639,9 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, contin
   const hasDetails = node.toolSpecificData && node.toolSpecificData.kind !== 'terminal' && node.toolSpecificData.kind !== 'todoList';
   const resultDetails = unrenderedResultDetails(node);
   const hasBody = continuation || node.images?.length || node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
+  const question = continuation ? undefined : node.question;
   // Nothing to expand: render a plain line rather than an empty collapsible.
-  if (!hasBody)
+  if (!hasBody && !question)
     return [`- ${mutedSummary(node.noRecordedContent
       ? `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: No message, input or output was recorded.`
       : head)}`];
@@ -548,6 +719,8 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, contin
     const fence = fenceFor(json, 'json');
     Object.keys(detailsSource).length && body.push(`<details><summary>${mutedSummary('⚙️ Tool details')}</summary>`, '', ...indentBlock([fence.open, json, fence.close], NESTED_INDENT), '', '</details>', '');
   }
+  if (question)
+    return renderQuestion(question, body, `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: `);
   return [
     `<details><summary>${mutedSummary(head)}</summary>`,
     '<div aria-hidden="true" style="height:0.35rem"></div>',
@@ -560,6 +733,8 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, contin
 
 // A recorded event that is not prose, reasoning or a tool call. One line when it has no body.
 function renderNote (node: NoteNode) {
+  if (node.question)
+    return renderQuestion(node.question);
   const link = node.link ? ` - [${esc(node.link.label)}](${node.link.href.replaceAll(' ', '%20')})` : '';
   const image = [...(node.image ? [`![${esc(node.image.alt)}](${node.image.href.replaceAll(' ', '%20')})`, ''] : []), ...renderImages(node.images)];
   if (!node.text)
@@ -1212,13 +1387,36 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
     Buffer.from(image.bytes!).toString('base64'),
     `[recorded image saved separately; SHA-256 ${createHash('sha256').update(image.bytes!).digest('hex').slice(0, 12)}]`,
   ])).entries()].map(([encoded, label]) => ({ encoded, label }));
+  questionNumbers = new Map(topLevelQuestions(session.turns).map(({ record }, index) => [record, index + 1]));
   try {
     return buildDocumentBody(session, context);
   } finally {
     overflow = null;
     fenceRepairs = null;
     imageReplacements = [];
+    questionNumbers = new Map();
   }
+}
+
+function topLevelQuestions (turns: readonly Turn[]) {
+  return turns.flatMap((turn) => turn.body.flatMap((node) =>
+    (node.type === 'tool' || node.type === 'note') && node.question ? [{ turn: turn.number, record: node.question }] : []));
+}
+
+// Questions steer the rest of a chat, so the export lists every question and its answer up front.
+function decisionIndex (turns: readonly Turn[]): string[] {
+  const questions = topLevelQuestions(turns);
+  if (!questions.length)
+    return [];
+  return [
+    '### ❓ Agent questions and your answers',
+    '',
+    '| # | Turn | Question | Answer |',
+    '| ---: | ---: | --- | --- |',
+    ...questions.map(({ turn, record }, index) =>
+      `| ${index + 1} | ${turn} | [${tableCell(questionTitle(record)).replaceAll('[', '\\[').replaceAll(']', '\\]')}](#question-${index + 1}) | ${tableCell(clip(questionAnswerSummary(record), 100))} |`),
+    '',
+  ];
 }
 
 function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
@@ -1327,6 +1525,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     '',
     ...turns.map((turn) => `${turn.number}. 🔷 [Q${turn.number}: ${clip(turn.prompt, 130).replaceAll('[', '\\[').replaceAll(']', '\\]')}](${userMessageHref(turn.number)}) - ${isoTimestamp(turn.ts).slice(0, 10)}`),
     '',
+    ...decisionIndex(turns),
     backToContents(),
     '',
     sectionAnchor(MARK.sectionCostTiming),

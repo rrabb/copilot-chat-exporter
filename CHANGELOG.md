@@ -16,6 +16,7 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- Questions to the user render as open, never-collapsed boxes with the chosen option and the answer, plus a decision index near the top. Covers agent `ask_user`, Local question carousels, MCP forms and MCP confirmations (`elicitationSerialized`). **Local exports now show the user's answer**, which was dropped before. Raw records stay in a collapsed block (WI-068).
 - Seven reviewed Fusion families render as ordered readable notes, including failed-phase errors and degradation metadata. **Selected rule ID** stays distinct from **Rule ID**. Unknown fields and versions are diagnosed.
 - Instruction updates, mode notices and retries keep reviewed content/metadata. Retry catalogs retain identity/provider, availability/endpoints, capabilities and configured billing groups without catalog/retry deduplication. Configuration never adds charges or proves producer execution.
 - Six websocket fallback fields are retained as typed receipt telemetry, not a new full per-call Markdown archive.

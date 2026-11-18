@@ -14,7 +14,7 @@
 //   - the journal re-emits a tool call each time its status changes, so later copies are merged
 //     into the first, which is the order the chat displayed.
 
-import type { AutoModelResolution, ParsedSession } from '../types.ts';
+import type { AutoModelResolution, ParsedSession, QuestionRecord, TurnNode } from '../types.ts';
 import { COLLATOR, parseJson } from '../text.ts';
 import { workspacePath } from '../host.ts';
 import { collectRecordedImages } from '../images.ts';
@@ -259,6 +259,8 @@ export function parseChatSession (
       const nodes = [];
       const autoModelResolutions: AutoModelResolution[] = [];
       const toolNodesById = new Map();
+      const carousels = new Map<string, QuestionRecord>();
+      const carouselNotes = new Map<TurnNode, string>();
       for (const item of Array.isArray(request?.response) ? request.response : [])
         for (const leaf of flattenItems(item)) {
           const produced = classifyNode(leaf);
@@ -267,6 +269,14 @@ export function parseChatSession (
           const classified = Array.isArray(produced) ? produced : (produced ? [produced] : []);
           const kind = typeof leaf.kind === 'string' ? leaf.kind : (classified.length ? '(implicit text)' : '(no kind or value)');
           tally(census.seen, kind);
+          const resolveId = kind === 'questionCarousel' && typeof leaf.resolveId === 'string' ? leaf.resolveId : '';
+          for (const node of classified) {
+            if (!resolveId || node.type !== 'note' || !node.question)
+              continue;
+            carouselNotes.set(node, resolveId);
+            const earlier = carousels.get(resolveId);
+            (!earlier || earlier.outcome === 'unanswered') && carousels.set(resolveId, node.question);
+          }
           if (typeof leaf.toolSpecificData?.kind === 'string')
             tally(census.toolData, leaf.toolSpecificData.kind);
           if (!classified.length) {
@@ -299,6 +309,16 @@ export function parseChatSession (
             nodes.push(node);
           }
         }
+      // A vscode_askQuestions call's answers live in a separate carousel part keyed by its call id.
+      // The paired call renders the question, so its carousel notes are dropped.
+      const paired = new Set<string>();
+      for (const node of nodes) {
+        if (node.type !== 'tool' || node.toolId !== 'vscode_askQuestions' || !carousels.has(node.toolCallId))
+          continue;
+        node.question = carousels.get(node.toolCallId);
+        paired.add(node.toolCallId);
+      }
+      paired.size && nodes.splice(0, nodes.length, ...nodes.filter((node) => !paired.has(carouselNotes.get(node) ?? '')));
 
       const scalar: Record<string, unknown> = {};
       for (const field of SCALAR_FIELDS)

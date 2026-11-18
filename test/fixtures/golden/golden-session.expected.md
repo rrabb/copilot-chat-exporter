@@ -55,6 +55,12 @@
 9. 🔷 [Q9: Confirm the repeated call from the next turn.](#user-message-9) - 2023-11-14
 10. 🔷 [Q10: Rename one file, delete another, create a third.](#user-message-10) - 2023-11-14
 
+### ❓ Agent questions and your answers
+
+| # | Turn | Question | Answer |
+| ---: | ---: | --- | --- |
+| 1 | 10 | [Delivery scope](#question-1) | 🚫 No answer |
+
 <div align="right"><a href="#contents">⬆️ Back to Contents</a></div>
 
 <a id="cost-and-timing-summary"></a>
@@ -932,20 +938,54 @@ Copilot has been working on this for a while.
 </details>
 
 
-<details><summary><sub><span style="color:#7d8590;font-weight:400">Copilot questions</span></sub></summary>
+<div style="border:1px solid #f85149;border-left:8px solid #f85149;border-radius:6px;padding:4px 16px;margin:12px 0;background:rgba(248,81,73,0.08)">
+
+<a id="question-1"></a>
+
+### ❓ Agent asked · Delivery scope
+
+Which option do you want?
+
+- Option A
+
+🚫 **No answer was recorded.** The question may have been skipped, or the response ended first.
+
+<details><summary><sub><span style="color:#7d8590;font-weight:400">🧾 Recorded question and answer</span></sub></summary>
 
 <div style="margin-left:1em">
 
-```text
-Delivery scope
-Which option do you want?
-- Option A
+**Recorded question and answer:**
+
+```json
+{
+  "question": {
+    "kind": "questionCarousel",
+    "questions": [
+      {
+        "id": "golden_carousel:0",
+        "type": "singleSelect",
+        "title": "Delivery scope",
+        "message": "Which option do you want?",
+        "options": [
+          {
+            "id": "opt-a",
+            "label": "Option A",
+            "value": "Option A"
+          }
+        ]
+      }
+    ]
+  },
+  "answer": null
+}
 ```
+
 
 </div>
 
 </details>
 
+</div>
 
 <div style="border-left:3px solid #1f6feb;padding-left:14px;margin:10px 0;font-size:1.06em;line-height:1.6">
 

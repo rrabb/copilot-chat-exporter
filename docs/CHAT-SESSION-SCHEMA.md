@@ -617,7 +617,7 @@ fixture:
 | `inlineReference` | reduce URI/reference to a readable label | `RefNode` |
 | `textEditGroup` | read edited URI | `EditNode` |
 | `workspaceEdit` | one item can produce several file operations | multiple `EditNode`s |
-| `questionCarousel` | currently deliberately ignored | census only |
+| `questionCarousel` | render questions and options as a note. Since 261117 also parse answers and attach them to the paired `vscode_askQuestions` call (see below). | `NoteNode`, plus `ToolNode.question` |
 | `confirmation` | currently deliberately ignored | census only |
 | `progressMessage` | currently deliberately ignored | census only |
 | `progressTaskSerialized` | currently deliberately ignored | census only |
@@ -646,17 +646,35 @@ Current VS Code source permits these additional named kinds in a serialized resp
 | Text and status | `markdownVuln`, `warning`, `info`, `systemNotification`, `command` |
 | Structured views | `treeData`, `multiDiffData`, `extensions`, `pullRequest`, `planReview` |
 | Editing and control | `notebookEditGroup`, `externalEdit`, `clearToPreviousToolInvocation` |
-| Agent and model state | `hook`, `elicitationSerialized`, `disabledClaudeHooks` |
+| Agent and model state | `hook`, `disabledClaudeHooks` |
 
 These names stay in `KNOWN_UNSEEN_KINDS`, not `IGNORED_RESPONSE_KINDS`. If one reaches a real
 journal, the census still reports it and strict mode fails until its archive behavior is reviewed.
 `autoModeResolution` used to be in this list. It is now observed and handled, see below.
+`elicitationSerialized` left this list on 261117 (WI-068). It's handled from the VS Code source fields alone (`chatService.ts:622-661`: `title`, `message`, `subtitle`, `source`, `state`, `isHidden`, `acceptedResult`), with no real sample yet.
 Active-only kinds such as `toolInvocation`, `elicitation2`, `progressTask`, and `voiceProgress` are
 not part of the normal serialized union. `disabledClaudeHooks` is a compatibility exception that
 the serialized response-part type admits explicitly.
 
 That difference is expected. A declaration is not the same as an observed journal example, and an
 observed example is not the same as a promise that the kind will remain unchanged.
+
+### Questions to the user and their answers
+
+`src/session/questions.ts` parses every question the agent asked into a `QuestionRecord` (WI-068). Each record keeps the recorded payloads in `raw` and the recorded answer in `answerText`. When an answer doesn't match a known format, it sets `parseWarning` and guesses nothing.
+
+| Record | Where the answer is | Parsing rule (observed here 261117 unless marked) |
+|---|---|---|
+| Agent `ask_user`, `{ message, requestedSchema }` | `result.detailedContent`, then `result.content` | `User responded:` then one `<title or key>: <value>` line per answered field. Content fallback: `User responded: key=value, key=value`. Values match an option's `const` (195 seen) or `title` (2 seen). Anything else is freeform. |
+| Agent `ask_user`, `{ question, choices }` | `result.content` | `User selected: <choice>` or `User responded: <typed text>` |
+| Local `questionCarousel` | `data[<question id>]` | Question ids are `<resolveId>:<index>`, and `resolveId` equals the `vscode_askQuestions` `toolCallId`. Values: `selectedValue`, `selectedValues`, `freeformValue`, or a plain string. The journal can hold earlier unanswered copies, so the answered copy wins. |
+| Local `elicitationSerialized` | `state` | `accepted` or `rejected`. VS Code also saves a pending request as `rejected` (inferred from source, not seen here). |
+
+- Multi-select answers are joined with `, `, and options can contain commas. The parser matches whole options, longest first.
+- A field missing from the answer was left blank. Optional text fields often are.
+- Typed answers can span several lines (seen here).
+- A real-corpus run on 261117 parsed 654 of 654 `ask_user` answers and 69 of 69 unique carousels with no warnings.
+- The agent `user_input.*` and `elicitation.*` events are never written to disk (documented in the SDK streaming-events reference).
 
 ### `autoModeResolution`
 

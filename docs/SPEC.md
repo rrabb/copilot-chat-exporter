@@ -322,6 +322,7 @@ Top-to-bottom. Each `##` section ends with a right-aligned "Back to Contents" li
 3. `<a id="contents"></a> ## Contents` - numbered links to the 9 sections below.
 4. `## User Questions and Requests` - numbered list, one line per turn:
    `N. 🔷 [Q<N>: <clipped prompt, brackets escaped>](#user-message-N) - YYYY-MM-DD`.
+   When the chat has questions to the user, a `### ❓ Agent questions and your answers` table follows: `# | Turn | [title](#question-N) | answer`, with the answer clipped to 100 characters (section 5.1).
 5. `## Cost and Timing Summary` - table `Model | Turns | Prompt tokens | Completion tokens | Credits |
    Elapsed`, right-aligned numerics, a **Total** row, and a note that prompt tokens are per-request
    context sizes (not additive), while completion tokens and credits are the per-turn increment.
@@ -429,6 +430,19 @@ For each turn, in order:
 - `toolId` is open-ended. Any `toolInvocationSerialized` item is rendered as a tool call regardless
   of whether its built-in, extension, MCP, user, external, or agent-host tool name has been seen
   before. Specialized presentation is selected by payload shape, not by a closed tool-name list.
+
+### 5.1 Questions to the user (WI-068)
+
+A question the agent or an MCP server asked the user steers the rest of the chat, so it never renders as an ordinary tool line. Sources: agent `ask_user`, Local `vscode_askQuestions` paired with its `questionCarousel` by `resolveId`, an MCP form `questionCarousel` with no tool call, and Local `elicitationSerialized` (MCP confirmation).
+
+- **Box:** an open, never-collapsed bordered box. Amber means answered or accepted. Red means no answer, declined, cancelled, rejected or failed.
+- **Heading:** `### ❓ Agent asked · <title>`. The title is the field title, `N questions: A, B`, or the message's first sentence. Top-level questions get an `<a id="question-N">` anchor.
+- **Message:** rendered as Markdown, with its headings moved down 3 levels (max `######`), HTML neutralized and fences closed. An MCP server name follows as *(from MCP server X)*.
+- **Options:** `- ✅ **label** ← chosen`, a `⭐ *(default)*` marker (just `⭐` when the label already says "recommended"), and `- ✏️ *Typed answer allowed*`. MCP confirmations list the implied buttons **Accept** and **Reject or no answer**, because VS Code saves only the final state, and saves a request that was still waiting as rejected.
+- **Answer:** a green `**✅ You answered:**` block, or a table for several fields. An outcome line follows for non-answers.
+- **Record:** a collapsed `🧾 Recorded question and answer` block holds the raw JSON and the tool's usual input and result blocks. Its summary keeps the 🛠️ tool badge.
+- **Fail-safe:** when an answer can't be parsed, the box shows a warning, the recorded answer text and the raw JSON in the open. The answer is never dropped.
+- **Duplicates:** a carousel note paired with its tool call isn't rendered again.
 
 ## 6. Formatting and visual design system
 

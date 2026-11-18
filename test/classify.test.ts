@@ -21,6 +21,7 @@ const SAMPLES = {
     kind: 'questionCarousel',
     questions: [{ title: 'Delivery scope', message: 'Which option?', options: [{ label: 'Local only', value: 'local' }] }],
   },
+  elicitationSerialized: { kind: 'elicitationSerialized', title: 'Allow write?', message: 'Write 3 files.', subtitle: 'files (MCP Server)', state: 'accepted' },
   markdownVuln: {
     kind: 'markdownVuln',
     content: { value: ' {\n', supportThemeIcons: false, supportHtml: false, uris: {} },
@@ -96,9 +97,12 @@ test('warnings, confirmations, and question carousels become readable notes', ()
   assert.deepEqual(classifyNode(SAMPLES.confirmation), {
     type: 'note', title: 'Confirmation: Continue?', text: 'The task is still running.',
   });
-  assert.deepEqual(classifyNode(SAMPLES.questionCarousel), {
+  const { question, ...carousel } = classifyNode(SAMPLES.questionCarousel);
+  assert.deepEqual(carousel, {
     type: 'note', title: 'Copilot questions', text: 'Delivery scope\nWhich option?\n- Local only (local)',
   });
+  assert.equal(question?.source, 'mcp-form', 'a carousel without a tool call keeps its parsed question');
+  assert.equal(question?.fields[0]?.title, 'Delivery scope');
 });
 
 test('a textual tool result error reaches the parsed tool node', () => {

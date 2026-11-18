@@ -155,6 +155,67 @@ export interface ToolNode {
   fileUri: string;
   /** Optional edit details recovered from the sibling transcript by tool-call identity. */
   patchFiles: PatchFileChange[];
+  /** Set on calls that asked the user a question (`ask_user`, `vscode_askQuestions`). */
+  question?: QuestionRecord;
+}
+
+/** Where a question to the user came from. */
+export type QuestionSource = 'ask_user' | 'vscode_askQuestions' | 'mcp-form' | 'mcp-confirmation';
+
+/**
+ * How the question ended. `unanswered` means no answer was recorded, which can be a skip, a cancel,
+ * an ended response or a reload. `declined` and `cancelled` are elicitation actions documented in the
+ * Copilot CLI. Their result text isn't known, so they're inferred from the recorded wording. `unknown`
+ * means the recorded answer text wasn't recognized.
+ */
+export type QuestionOutcome = 'answered' | 'unanswered' | 'declined' | 'cancelled' | 'accepted' | 'rejected' | 'failed' | 'unknown';
+
+export interface QuestionOption {
+  value: string;
+  label: string;
+  isDefault?: boolean;
+}
+
+export interface QuestionAnswer {
+  /** Values of the listed options the user picked. */
+  selected: string[];
+  /** Text the user typed instead of, or beside, a listed option. */
+  freeform?: string;
+  /** The recorder replaced the value with a mask, for example a password. */
+  masked?: boolean;
+}
+
+export interface QuestionField {
+  id: string;
+  title: string;
+  /** Markdown written by the agent. */
+  message?: string;
+  kind: 'single' | 'multi' | 'text' | 'boolean' | 'number';
+  options: QuestionOption[];
+  allowFreeform: boolean;
+  answer?: QuestionAnswer;
+}
+
+/**
+ * One question the agent asked and what the user answered, parsed from private record formats.
+ * Parsing is best-effort: `answerText` and `raw` always keep the recorded data, and `parseWarning`
+ * says when the structured fields shouldn't be trusted, so a renderer can fall back to them.
+ */
+export interface QuestionRecord {
+  source: QuestionSource;
+  /** Short heading recorded with the question, when there is one (MCP confirmations). */
+  title?: string;
+  /** Markdown written by the agent above the fields. */
+  message: string;
+  fields: QuestionField[];
+  outcome: QuestionOutcome;
+  /** The recorded answer text, unchanged. Empty when the record holds structured answers only. */
+  answerText: string;
+  parseWarning?: string;
+  /** MCP server label, when the question came from one. */
+  server?: string;
+  /** The recorded question and answer payloads, for a fail-safe JSON view. */
+  raw: { question: unknown; answer: unknown };
 }
 
 export type TurnNode = TextNode | ThinkNode | RefNode | EditNode | ToolNode | NoteNode | UnknownResponseNode;
@@ -301,6 +362,8 @@ export interface NoteNode {
   /** A saved companion file the note points to. `href` is relative to the Markdown file. */
   link?: { label: string; href: string };
   image?: { href: string; alt: string };
+  /** A question to the user recorded without a tool call. Rendered as a question box instead of the note. */
+  question?: QuestionRecord;
 }
 
 /** A response kind with no reviewed renderer, kept as redacted raw JSON for inspection. */

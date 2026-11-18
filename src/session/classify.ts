@@ -16,6 +16,7 @@
 // built to catch them.
 
 import { extractUri, stripAnsi } from '../text.ts';
+import { parseCarousel, parseElicitation } from './questions.ts';
 
 // A handled kind can still yield nothing for a given item (an empty streamed `thinking` partial,
 // say); that is not drift.
@@ -30,6 +31,7 @@ export const HANDLED_RESPONSE_KINDS = new Set([
   'warning',
   'confirmation',
   'questionCarousel',
+  'elicitationSerialized',
   'markdownVuln',
 ]);
 
@@ -60,7 +62,6 @@ export const KNOWN_UNSEEN_KINDS = new Set([
   'planReview',
   'hook',
   'externalEdit',
-  'elicitationSerialized',
   'clearToPreviousToolInvocation',
   'disabledClaudeHooks',
 ]);
@@ -237,7 +238,11 @@ function classifyRecord (item: any) {
   }
   if (item.kind === 'questionCarousel') {
     const text = questionCarouselText(item.questions);
-    return text ? { type: 'note', title: 'Copilot questions', text } : null;
+    return text ? { type: 'note', title: 'Copilot questions', text, question: parseCarousel(item) } : null;
+  }
+  if (item.kind === 'elicitationSerialized') {
+    const question = parseElicitation(item);
+    return { type: 'note', title: 'MCP confirmation', text: [question.title, question.message].filter(Boolean).join('\n'), question };
   }
   if (item.kind === 'textEditGroup') {
     const uri = item.uri && (item.uri.path || item.uri.fsPath || item.uri);
@@ -294,6 +299,7 @@ const CONTENT_FIELDS: Record<string, string[]> = {
   warning: ['content'],
   confirmation: ['title', 'message', 'buttons'],
   questionCarousel: ['questions'],
+  elicitationSerialized: ['title', 'message'],
   textEditGroup: ['uri'],
   workspaceEdit: ['edits'],
   autoModeResolution: ['resolved', 'resolvedModel', 'resolvedModelName'],
