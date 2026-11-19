@@ -379,6 +379,8 @@ export interface NoteNode {
   title: string;
   /** Full text shown in a collapsed block under the title. */
   text?: string;
+  /** Unreviewed payloads move to companions at 300 lines OR 15 KiB. */
+  overflowRule?: 'both' | 'either';
   /** A saved companion file the note points to. `href` is relative to the Markdown file. */
   link?: { label: string; href: string };
   image?: { href: string; alt: string };

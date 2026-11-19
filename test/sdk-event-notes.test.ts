@@ -122,6 +122,73 @@ test('instruction and notice notes keep every reviewed field, empty strings, fal
   assert.deepEqual(exportEvents(events).session.census.unhandled, []);
 });
 
+test('instruction delivery metadata and post-initial state stay visible without schema drift', () => {
+  const delivery = {
+    deliveryId: 'delivery-1',
+    firstUpdateEventId: 'update-1',
+    latestUpdateEventId: 'update-2',
+    updateCount: 2,
+    requestGeneration: 3,
+    outcome: 'futureOutcome',
+    capability: 'futureCapability',
+    reason: 'futureReason',
+  };
+  const events = [
+    event('instruction.update', update({ postInitial: true })),
+    prompt(),
+    event('instruction.update_delivery', delivery),
+  ];
+  const out = exportEvents(events);
+  assert.deepEqual(out.session.census.unhandled, []);
+  const notes = parsedNotes(events);
+  assert.match(notes[0]?.text ?? '', /Recorded after initial user message: true/u);
+  assert.match(notes[1]?.text ?? '', /Delivery ID: delivery-1/u);
+  assert.match(notes[1]?.text ?? '', /"requestGeneration": 3/u);
+  assert.equal(notes[1]?.overflowRule, 'either');
+  assert.equal(buildSdkLossAccount(events, out.markdown, out.companions).failed, false);
+});
+
+test('model telemetry keeps a compact transport note and the complete redacted payload', () => {
+  const payload = {
+    kind: 'telemetry',
+    telemetry: {
+      event: 'model_websocket_attempt',
+      properties: {
+        logical_request_id: 'logical-1', model: 'future-model', outcome: 'completed',
+        disposition: 'returned', futureProperty: 'authorization: bearer telemetry-secret',
+      },
+      restrictedProperties: {},
+      metrics: { duration_ms: 1250, frames_received: 12, bytes_received: 2048, output_tokens: 34, futureMetric: 7 },
+    },
+  };
+  const events = [prompt(), event('model.telemetry', payload)];
+  const out = exportEvents(events);
+  assert.deepEqual(out.session.census.unhandled, []);
+  const [note] = parsedNotes(events);
+  assert.equal(note?.title, '📡 Model telemetry: future-model · completed');
+  assert.match(note?.text ?? '', /Duration: 1250 ms/u);
+  assert.match(note?.text ?? '', /"futureProperty": "authorization: bearer telemetry-secret"/u);
+  assert.match(note?.text ?? '', /"futureMetric": 7/u);
+  assert.equal(note?.overflowRule, 'either');
+  assert.match(out.markdown, /Model telemetry: future-model · completed/u);
+  assert.doesNotMatch(out.markdown, /telemetry-secret/u);
+  assert.match(out.markdown, /authorization: bearer \[REDACTED\]/u);
+  assert.equal(buildSdkLossAccount(events, out.markdown, out.companions).failed, false);
+});
+
+test('future SDK event types stay visible as collapsed payloads while strict still has drift', () => {
+  const events = [prompt(), event('future.sdk_event', { summary: 'Invented future event.', nested: { count: 2 } })];
+  const out = exportEvents(events);
+  assert.deepEqual(out.session.census.unhandled, [['future.sdk_event', 1]]);
+  const [note] = parsedNotes(events);
+  assert.equal(note?.title, '⚠️ Unreviewed SDK event: future.sdk_event');
+  assert.equal(note?.overflowRule, 'either');
+  assert.match(note?.text ?? '', /"summary": "Invented future event\."/u);
+  assert.match(note?.text ?? '', /"count": 2/u);
+  assert.match(out.markdown, /future\.sdk_event/u);
+  assert.match(out.markdown, /collapsed diagnostic records/u);
+});
+
 test('minimal and empty failure fields remain distinct without invented usage or errors', () => {
   const events = [
     prompt(), event('assistant.fusion_phase_failed', { phaseKind: 'judge' }),
@@ -173,6 +240,7 @@ test('unknown and nested note fields remain diagnostic without losing content', 
     const notes = parsedNotes(events);
     assert.ok(notes[0]?.text?.includes(kept));
     assert.equal(notes[1]?.text, `Unrecognized field ${path}.`);
+    assert.match(notes[2]?.text ?? '', new RegExp(`"futureField"|"futureCounter"`));
   }
 });
 

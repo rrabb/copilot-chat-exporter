@@ -137,6 +137,35 @@ test('single fusion phase keeps same-record projection once and keeps equal assi
   assert.equal(count(out.markdown, phaseText), 2, 'one phase record and one assistant message');
 });
 
+test('background-work fields are reviewed Fusion metadata', () => {
+  const phase = fusionNote('assistant.fusion_phase_completed', {
+    fusionId: 'fusion-background',
+    phaseId: 'phase-primary',
+    phaseKind: 'primary',
+    content: 'Phase output.',
+    endedWithBackgroundWork: true,
+  });
+  assert.deepEqual(phase.issues, []);
+  assert.match(phase.note.text ?? '', /Ended with background work: true/u);
+  const complete = fusionNote('session.fusion_completed', {
+    fusionId: 'fusion-background',
+    awaitingBackgroundWork: false,
+  });
+  assert.deepEqual(complete.issues, []);
+  assert.match(complete.note.text ?? '', /Awaiting background work: false/u);
+  const out = exportSdk([
+    prompt('Keep background-work state', 1),
+    event('assistant.fusion_phase_completed', {
+      fusionId: 'fusion-background', phaseId: 'phase-primary', phaseKind: 'primary',
+      content: 'Phase output.', endedWithBackgroundWork: true,
+    }, 2),
+    event('session.fusion_completed', { fusionId: 'fusion-background', awaitingBackgroundWork: true }, 3),
+  ]);
+  assert.deepEqual(out.session.census.unhandled, []);
+  assert.match(out.markdown, /Ended with background work: true/u);
+  assert.match(out.markdown, /Awaiting background work: true/u);
+});
+
 test('cascade fusion keeps differing projection text and complete handoff content', () => {
   const out = exportSdk([
     prompt('Review and repair', 1),

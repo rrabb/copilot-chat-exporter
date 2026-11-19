@@ -8,6 +8,7 @@ const STRING_TELEMETRY = [
   'modelDisplayName', 'responseModel', 'cacheExpiresAt', 'initiator', 'interactionType', 'transport', 'requestBodyEncoding',
   'apiCallId', 'providerCallId', 'serviceRequestId', 'apiEndpoint', 'reasoningSummary', 'frontierSource', 'finishReason',
   'websocketFallbackErrorKind', 'websocketFallbackReason',
+  'instructionUpdateDeliveryId', 'instructionUpdateLatestEventId',
 ];
 const NUMBER_TELEMETRY = [
   'cost', 'timeToFirstTokenMs', 'outputTtftMs', 'interTokenLatencyMs', 'maxPromptTokens', 'maxOutputTokens',

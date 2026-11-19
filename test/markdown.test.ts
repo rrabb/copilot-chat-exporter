@@ -434,6 +434,22 @@ test('unknown payloads use a companion when they are over 300 lines OR over 15 K
   assert.equal(renderUnknownWithCompanions(small).companions.length, 0, 'small payload stays inline');
 });
 
+test('unreviewed note payloads use the either overflow rule', () => {
+  const payload = Array.from({ length: 301 }, (_, index) => `line ${index + 1}`).join('\n');
+  const companions: CompanionArtifact[] = [];
+  const output = buildDocument(testSession({
+    turns: [testTurn({
+      prompt: 'question',
+      body: [{ type: 'note', title: 'Recorded SDK payload', text: payload, overflowRule: 'either' }],
+    })],
+  }), documentContext({ overflow: { assetsDirectory: 'export-assets', companions } }));
+
+  assert.ok(Buffer.byteLength(payload) < 15 * 1024);
+  assert.equal(companions.length, 1);
+  assert.equal(Buffer.from(companions[0].bytes).toString('utf8'), payload);
+  assert.match(output, /first 10 lines, full text linked/u);
+});
+
 test('the byte-capped preview never splits a surrogate pair', () => {
   const payload = `${'a'.repeat(2047)}😀${'b'.repeat(20 * 1024)}`;
   const { output } = renderUnknownWithCompanions(payload);

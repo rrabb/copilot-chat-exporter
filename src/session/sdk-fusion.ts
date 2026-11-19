@@ -114,6 +114,7 @@ export function fusionNote (type: FusionEventType, data: Record<string, unknown>
         ['fusionId', 'Fusion ID'], ['phaseId', 'Phase ID'], ['model', 'Model'], ['reasoningEffort', 'Reasoning effort'],
         ['role', 'Role'], ['conversationScope', 'Scope'], ['status', 'Status'], ['projectionMode', 'Projection mode'],
       ]);
+      add('Ended with background work', fields.flag('endedWithBackgroundWork'));
       add('Verdict', fields.string('verdict', true));
       duration(fields, 'durationMs', 'Duration');
       const content = fields.string('content');
@@ -168,6 +169,7 @@ export function fusionNote (type: FusionEventType, data: Record<string, unknown>
         ['pattern', 'Pattern'], ['outcome', 'Outcome'], ['finalSourcePhaseId', 'Final source phase'],
         ['finalSourceModel', 'Final source model'], ['followUpModel', 'Follow-up model'],
       ]);
+      add('Awaiting background work', fields.flag('awaitingBackgroundWork'));
       add('Degraded reason', fields.string('degradedReason', true));
       add('Phase count', fields.counter('phaseCount'));
       counters(fields);

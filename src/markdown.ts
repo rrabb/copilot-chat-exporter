@@ -23,6 +23,7 @@ import { sumKnown, sumUsageFigures } from './session/usage-figures.ts';
 import { exporterCommit, exporterVersion } from './version.ts';
 import type { SourceCopy } from './session/source-snapshot.ts';
 import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, QuestionField, QuestionOutcome, QuestionRecord, SessionLocation, SessionUsage, ThinkNode, TodoItem, ToolGroupOrder, ToolNode, TextNode, Turn, TurnNode, TurnScalars, TurnUsage, UnknownResponseNode, UsageCall, UsageFigures } from './types.ts';
+import { splitSdkSchemaDrift } from './session/sdk-schema.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
@@ -896,7 +897,11 @@ function renderNote (node: NoteNode) {
     `${esc(node.title)}${link}`,
     text,
     'text',
-    { kind: 'metadata', label: `note-${createHash('sha256').update(`${node.title}\n${text}`).digest('hex').slice(0, 8)}` },
+    {
+      kind: 'metadata',
+      label: `note-${createHash('sha256').update(`${node.title}\n${text}`).digest('hex').slice(0, 8)}`,
+      ...(node.overflowRule ? { rule: node.overflowRule } : {}),
+    },
   ), ...image];
 }
 
@@ -1834,6 +1839,22 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
   }
 
   const title = session.title || `session ${location.sessionId}`;
+  const schemaDrift = splitSdkSchemaDrift(sdk ? session.census.unhandled : []);
+  const schemaDriftWarnings = sdk ? [
+    ...(schemaDrift.unhandledEvents.length
+      ? [
+        '> [!WARNING]',
+        `> ${schemaDrift.unhandledEvents.length} SDK event type${schemaDrift.unhandledEvents.length === 1 ? ' remains' : 's remain'} unhandled: ${schemaDrift.unhandledEvents.map(([kind, count]) => `\`${esc(kind)}\` (${thousands(count)})`).join(', ')}. Their payloads are shown as collapsed diagnostic records and are still checked by \`--strict\`.`,
+      ] : []),
+    ...(schemaDrift.unsupportedPayloads.length
+      ? [
+        schemaDrift.unhandledEvents.length ? '' : '> [!WARNING]',
+        `> ${schemaDrift.unsupportedPayloads.length} reviewed SDK event type${schemaDrift.unsupportedPayloads.length === 1 ? ' has' : 's have'} unsupported payload fields: ${schemaDrift.unsupportedPayloads.map(([kind, count]) => `\`${esc(kind)}\` (${thousands(count)})`).join(', ')}. Reviewed content still renders. Unknown fields stay in collapsed diagnostic records and fail \`--strict\`.`,
+      ] : []),
+  ] : [
+    '> [!WARNING]',
+    `> This build has no handler for ${session.census.unhandled.length} journal node kind(s), so their content is missing from this export: ${session.census.unhandled.map(([kind, count]) => `\`${esc(kind)}\` (${thousands(count)})`).join(', ')}. The journal format is undocumented and changes with VS Code; re-run with \`--verify\` for the full schema census.`,
+  ];
   const lines = [
     '<a id="top"></a>',
     '',
@@ -2095,13 +2116,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     ...(sdk ? [] : [`- Parse validated against: ${VALIDATED_AGAINST}.`]),
     ...session.errors.map((error) => `- Parse warning: ${redact(error)}`),
     ...questionWarningList(),
-    ...(session.census.unhandled.length
-      ? [
-        '',
-        '> [!WARNING]',
-        `> This build has no handler for ${session.census.unhandled.length} journal node kind(s), so their content is missing from this export: ${session.census.unhandled.map(([kind, count]) => `\`${esc(kind)}\` (${thousands(count)})`).join(', ')}. The journal format is undocumented and changes with VS Code; re-run with \`--verify\` for the full schema census.`,
-      ]
-      : []),
+    ...(session.census.unhandled.length ? ['', ...schemaDriftWarnings] : []),
     '',
     '<div align="right"><a href="#top">⬆️ Back to top</a></div>',
   );

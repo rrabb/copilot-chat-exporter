@@ -23,6 +23,7 @@ import { discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, 
 import { exportFailureFromReport, failureDetails, verificationException, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
 import type { ToolGroupOrder } from './types.ts';
+import { splitSdkSchemaDrift } from './session/sdk-schema.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -198,7 +199,18 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     const left = [...result.leftOut].map(([name, count]) => `${name} ${count.toLocaleString('en-US')}`).join('; ');
     left && console.log(`Left out (counted, not exported): ${left}.`);
     const drift = result.session.census.unhandled;
-    drift.length && console.log(`Schema drift: ${drift.length} unhandled SDK event type(s) - ${drift.map(([kind, count]) => `${kind}=${count}`).join(', ')}.`);
+    if (drift.length) {
+      const parts = splitSdkSchemaDrift(drift);
+      const labels = [
+        parts.unhandledEvents.length
+          ? `${parts.unhandledEvents.length} unhandled SDK event type(s) - ${parts.unhandledEvents.map(([kind, count]) => `${kind}=${count}`).join(', ')}`
+          : '',
+        parts.unsupportedPayloads.length
+          ? `${parts.unsupportedPayloads.length} unsupported SDK payload variant(s) - ${parts.unsupportedPayloads.map(([kind, count]) => `${kind}=${count}`).join(', ')}`
+          : '',
+      ].filter(Boolean);
+      console.log(`Schema drift: ${labels.join('; ')}.`);
+    }
     const questionWarnings = result.session.census.questionWarnings ?? [];
     questionWarnings.length && console.log(`Questions not fully read: ${questionWarnings.map(([key, count]) => `${key}=${count}`).join(', ')}. Their boxes show a warning and the recorded data.`);
     for (const line of questionWarningLines(result.session.census.questionWarningDetails ?? [], 5))
@@ -226,9 +238,13 @@ async function verifyReport (preview: SdkExport, strict: boolean, json: boolean,
   }
   console.log('SDK event census');
   console.log(`- Scoped events: ${[...preview.session.census.seen.values()].reduce((sum, count) => sum + count, 0).toLocaleString('en-US')}`);
-  drift.length
-    ? console.log(`- UNHANDLED event types: ${drift.map(([kind, count]) => `${kind}=${count}`).join(', ')}`)
-    : console.log('- Unhandled event types: none');
+  const driftParts = splitSdkSchemaDrift(drift);
+  console.log(driftParts.unhandledEvents.length
+    ? `- UNHANDLED event types: ${driftParts.unhandledEvents.map(([kind, count]) => `${kind}=${count}`).join(', ')}`
+    : '- Unhandled event types: none');
+  console.log(driftParts.unsupportedPayloads.length
+    ? `- Unsupported payload variants: ${driftParts.unsupportedPayloads.map(([kind, count]) => `${kind}=${count}`).join(', ')}`
+    : '- Unsupported payload variants: none');
   const questionWarnings = preview.session.census.questionWarnings ?? [];
   console.log(`- Questions not fully read: ${questionWarnings.map(([key, count]) => `${key}=${count}`).join(', ') || 'none'}${questionWarnings.length ? ' (fails --strict; see docs/UPGRADING.md, "Questions to the user")' : ''}`);
   for (const line of questionWarningLines(preview.session.census.questionWarningDetails ?? []))

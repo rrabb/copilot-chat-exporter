@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "generation": "9e534ced1f142dff432bf1dfd9bf808bf99edfdfde8b85f0c3da352aef327dbe",
+  "generation": "a02076a76987f3084350f624e0287e96ac0dab147243b905f39fda945a6f1eb1",
   "files": [
     {
       "file": "core/archive.md",
@@ -14,8 +14,8 @@
     },
     {
       "file": "edges/archive.md",
-      "bytes": 46709,
-      "sha256": "b0d4a2b09b83fae720bf90a56107e5e3decea90346a0d9d11a74a0adedca2cd9"
+      "bytes": 48364,
+      "sha256": "dfda990a5c003f35b4b7fa5fb639ee198f6797bedecdb292e5fc384ecd6acc85"
     },
     {
       "file": "exception/archive.md",
@@ -29,8 +29,8 @@
     },
     {
       "file": "ledger/archive.md",
-      "bytes": 45111,
-      "sha256": "507f4883f593fd107f8d211ee47c2e2f248d6d47120feffb2f602b88c527589e"
+      "bytes": 46766,
+      "sha256": "08d9e8e0fed7d011b84f1c56765329d25a85cb081e3bfd1938816ff4fd82f473"
     },
     {
       "file": "selected-child/archive.md",

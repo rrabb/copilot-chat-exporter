@@ -253,17 +253,19 @@ test('an unknown agent event type is schema drift that --verify --strict reports
   await fs.writeFile(file, [
     { id: 'start', type: 'session.start', data: { sessionId: chat, version: 1 } },
     { id: 'u', type: 'user.message', data: { content: 'Hello there' } },
+    { id: 'i', type: 'instruction.update', data: { content: 'Recorded update.', futureField: true } },
     { id: 'x', type: 'brand.new.kind', data: {} },
   ].map((event) => JSON.stringify(event)).join('\n'));
   const result = invoke('--verify', '--strict', 'bbbbbbbb', '--user-data-root', root);
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.match(result.stdout, /UNHANDLED event types: brand\.new\.kind=1/u);
+  assert.match(result.stdout, /Unsupported payload variants: instruction\.update=1/u);
   const json = invoke('--verify', '--strict', '--json', 'bbbbbbbb', '--user-data-root', root);
   assert.equal(json.status, 2, json.stdout + json.stderr);
   const report = JSON.parse(json.stdout);
   assert.equal(report.path, 'sdk');
   assert.deepEqual(report.failureReasons, ['unhandled-kind']);
-  assert.deepEqual(report.census.unhandled, { 'brand.new.kind': 1 });
+  assert.deepEqual(report.census.unhandled, { 'instruction.update:unsupported': 1, 'brand.new.kind': 1 });
 });
 
 test('ambiguous child content is omitted with an archive warning while --strict passes', async (context) => {

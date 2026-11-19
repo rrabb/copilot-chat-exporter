@@ -19,7 +19,7 @@ import type { Census, NoteNode, ParsedSession, ToolNode, Turn, TurnNode, TurnSca
 import { childScopes, isRecord } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import { fusionNote } from './sdk-fusion.ts';
-import { eventNote } from './sdk-event-notes.ts';
+import { eventNote, modelTelemetryNote } from './sdk-event-notes.ts';
 import { parseUsageRecords } from './sdk-usage-record.ts';
 import { isQuestionLikeTool, parseAskUser, parseGuessedQuestion, questionCensus, questionWarningDetails } from './questions.ts';
 import type { SdkEventSource } from './sources.ts';
@@ -51,8 +51,8 @@ const HANDLED = new Set([
   'session.fusion_change_checkpoint', 'session.fusion_completed', 'session.fusion_handoff', 'session.usage_record',
   'user.message', 'assistant.message', 'tool.execution_start', 'tool.execution_complete',
   'system.message', 'system.notification', 'skill.invoked', 'skill.invoked_ref', 'skill.context_delivered_ref',
-  'session.binary_asset',
-  'instruction.update', 'session.mode_notice_delivered', 'model.turn_retry',
+  'session.binary_asset', 'model.telemetry',
+  'instruction.update', 'instruction.update_delivery', 'session.mode_notice_delivered', 'model.turn_retry',
 ]);
 
 export interface SdkSessionOptions {
@@ -99,6 +99,15 @@ function jsonText (value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function withRecordedPayload (note: NoteNode, event: SdkEvent): NoteNode {
+  const payload = jsonText(event.raw);
+  return {
+    ...note,
+    text: [note.text, `Full recorded SDK payload:\n${payload}`].filter(Boolean).join('\n\n'),
+    overflowRule: 'either',
+  };
 }
 
 function toolNode (id: string, name: string): ToolNode {
@@ -166,6 +175,8 @@ interface Shared {
   options: SdkSessionOptions;
   all: readonly SdkEvent[];
   usageDiagnostics: Map<SdkEvent, string[]>;
+  usageDiagnosticExamples: Set<string>;
+  processedEvents: Set<SdkEvent>;
   meta: ReadonlyMap<string, SubagentMeta>;
   attached: Set<string>;
   seen: Map<string, number>;
@@ -236,10 +247,11 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
     }
     return relativePath;
   };
-  const unsupported = (eventType: string, reason: string) => {
-    const key = `${eventType}:unsupported`;
+  const unsupported = (event: SdkEvent, reason: string, payloadShown = false) => {
+    const key = `${event.type}:unsupported`;
     unhandled.set(key, (unhandled.get(key) ?? 0) + 1);
-    note({ type: 'note', title: `⚠️ ${eventType} has an unsupported payload.`, text: reason });
+    note({ type: 'note', title: `⚠️ ${event.type} has an unsupported payload.`, text: reason });
+    !payloadShown && note(withRecordedPayload({ type: 'note', title: `📄 Recorded payload: ${event.type}` }, event));
   };
   const note = (node: NoteNode) => (current ? current.body.push(node) : prePromptNotes.push(node));
   if (implicit) {
@@ -253,6 +265,7 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
   for (const event of events) {
     const type = event.type;
     const data = event.data;
+    ctx.processedEvents.add(event);
     seen.set(type, (seen.get(type) ?? 0) + 1);
     const group = SDK_LEFT_OUT.get(type);
     if (group) {
@@ -268,6 +281,7 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
     }
     if (!HANDLED.has(type)) {
       unhandled.set(type, (unhandled.get(type) ?? 0) + 1);
+      note(withRecordedPayload({ type: 'note', title: `⚠️ Unreviewed SDK event: ${type}` }, event));
       continue;
     }
     switch (type) {
@@ -450,20 +464,40 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
       case 'session.fusion_handoff': {
         const normalized = fusionNote(type, data);
         note(normalized.note);
-        normalized.issues.length && unsupported(type, normalized.issues.join('\n'));
+        normalized.issues.length && unsupported(event, normalized.issues.join('\n'));
         break;
       }
       case 'instruction.update':
+      case 'instruction.update_delivery':
       case 'session.mode_notice_delivered':
       case 'model.turn_retry': {
         const normalized = eventNote(type, data);
-        note(normalized.note);
-        normalized.issues.length && unsupported(type, normalized.issues.join('\n'));
+        const recorded = type === 'instruction.update_delivery' ? withRecordedPayload(normalized.note, event) : normalized.note;
+        note(recorded);
+        normalized.issues.length && unsupported(event, normalized.issues.join('\n'), type === 'instruction.update_delivery');
+        break;
+      }
+      case 'model.telemetry': {
+        const normalized = modelTelemetryNote(data);
+        note(withRecordedPayload(normalized.note, event));
+        normalized.issues.length && unsupported(event, normalized.issues.join('\n'), true);
         break;
       }
       case 'session.usage_record': {
         if (isRecord(data.usage) && typeof data.usage.duration === 'number' && Number.isFinite(data.usage.duration) && data.usage.duration >= 0)
           nextModelCallDurationMs = data.usage.duration;
+        const issues = ctx.usageDiagnostics.get(event);
+        if (issues?.length) {
+          const signature = issues.join('; ');
+          if (!ctx.usageDiagnosticExamples.has(signature)) {
+            ctx.usageDiagnosticExamples.add(signature);
+            note(withRecordedPayload({
+              type: 'note',
+              title: '⚠️ Unsupported session.usage_record example',
+              text: issues.join('\n'),
+            }, event));
+          }
+        }
         break;
       }
       case 'session.task_complete':
@@ -623,6 +657,8 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
   const ctx: Shared = {
     options, all: relevantEvents,
     usageDiagnostics: new Map([...parseUsageRecords(all).diagnostics].filter(([event]) => relevantEventSet.has(event))),
+    usageDiagnosticExamples: new Set(),
+    processedEvents: new Set(),
     meta: subagentMeta(relevantEvents, verifiedAgentIds), attached: new Set(rootAgentId ? [rootAgentId] : []),
     seen: new Map(), dropped: new Map(), unhandled: new Map(),
     leftOut: new Map(), companions: [], systemFiles: new Map(), copilotVersion: 'unknown', producer: null, creationDate: null, workingDirectory: '',
@@ -658,7 +694,7 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
   for (const [event, issues] of ctx.usageDiagnostics) {
     const key = `${event.type}:unsupported`;
     ctx.unhandled.set(key, (ctx.unhandled.get(key) ?? 0) + 1);
-    ctx.seen.set(event.type, (ctx.seen.get(event.type) ?? 0) + 1);
+    !ctx.processedEvents.has(event) && ctx.seen.set(event.type, (ctx.seen.get(event.type) ?? 0) + 1);
     const signature = issues.join('; ');
     const entry = usageErrors.get(signature) ?? { count: 0, lines: [] };
     entry.count += 1;

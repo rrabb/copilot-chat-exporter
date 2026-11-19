@@ -76,12 +76,19 @@ test('absent websocket telemetry creates no entry, including an absent status co
   assert.equal(absent.calls[0]?.provenance?.telemetry, undefined);
 });
 
-test('reviewed response-model and gateway fields keep valid usage without a schema warning', () => {
-  const record = receipt({ responseModel: 'future-model-provider', inferenceGateway: false });
+test('reviewed response-model, gateway and instruction-delivery fields keep usage without a schema warning', () => {
+  const record = receipt({
+    responseModel: 'future-model-provider',
+    inferenceGateway: false,
+    instructionUpdateDeliveryId: 'delivery-1',
+    instructionUpdateLatestEventId: 'update-2',
+  });
   const parsed = parseUsageRecords([record]);
   assert.equal(parsed.diagnostics.size, 0);
   assert.deepEqual(parsed.calls[0]?.provenance?.telemetry, [
     { field: 'responseModel', value: 'future-model-provider' },
+    { field: 'instructionUpdateDeliveryId', value: 'delivery-1' },
+    { field: 'instructionUpdateLatestEventId', value: 'update-2' },
     { field: 'inferenceGateway', value: false },
   ]);
 });
@@ -235,7 +242,7 @@ test('invalid ledger counters are unknown rather than negative or free amounts',
   assert.equal(selected.calls[0]?.provenance?.issues?.length, 3);
 });
 
-test('unknown and malformed known receipt fields produce unsupported census without a raw receipt note', () => {
+test('unknown and malformed known receipt fields produce one representative raw payload note', () => {
   for (const extra of [
     { futureField: true }, { contractVersion: 2 }, { reasoningEffort: 4 }, { fusion: { phaseId: 7 } },
     { provider: { id: 'test', kind: 'test', label: false } }, { copilotUsage: { totalNanoAiu: 10, tokenDetails: [{ tokenCount: -1 }] } },
@@ -244,6 +251,10 @@ test('unknown and malformed known receipt fields produce unsupported census with
     const all = [prompt(), receipt(extra)];
     const built = buildSdkSession(all, all, { title: 'Synthetic malformed usage', assetsDirectory: 'assets' });
     assert.ok(built.session.census.unhandled.some(([kind]) => kind === 'session.usage_record:unsupported'));
+    assert.equal(built.session.census.seen.get('session.usage_record'), 1);
+    const [note] = built.session.turns.flatMap(turn => turn.body).filter(node =>
+      node.type === 'note' && node.title === '⚠️ Unsupported session.usage_record example');
+    assert.match(note?.type === 'note' ? note.text ?? '' : '', /Full recorded SDK payload:/u);
   }
   const malformed = event('session.usage_record', { usage: 'wrong' });
   assert.ok(parseUsageRecords([malformed]).diagnostics.size > 0);

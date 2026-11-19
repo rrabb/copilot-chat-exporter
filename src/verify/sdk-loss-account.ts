@@ -144,6 +144,23 @@ export function sdkLossPieces (events: readonly SdkEvent[], toolGroupOrder: Tool
       case 'instruction.update':
         add('instruction-update', str(data.content), event, true);
         break;
+      case 'instruction.update_delivery':
+        for (const value of new Set(strings(data)))
+          add('instruction-update-delivery', value, event);
+        break;
+      case 'model.telemetry':
+        for (const value of new Set(strings(data)))
+          add('model-telemetry', value, event);
+        break;
+      case 'session.usage_record': {
+        const usage = record(data.usage);
+        for (const value of [
+          str(usage?.instructionUpdateDeliveryId),
+          str(usage?.instructionUpdateLatestEventId),
+        ].filter(Boolean))
+          add('usage-provenance', value, event);
+        break;
+      }
       case 'model.turn_retry':
         add('model-turn-retry-reason', str(data.reason), event, true);
         break;

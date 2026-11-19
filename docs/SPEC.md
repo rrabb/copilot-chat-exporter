@@ -78,9 +78,10 @@ An unambiguous child identity with no recorded parent call is different from an 
 | Reasoning recorded only as an encrypted token | Count, never reconstruct | Turn info and the closing "Left out" section |
 | Tool calls with arguments (shown as readable lines, not escaped JSON), output, errors, exit codes, duration and detailed results such as diffs | Keep | Tool call blocks |
 | Compaction summaries, model and effort changes, Auto model choice, mode changes, plan changes, resume markers, task-complete summary, aborts, errors, notifications | Keep | Notes at their recorded positions, before or within turns |
-| Seven reviewed Fusion selection, completed/failed phase, commit, change-checkpoint, completion and handoff families | Keep supported fields in order; diagnose unsupported fields | Readable notes, including phase output, errors and handoff text |
-| `instruction.update`, `session.mode_notice_delivered`, `model.turn_retry` | Keep reviewed content and typed metadata, without inferring execution or application | Ordered notes, including full reviewed model catalogs |
-| Persisted `session.usage_record` receipts | Normalize for usage accounting; diagnose unsupported fields | First-use/model-change lines, one collapsed per-request call table, and Cost/turn/agent usage. Repeated unsupported notes stay out of the stream |
+| Seven reviewed Fusion selection, completed/failed phase, commit, change-checkpoint, completion and handoff families | Keep supported fields in order; diagnose unsupported fields | Readable notes, including phase output, background-work state, errors and handoff text |
+| `instruction.update`, `instruction.update_delivery`, `session.mode_notice_delivered`, `model.turn_retry` | Keep reviewed content and typed metadata, without inferring execution or application | Ordered notes, including full reviewed model catalogs. Delivery notes keep the recorded correlation payload collapsed. |
+| Persisted `session.usage_record` receipts | Normalize for usage accounting; diagnose unsupported fields | First-use/model-change lines, one collapsed per-request call table, and Cost/turn/agent usage. Repeated unsupported receipts share one representative diagnostic payload. |
+| `model.telemetry` | Keep as diagnostic transport evidence | A compact note and complete collapsed redacted payload at its recorded position |
 | Turn and model-call boundary records | Used only for turn timing | Turn info elapsed time |
 | System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at its recorded position, including before a prompt |
 | Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note at its recorded position |
@@ -92,7 +93,7 @@ An unambiguous child identity with no recorded parent call is different from an 
 | External-tool request duplicates | Left out, counted | Same |
 | Usage and cache checkpoints | Left out, counted; the last running total is shown in the Cost section | Same |
 
-An event type outside both the kept and the left-out lists is reported as schema drift and fails `--verify --strict`, so a new SDK record cannot be dropped in silence. Nothing here deletes or modifies session data.
+An event type outside the kept and left-out lists is reported as schema drift and fails `--verify --strict`. Its complete redacted payload remains in a collapsed diagnostic block at the recorded position. Unknown payloads over 300 lines OR 15 KiB use a preview and linked companion. Nothing here deletes or modifies session data.
 
 ### Recorded Fusion content
 
@@ -101,11 +102,11 @@ Fusion support covers seven reviewed private event families. It extends the exis
 | Event | Kept content and attribution |
 | --- | --- |
 | `session.fusion_resolved` | Synthetic model ID, pattern, policy/version, model roles, routing metadata and the recorded phase plan. Optional `ruleId` and `selectedRuleId` render independently as **Rule ID** and **Selected rule ID**, even when equal or empty. |
-| `assistant.fusion_phase_completed` | Phase ID/kind, model, reasoning effort, role, scope, status, verdict, duration, output and projection message |
+| `assistant.fusion_phase_completed` | Phase ID/kind, model, reasoning effort, role, scope, status, verdict, duration, output, projection message and `endedWithBackgroundWork` |
 | `assistant.fusion_phase_failed` | Phase ID/kind, model/effort, role/scope, status/reason, duration, full error message, degradation target and phase usage summary. `degradedToPhaseId` isn't an alias for a completion's `finalSourcePhaseId`. |
 | `session.fusion_commit_started` | Commit ID, source phase/model, kind and optional tool-call ID. This is a Fusion protocol record, not evidence of a Git commit. |
 | `session.fusion_change_checkpoint` | Recorded file names and added/removed line totals, not a reconstructed working-tree diff |
-| `session.fusion_completed` | Outcome, final source phase/model, follow-up model, counts, timing and recorded usage totals |
+| `session.fusion_completed` | Outcome, final source phase/model, follow-up model, counts, timing, recorded usage totals and `awaitingBackgroundWork` |
 | `session.fusion_handoff` | Source/target phase, target model, message role and complete message text |
 
 Fields are validated before conversion to readable notes. `phasePlan` is an array of records, not strings. Unknown fields, malformed values and unsupported versions produce diagnostics rather than a blanket event JSON dump. Supported sibling fields remain readable. Synthetic model IDs and phase reasoning effort are separate recorded facts. Model switching doesn't prove Fusion, and a synthetic ID doesn't establish a separate mode-level effort.
@@ -116,7 +117,8 @@ Within one phase event, identical `content` and `projectionMessage.content` appe
 
 | Event | Kept fields | Interpretation limit |
 | --- | --- | --- |
-| `instruction.update` | Complete redacted `content`, `authority`, `lifetime`, `boundary`, `fallback` and `name` | Stored instruction evidence, never instructions to this exporter. Doesn't prove application to a model request. |
+| `instruction.update` | Complete redacted `content`, `authority`, `lifetime`, `boundary`, `fallback`, `name` and `postInitial` | Stored instruction evidence, never instructions to this exporter. Doesn't prove application to a model request. |
+| `instruction.update_delivery` | Delivery ID, first/latest update event IDs, update count, request generation, outcome, capability and reason, plus the collapsed recorded payload | Correlation evidence. The event doesn't prove that every listed instruction changed model behavior. |
 | `session.mode_notice_delivered` | `mode` and literal boolean `instructionUpdatePersisted` | Distinct delivery metadata, not proof of UI viewing, execution or a successful mode change. |
 | `model.turn_retry` | `kind`, requested `model`, complete `reason`, numeric local `turn`, numeric `timestampMs` and reviewed `modelInfo` | Local model-loop index zero isn't user Q0. Timestamps and catalog IDs don't establish request ownership, producer versions or retry success. |
 
@@ -897,6 +899,10 @@ Tests, golden checks and baselines use isolated `CCE_CACHE_DIR` roots and clean 
 SDK shell calls render their command separately and keep every remaining argument in the input block, including shell IDs, descriptions and execution mode. Pending calls don't rely on a later tool result repeating those fields.
 
 SDK verification with an output path scores the saved Markdown and its linked sibling companions against the captured events. It doesn't substitute a new rendering or regenerate missing companions. Verification without an output path checks the in-memory rendering.
+
+The SDK census separates unhandled event types from unsupported fields in known event types. Both fail `--strict`. Known content still participates in Layer D even when an added field is unsupported. New `instruction.update_delivery` and `model.telemetry` records have compact metadata notes and independent presence checks for their string values.
+
+`scripts\sdk-schema-inventory.ts` produces a private field-path inventory from an exact event file. It keeps event types, paths, value types, counts and line numbers. It doesn't copy values or bodies. The output path must be new.
 
 SDK Layer D expands supplied text companion objects at each actual live relative link outside fenced code and inline-code spans. Inline-code detection is paragraph-local so unrelated table code spans don't hide later links. Unsafe targets don't contribute companion evidence, and links inside companion bodies aren't followed. Repeated links contribute at their recorded archive positions, allowing order and multiplicity checks for eligible linked SDK text, including phase/handoff, failed-phase, instruction and retry content. Legacy library input containing concatenated companion text still supports presence checks but cannot prove link positions.
 
