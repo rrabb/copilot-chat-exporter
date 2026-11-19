@@ -20,6 +20,7 @@ import {
 import { attachTranscriptPatches, loadTranscriptPatches } from './session/edits.ts';
 import { parseChatSession } from './session/journal.ts';
 import { validateLocalJournalRecords } from './session/journal-validation.ts';
+import type { ToolGroupOrder } from './types.ts';
 
 export type * from './types.ts';
 export type * from './export-policy.ts';
@@ -178,7 +179,9 @@ export function renderSession (loaded: LoadedSession, options: {
   overflow?: TextOverflow;
   /** Collects the code fences the renderer closed itself; early closes fail strict mode. */
   fenceRepairs?: FenceRepairs;
+  /** Agent Host batch order. Request order is the default. */
+  toolGroupOrder?: ToolGroupOrder;
 } = {}) {
-  const { outputPath = '', gitStatus = '', generatedAt = new Date().toISOString(), overflow, fenceRepairs } = options;
-  return buildDocument(loaded.session, { ...loaded, sourceCopy: loaded.copiedSource, outputPath, gitStatus, generatedAt, ...(overflow ? { overflow } : {}), ...(fenceRepairs ? { fenceRepairs } : {}) });
+  const { outputPath = '', gitStatus = '', generatedAt = new Date().toISOString(), overflow, fenceRepairs, toolGroupOrder } = options;
+  return buildDocument(loaded.session, { ...loaded, sourceCopy: loaded.copiedSource, outputPath, gitStatus, generatedAt, ...(toolGroupOrder ? { toolGroupOrder } : {}), ...(overflow ? { overflow } : {}), ...(fenceRepairs ? { fenceRepairs } : {}) });
 }

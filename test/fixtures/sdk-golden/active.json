@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "generation": "6d49dd6502319c4e2bf43dcc2fe838040dbc1f5533f68cfbe73c1a29dd3dbd93",
+  "generation": "9e534ced1f142dff432bf1dfd9bf808bf99edfdfde8b85f0c3da352aef327dbe",
   "files": [
     {
       "file": "core/archive.md",
-      "bytes": 29394,
-      "sha256": "3ee0de36d502012bec7b94f3d8712fdf946252ea62be0ec42b0a9bea85963f57"
+      "bytes": 29459,
+      "sha256": "aa27567618c3b3771145c5238a656c262e3d01b1b840739b2f9d055cf93128ee"
     },
     {
       "file": "edges/archive_assets_fixture/note-6e7a52ce-d1e5e042.txt",
@@ -14,13 +14,13 @@
     },
     {
       "file": "edges/archive.md",
-      "bytes": 45294,
-      "sha256": "0cc3f9528482caedb29dc2a17af97132ff5ebb54851b5a171e0d1e195a2268aa"
+      "bytes": 46709,
+      "sha256": "b0d4a2b09b83fae720bf90a56107e5e3decea90346a0d9d11a74a0adedca2cd9"
     },
     {
       "file": "exception/archive.md",
-      "bytes": 16388,
-      "sha256": "a0e7d662ec35cab0b1747f323a5b8d593c1da4a024554525bc2817acbe04086f"
+      "bytes": 16453,
+      "sha256": "81cd0cf68fa6ac7aae60bf0f3f6e9834d7eaa1f288067f9ff09201ea0bef502d"
     },
     {
       "file": "ledger/archive_assets_fixture/note-6e7a52ce-d1e5e042.txt",
@@ -29,13 +29,13 @@
     },
     {
       "file": "ledger/archive.md",
-      "bytes": 44892,
-      "sha256": "5107a676fbd1654dcb5c1595bbdd3c9bb3e57cd9f8451319d250dfa5bcc5055f"
+      "bytes": 45111,
+      "sha256": "507f4883f593fd107f8d211ee47c2e2f248d6d47120feffb2f602b88c527589e"
     },
     {
       "file": "selected-child/archive.md",
-      "bytes": 8819,
-      "sha256": "cf8a7ab1a9d73f52e6b6026b9a1cc4a65c5dce8295c2d47027c1d1cd23837cc4"
+      "bytes": 9570,
+      "sha256": "0ccb7babeffbf0374eb2b4d1163bc101c67011009fddb727ccba952923f149c0"
     }
   ]
 }

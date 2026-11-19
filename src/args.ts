@@ -4,6 +4,8 @@
 //
 // It returns a result rather than printing or exiting, per the rule that only `cli.ts` does that.
 
+import type { ToolGroupOrder } from './types.ts';
+
 export interface CliOptions {
   list: boolean;
   showIgnored: boolean;
@@ -17,6 +19,7 @@ export interface CliOptions {
   current: boolean;
   overwrite: boolean;
   keepSource: boolean;
+  toolGroupOrder: ToolGroupOrder;
   cache: boolean;
   clean: boolean;
   dryRun: boolean;
@@ -58,6 +61,7 @@ const VALUE_FLAGS: Record<string, string> = {
   '--snapshot': '--snapshot check|update [sessionId]',
   '--install-skill': '--install-skill <targetRoot>',
   '--older-than': '--older-than <nonnegative days>',
+  '--tool-group-order': '--tool-group-order request|completion',
 };
 
 const ACTION_FLAGS = ['--golden', '--snapshot'] as const;
@@ -134,6 +138,11 @@ export function parseArgs (argv: string[]): ParsedArgs {
     return { ok: false, error: '--no-html cannot be combined with --html-output.' };
   if (booleans.has('--json') && !(booleans.has('--verify') || booleans.has('--audit')))
     return { ok: false, error: '--json is available only with --verify.' };
+  const groupOrder = values.get('--tool-group-order');
+  if (groupOrder !== undefined && groupOrder !== 'request' && groupOrder !== 'completion')
+    return { ok: false, error: 'Usage: --tool-group-order request|completion' };
+  if (groupOrder !== undefined && (listRequested || values.has('--golden') || values.has('--snapshot') || values.has('--install-skill')))
+    return { ok: false, error: '--tool-group-order is available only for chat export or verification.' };
   if (modes > 1)
     return { ok: false, error: 'Choose one action: --list, --verify, --snapshot, --golden or --install-skill.' };
   if (booleans.has('--current') && (booleans.has('--list') || values.has('--golden') || values.has('--install-skill')))
@@ -158,6 +167,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       current: booleans.has('--current'),
       overwrite: booleans.has('--overwrite'),
       keepSource: booleans.has('--keep-source'),
+      toolGroupOrder: (groupOrder ?? 'request') as ToolGroupOrder,
       cache: booleans.has('--cache') || booleans.has('--clean'),
       clean: booleans.has('--clean'),
       dryRun: booleans.has('--dry-run'),

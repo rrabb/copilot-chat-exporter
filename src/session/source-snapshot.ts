@@ -5,6 +5,7 @@ import path from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { createSourceCacheDirectory, sourceCacheRoot, discardCapture, finishCapture, registerCapture } from './source-cache.ts';
 import type { SdkCapture } from './sdk-capture.ts';
+import type { ToolGroupOrder } from '../types.ts';
 import { readChatIndex } from './inventory.ts';
 
 export interface SourceStamp { size: number; mtimeMs: number }
@@ -327,6 +328,7 @@ interface ExportCopyReceipt {
   root?: string;
   source?: string;
   copy?: SourceCopy;
+  toolGroupOrder?: ToolGroupOrder;
 }
 
 const receiptFile = (output: string) => path.join(sourceCacheRoot(), 'receipts',

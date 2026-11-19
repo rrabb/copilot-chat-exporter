@@ -24,6 +24,29 @@ test('pending SDK shell calls keep shell IDs and other arguments alongside the c
   const preview = renderSdkExport(events, source(), {
     title: 'Pending shell', assetsDirectory: 'assets', outputPath: '', generatedAt: '2026-10-21T00:00:00Z',
   });
+
+  test('completion order is optional and keeps source verification aligned with the rendered order', () => {
+    const events = [
+      prompt('Read two files'),
+      assistant({ toolRequests: [
+        { toolCallId: 'a', name: 'view', arguments: { path: 'a.ts' }, intentionSummary: 'Read a' },
+        { toolCallId: 'b', name: 'view', arguments: { path: 'b.ts' }, intentionSummary: 'Read b' },
+      ] }),
+      event('tool.execution_complete', { toolCallId: 'b', success: true, result: { content: 'b' } }),
+      event('tool.execution_complete', { toolCallId: 'a', success: true, result: { content: 'a' } }),
+    ];
+    const requested = renderSdkExport(events, source(), {
+      title: 'Request order', assetsDirectory: 'assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z',
+    });
+    const completed = renderSdkExport(events, source(), {
+      title: 'Completion order', assetsDirectory: 'assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z',
+      toolGroupOrder: 'completion',
+    });
+    assert.ok(requested.markdown.indexOf('Read a') < requested.markdown.indexOf('Read b'));
+    assert.ok(completed.markdown.indexOf('Read b') < completed.markdown.indexOf('Read a'));
+    assert.equal(buildSdkLossAccount(events, requested.markdown, [], 'request').failed, false);
+    assert.equal(buildSdkLossAccount(events, completed.markdown, [], 'completion').failed, false);
+  });
   assert.match(preview.markdown, /synthetic-terminal-id/u);
   assert.match(preview.markdown, /Run a synthetic terminal check/u);
   assert.match(preview.markdown, /mode: async/u);
@@ -69,17 +92,53 @@ test('readable reasoning, text and tool intent become turn content in recorded o
   assert.equal(session.workingDirectory, 'C:\\work');
 });
 
-test('reasoning recorded only as an encrypted token is counted, not invented', () => {
+test('SDK tool requests keep batch identity, structured arguments, reasoning duration and failure state', () => {
   const { session } = build([
+    prompt('Inspect two files'),
+    event('session.usage_record', { usage: {
+      accounting: { usageId: 'usage-1', sourceSessionId: 'source-1', sequence: 1 },
+      model: 'claude-test', responseModel: 'claude-test-provider', inferenceGateway: false,
+      duration: 1250,
+    } }),
+    assistant({
+      reasoningText: 'I will read both files.', toolRequests: [
+        { toolCallId: 'a', name: 'view', arguments: { path: 'C:\\work\\a.ts', view_range: [1, 20] } },
+        { toolCallId: 'b', name: 'view', arguments: { path: 'C:\\work\\b.ts', view_range: [21, 40] } },
+      ],
+    }),
+    event('tool.execution_complete', { toolCallId: 'b', success: false, error: { message: 'Read failed', code: 'READ' } }),
+  ]);
+  const turn = session.turns[0]!;
+  assert.equal(turn.reasoning[0], 'I will read both files.');
+  assert.equal(turn.body.find((node) => node.type === 'think')?.modelCallDurationMs, 1250);
+  const [left, right] = turn.toolNodes;
+  assert.ok(left!.toolBatchId);
+  assert.equal(left!.toolBatchId, right!.toolBatchId);
+  assert.deepEqual(left!.inputData, { path: 'C:\\work\\a.ts', view_range: [1, 20] });
+  assert.equal(right!.failed, true);
+  assert.match(right!.resultText, /Read failed/u);
+});
+
+test('reasoning recorded only as an encrypted token is counted, not invented', () => {
+  const events = [
     prompt('Question'),
     assistant({ reasoningOpaque: 'AAAA', encryptedContent: 'BBBB', content: 'Answer' }),
     assistant({ reasoningText: 'Visible thinking', reasoningBlocks: { blocks: [{ type: 'thinking', thinking: 'Visible thinking' }] } }),
-    assistant({ reasoningBlocks: { blocks: [{ type: 'reasoning', summary: [{ type: 'summary_text', text: 'A model-written summary' }] }] } }),
-  ]);
+    assistant({ reasoningBlocks: { blocks: [{ type: 'reasoning', summary: [
+      { type: 'summary_text', text: '**Planning the check**\n\nA model-written summary' },
+      { type: 'summary_text', text: '**Reviewing the result**\n\nA second model-written summary' },
+    ] }] } }),
+  ];
+  const { session } = build(events);
   const turn = session.turns[0]!;
   assert.equal(turn.scalar.opaqueReasoningBlocks, 1);
-  assert.deepEqual(turn.reasoning, ['Visible thinking', 'A model-written summary']);
-  assert.deepEqual(turn.scalar.reasoningKinds, { thinking: 1, summary: 1 });
+  assert.deepEqual(turn.reasoning, ['Visible thinking', '**Planning the check**\n\nA model-written summary', '**Reviewing the result**\n\nA second model-written summary']);
+  assert.equal(turn.body.filter((node) => node.type === 'think' && node.summaryTitle === 'Reviewing the result').length, 1);
+  assert.deepEqual(turn.scalar.reasoningKinds, { thinking: 1, summary: 2 });
+  const rendered = renderSdkExport(events, source(), {
+    title: 'Structured reasoning', assetsDirectory: 'assets', outputPath: 'x.md', generatedAt: '2026-10-14T12:00:00Z',
+  });
+  assert.equal(buildSdkLossAccount(events, rendered.markdown).failed, false);
 });
 
 test('tool failures, shell exit codes and detailed diffs are kept', () => {
@@ -225,10 +284,11 @@ test('a delegated agent is nested at its call, labelled, and its conversation is
   assert.equal(task!.subagent!.turns[0]!.prompt, 'Find the parser bug');
   const nested = task!.subagent!.turns[0]!.toolNodes.find((node) => node.toolCallId === 'task2');
   assert.equal(nested!.subagent!.turns[0]!.prose.length, 1, 'a delegated agent can delegate');
-  assert.match(out.markdown, /🤖 SUB-AGENT<\/code>: Research the parser \(type research · Claude Test · 2 tool calls · 5\.0s · 1,234 tokens\)/u);
+  assert.match(out.markdown, /### 🤖 Sub-agent · Research the parser/u);
+  assert.match(out.markdown, /\*\*Work:\*\* type research · Claude Test · 2 tool calls · 5\.0s · 1,234 tokens/u);
   assert.match(out.markdown, /\*\*Delegated task:\*\*[\s\S]*Find the parser bug/u);
   assert.match(out.markdown, /\*\*Summary returned to the main chat:\*\*[\s\S]*The bug is in the lexer\./u);
-  assert.match(out.markdown, /📜 Full sub-agent conversation[\s\S]*Child reasoning about the parser[\s\S]*Grandchild finding\./u);
+  assert.match(out.markdown, /📜 Full sub-agent conversation and recorded details[\s\S]*Child reasoning about the parser[\s\S]*Grandchild finding\./u);
   assert.match(out.markdown, /\*\*Sub-agents:\*\* 2 /u);
   const account = buildSdkLossAccount(events, out.markdown);
   assert.deepEqual(account.unaccounted, []);
@@ -377,7 +437,7 @@ test('the export names what was left out, keeps reasoning, and passes the indepe
   const account = buildSdkLossAccount(events, out.markdown);
   assert.equal(account.failed, false);
   assert.deepEqual(account.unaccounted, []);
-  const lossy = buildSdkLossAccount(events, out.markdown.replace('The stack trace points at the parser.', ''));
+  const lossy = buildSdkLossAccount(events, out.markdown.replaceAll('The stack trace points at the parser.', ''));
   assert.deepEqual(lossy.unaccounted.map((item) => [item.category, item.status]), [['reasoning', 'absent']]);
 });
 

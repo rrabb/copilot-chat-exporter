@@ -285,7 +285,7 @@ c:/fixture/src/example.ts
 
 #### 💬 Assistant Response
 
-<details class="agent-reasoning"><summary><sub><span style="color:#7d8590;font-weight:400">🧠 Agent reasoning (1 thought)</span></sub></summary>
+<details class="agent-reasoning"><summary><sub><span style="color:#7d8590;font-weight:400">🧠 Agent reasoning: <strong>I'm scanning the config for relevant settings before answering the question.</strong></span></sub></summary>
 
 <div style="color:grey;margin-left:2em;margin-top:8px;">
 
@@ -673,7 +673,7 @@ _No assistant text was recorded for this turn._
 
 #### 💬 Assistant Response
 
-<details class="agent-reasoning"><summary><sub><span style="color:#7d8590;font-weight:400">🧠 Agent reasoning (1 thought)</span></sub></summary>
+<details class="agent-reasoning"><summary><sub><span style="color:#7d8590;font-weight:400">🧠 Agent reasoning: <strong>First I will inspect the first invocation.</strong></span></sub></summary>
 
 <div style="color:grey;margin-left:2em;margin-top:8px;">
 
@@ -717,7 +717,7 @@ The first invocation completed.
 
 </div>
 
-<details class="agent-reasoning"><summary><sub><span style="color:#7d8590;font-weight:400">🧠 Agent reasoning (1 thought)</span></sub></summary>
+<details class="agent-reasoning"><summary><sub><span style="color:#7d8590;font-weight:400">🧠 Agent reasoning: <strong>Now I will inspect the second invocation.</strong></span></sub></summary>
 
 <div style="color:grey;margin-left:2em;margin-top:8px;">
 

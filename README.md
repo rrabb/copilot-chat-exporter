@@ -45,6 +45,15 @@ bundle, license, README, docs and CI templates are the files that would ship.
 
 ### Verification reports
 
+Agent Host and Copilot CLI tool groups use recorded request order by default. Pass `--tool-group-order completion` to show ordinary children in recorded completion order, matching the GUI for parallel calls. The group stays at its request position. Questions, sub-agents, prose and reasoning never move. Use the same flag when verifying that saved archive.
+
+```sh
+node src/cli.ts <sdk-session-selector> export.md --tool-group-order completion
+node src/cli.ts --verify <sdk-session-selector> export.md --tool-group-order completion
+```
+
+`--tool-group-order request` selects the default behavior. A saved SDK export receipt records the selected mode and reuses it for later file verification. Local tool batches are unchanged.
+
 `node src/cli.ts --verify --strict --json <session-selector> [export.md]` writes a machine-readable report. Local journals accept exact `.jsonl` paths. SDK chats use an exact qualified chat key from `--list`. Strict verification requires the pinned `markdown-it` dev dependency; it fails if the parser is unavailable. Exporting without verification still has no runtime dependencies.
 
 Run `node scripts/verify-corpus.mjs --user-data-root "<Code user-data root>" --concurrency 6` to verify every source selected by the inventory. `--out` is optional. The default is `reports/corpus/corpus-<generatedAt in local time with UTC offset>.json`, with colons and periods replaced by hyphens. For example, `corpus-2026-10-20T23-32-34-259-04-00.json`. The full timestamp avoids overwriting an earlier run on the same date. Reports keep `generatedAt` in UTC for comparison. Reports are local-only and gitignored. They record per-source exit reasons, text categories, parser checks, image hashes, Local export sizes, and size/mtime before and after each run. Changed live originals are listed, but their frozen copies remain in totals. Only `--live` excludes changing sources. The 64-KiB Base64 heuristic remains a separate review trigger for other payloads.

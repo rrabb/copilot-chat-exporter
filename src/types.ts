@@ -95,6 +95,10 @@ export interface TextNode {
 export interface ThinkNode {
   type: 'think';
   text: string;
+  /** Recorded bold heading from one `reasoningBlocks.summary` item, when present. */
+  summaryTitle?: string;
+  /** SDK usage-record duration for the model call that produced this reasoning. */
+  modelCallDurationMs?: number;
 }
 
 /** An inline file reference, reduced to a basename. */
@@ -115,6 +119,10 @@ export interface ToolNode {
   type: 'tool';
   images?: RecordedImage[];
   toolId: string;
+  /** Agent chats: the assistant message that requested this tool with sibling calls. */
+  toolBatchId?: string;
+  /** Position of this call's first completion event inside its Agent Host scope. */
+  completionOrder?: number;
   /** The source passed the reviewed metadata-only field check. */
   noRecordedContent?: true;
   /** Journal identity. Used to merge progress updates and to attach persisted resources. */
@@ -131,6 +139,8 @@ export interface ToolNode {
   promptText: string;
   /** Submitted source or text stored by some tools in `resultDetails.input`. */
   inputText: string;
+  /** Structured arguments kept for source-backed summaries. Complete text still renders separately. */
+  inputData?: unknown;
   /** Language hint paired with `resultDetails.input`, when recorded. */
   inputLanguage: string;
   /** Complete persisted `resultDetails`, retained so unknown result shapes cannot disappear. */
@@ -143,6 +153,8 @@ export interface ToolNode {
   duration: number | null;
   /** Model-facing result text, from `resultDetails.output` or a subagent's report. */
   resultText: string;
+  /** The call failed even when its error text is already part of `resultText`. */
+  failed?: true;
   /** Textual tool failure, when the journal records one. */
   resultError?: string;
   /** Richer result some tools record beside the model-facing text (for example a diff), shown in its own block. */
@@ -286,9 +298,13 @@ export interface UsageSelection {
 export interface TurnUsage {
   own: UsageFigures;
   agents: UsageFigures;
+  /** Ordered call rows used for the stream summary and the collapsed usage table. */
+  calls?: { own: readonly UsageCall[]; agents: readonly UsageCall[] };
   /** The chat's per-call rows cover about all of its assistant replies, so they can stand in for the turn's cost. */
   complete: boolean;
 }
+
+export type ToolGroupOrder = 'request' | 'completion';
 
 /**
  * Credits a turn added to the running total, from the difference between consecutive checkpoints.

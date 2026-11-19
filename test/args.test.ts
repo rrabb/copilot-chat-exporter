@@ -74,6 +74,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     current: false,
     overwrite: false,
     keepSource: false,
+    toolGroupOrder: 'request',
     cache: false,
     clean: false,
     dryRun: false,
@@ -90,6 +91,14 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     outDir: null,
     userDataRoot: null,
     positionals: [],
+  });
+
+  test('tool group child order defaults to request and accepts completion', () => {
+    assert.equal(ok(['synthetic']).toolGroupOrder, 'request');
+    assert.equal(ok(['synthetic', '--tool-group-order', 'completion']).toolGroupOrder, 'completion');
+    assert.equal(ok(['--verify', 'synthetic', '--tool-group-order', 'request']).toolGroupOrder, 'request');
+    assert.match(err(['synthetic', '--tool-group-order', 'parallel']), /request\|completion/u);
+    assert.match(err(['--list', '--tool-group-order', 'completion']), /chat export or verification/u);
   });
 
   test('cache commands validate age, dry-run and action conflicts', () => {

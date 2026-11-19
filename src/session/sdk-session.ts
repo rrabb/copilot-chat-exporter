@@ -121,6 +121,7 @@ export function argumentsText (value: unknown, indent = ''): string {
 }
 
 function applyArguments (node: ToolNode, args: unknown, name: string): void {
+  node.inputData = args;
   name === 'ask_user' && (node.question = parseAskUser(args, { isComplete: false, content: '', detailed: '' }));
   isQuestionLikeTool(name) && (node.question = parseGuessedQuestion(name, args, { isComplete: false, content: '', detailed: '' }));
   if (!isRecord(args)) {
@@ -222,6 +223,8 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
   const nodesById = new Map<string, ToolNode>();
   const turnEnds = new Map<Turn, number>();
   const kinds = new Map<Turn, { thinking: number; summary: number }>();
+  let nextModelCallDurationMs: number | null = null;
+  let completionOrder = 0;
 
   const companion = (name: string, mediaType: string, bytes: Uint8Array, kind: CompanionArtifact['kind'], event: SdkEvent): string => {
     const relativePath = `${options.assetsDirectory}/${name}`;
@@ -305,15 +308,33 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
           break;
         const reasoning = text(data.reasoningText).trim();
         const blocks = isRecord(data.reasoningBlocks) && Array.isArray(data.reasoningBlocks.blocks) ? data.reasoningBlocks.blocks.filter(isRecord) : [];
-        const summaryText = blocks.flatMap((block) => Array.isArray(block.summary) ? block.summary.filter(isRecord).map((item) => text(item.text)) : []).join('\n\n').trim();
-        const thinkingText = blocks.map((block) => text(block.thinking)).join('\n\n').trim();
-        const readable = reasoning || thinkingText || summaryText;
-        if (readable) {
-          const node: TurnNode = { type: 'think', text: readable };
+        const summaryTexts = blocks.flatMap((block) => Array.isArray(block.summary)
+          ? block.summary.filter(isRecord).map((item) => text(item.text).trim()).filter(Boolean) : []);
+        const thinkingTexts = blocks.map((block) => text(block.thinking).trim()).filter(Boolean);
+        const structuredTexts = thinkingTexts.length ? thinkingTexts : summaryTexts;
+        const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim();
+        const structuredMatch = structuredTexts.length > 0
+          && normalized(structuredTexts.join('\n\n')) === normalized(reasoning);
+        const readable = structuredMatch ? structuredTexts : reasoning ? [reasoning] : structuredTexts;
+        if (readable.length) {
+          const node: TurnNode = {
+            type: 'think', text: readable[0]!,
+            ...(/^\*\*[^*\n]+\*\*(?:\n|$)/u.exec(readable[0]!) ? { summaryTitle: /^\*\*([^*\n]+)\*\*/u.exec(readable[0]!)![1]! } : {}),
+            ...(nextModelCallDurationMs !== null ? { modelCallDurationMs: nextModelCallDurationMs } : {}),
+          };
           current.body.push(node);
-          current.reasoning.push(readable);
+          current.reasoning.push(readable[0]!);
+          for (const item of readable.slice(1)) {
+            const thought: TurnNode = {
+              type: 'think', text: item,
+              ...(/^\*\*[^*\n]+\*\*(?:\n|$)/u.exec(item) ? { summaryTitle: /^\*\*([^*\n]+)\*\*/u.exec(item)![1]! } : {}),
+              ...(nextModelCallDurationMs !== null ? { modelCallDurationMs: nextModelCallDurationMs } : {}),
+            };
+            current.body.push(thought);
+            current.reasoning.push(item);
+          }
           const count = kinds.get(current) ?? { thinking: 0, summary: 0 };
-          thinkingText ? (count.thinking += 1) : (count.summary += 1);
+          thinkingTexts.length ? (count.thinking += readable.length) : (count.summary += readable.length);
           kinds.set(current, count);
         } else if (text(data.reasoningOpaque) || text(data.encryptedContent) || blocks.length) {
           current.scalar.opaqueReasoningBlocks = (current.scalar.opaqueReasoningBlocks ?? 0) + 1;
@@ -326,12 +347,14 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
         }
         text(data.model) && (current.scalar.modelId = text(data.model));
         typeof data.outputTokens === 'number' && (current.scalar.messageOutputTokens = (current.scalar.messageOutputTokens ?? 0) + data.outputTokens);
+        const batchId = event.id || text(data.messageId) || `line:${event.line}`;
         for (const request of Array.isArray(data.toolRequests) ? data.toolRequests.filter(isRecord) : []) {
           const id = text(request.toolCallId);
           const name = text(request.name) || text(request.toolName) || 'tool';
           if (!id)
             continue;
           const node = nodesById.get(id) ?? toolNode(id, name);
+          node.toolBatchId ??= batchId;
           node.invocation = text(request.intentionSummary) || text(request.toolTitle) || node.invocation;
           text(request.intentionSummary) && (node.intent = text(request.intentionSummary));
           node.title = text(request.toolTitle) || node.title;
@@ -344,6 +367,7 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
         }
         const when = millis(event.timestamp);
         when !== null && (turnEnds.set(current, Math.max(turnEnds.get(current) ?? 0, when)));
+        nextModelCallDurationMs = null;
         break;
       }
       case 'tool.execution_start': {
@@ -371,6 +395,8 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
         if (!node)
           break;
         const result = isRecord(data.result) ? data.result : {};
+        completionOrder += 1;
+        node.completionOrder ??= completionOrder;
         const content = text(result.content);
         const detailed = text(result.detailedContent);
         node.isComplete = true;
@@ -386,6 +412,7 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
         detailed && detailed.trim() !== content.trim() && (node.detailText = detailed);
         if (data.success === false || failure) {
           const message = `${failure || 'The tool reported failure.'}${isRecord(data.error) && text(data.error.code) ? ` (code ${text(data.error.code)})` : ''}`;
+          node.failed = true;
           node.resultText = node.resultText ? `${node.resultText}\n\n[tool error] ${message}` : `[tool error] ${message}`;
         }
         if (node.question) {
@@ -435,9 +462,8 @@ function processScope (ctx: Shared, events: readonly SdkEvent[], implicit: { pro
         break;
       }
       case 'session.usage_record': {
-        const issues = ctx.usageDiagnostics.get(event);
-        issues?.length && unsupported(type, issues.join('\n'));
-        ctx.usageDiagnostics.delete(event);
+        if (isRecord(data.usage) && typeof data.usage.duration === 'number' && Number.isFinite(data.usage.duration) && data.usage.duration >= 0)
+          nextModelCallDurationMs = data.usage.duration;
         break;
       }
       case 'session.task_complete':
@@ -628,12 +654,19 @@ export function buildSdkSession (all: readonly SdkEvent[], scoped: readonly SdkE
     && !SDK_LEFT_OUT.has(event.type) && !SDK_MARKERS.has(event.type)).length;
   unplaced && ctx.leftOut.set('sub-agent events without a verified delegation', unplaced);
   const errors: string[] = [];
+  const usageErrors = new Map<string, { count: number; lines: number[] }>();
   for (const [event, issues] of ctx.usageDiagnostics) {
     const key = `${event.type}:unsupported`;
     ctx.unhandled.set(key, (ctx.unhandled.get(key) ?? 0) + 1);
     ctx.seen.set(event.type, (ctx.seen.get(event.type) ?? 0) + 1);
-    errors.push(`${event.type} at line ${event.line} has an unsupported payload: ${issues.join('; ')}`);
+    const signature = issues.join('; ');
+    const entry = usageErrors.get(signature) ?? { count: 0, lines: [] };
+    entry.count += 1;
+    entry.lines.length < 5 && entry.lines.push(event.line);
+    usageErrors.set(signature, entry);
   }
+  for (const [issues, entry] of usageErrors)
+    errors.push(`session.usage_record has ${entry.count} unsupported receipt${entry.count === 1 ? '' : 's'} (${issues}). Example line${entry.lines.length === 1 ? '' : 's'}: ${entry.lines.join(', ')}.`);
   for (const event of relevantEvents) {
     if (event.type !== 'session.shutdown' && event.type !== 'session.usage_checkpoint')
       continue;

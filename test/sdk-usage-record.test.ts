@@ -76,6 +76,16 @@ test('absent websocket telemetry creates no entry, including an absent status co
   assert.equal(absent.calls[0]?.provenance?.telemetry, undefined);
 });
 
+test('reviewed response-model and gateway fields keep valid usage without a schema warning', () => {
+  const record = receipt({ responseModel: 'future-model-provider', inferenceGateway: false });
+  const parsed = parseUsageRecords([record]);
+  assert.equal(parsed.diagnostics.size, 0);
+  assert.deepEqual(parsed.calls[0]?.provenance?.telemetry, [
+    { field: 'responseModel', value: 'future-model-provider' },
+    { field: 'inferenceGateway', value: false },
+  ]);
+});
+
 test('malformed websocket fields diagnose without erasing valid telemetry or financial amounts', () => {
   const groups = [
     { fields: ['websocketFallbackErrorKind', 'websocketFallbackReason'], invalid: [null, false, 0, {}, []], expected: 'a string' },

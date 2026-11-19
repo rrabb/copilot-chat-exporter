@@ -22,7 +22,7 @@ import { sourceCopyNotice } from './session/source-snapshot.ts';
 import { sumKnown, sumUsageFigures } from './session/usage-figures.ts';
 import { exporterCommit, exporterVersion } from './version.ts';
 import type { SourceCopy } from './session/source-snapshot.ts';
-import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, QuestionField, QuestionOutcome, QuestionRecord, SessionLocation, SessionUsage, TodoItem, ToolNode, TextNode, Turn, TurnNode, TurnScalars, UnknownResponseNode, UsageFigures } from './types.ts';
+import type { AutoModelResolution, FileTouch, NoteNode, ParsedSession, QuestionField, QuestionOutcome, QuestionRecord, SessionLocation, SessionUsage, ThinkNode, TodoItem, ToolGroupOrder, ToolNode, TextNode, Turn, TurnNode, TurnScalars, TurnUsage, UnknownResponseNode, UsageCall, UsageFigures } from './types.ts';
 import type { MemoryFile, Resource } from './session/enrich.ts';
 import { getWorkspaceRoot, workspacePath } from './host.ts';
 import { VALIDATED_AGAINST } from './session/classify.ts';
@@ -38,6 +38,7 @@ import {
 const MAX_EMBEDDED_RESOURCE_BYTES = 96 * 1024;
 const MAX_COPY_SOURCE_BYTES = 32 * 1024;
 let imageReplacements: Array<{ encoded: string; label: string }> = [];
+let renderedToolGroupOrder: ToolGroupOrder = 'request';
 
 function imageResourceText (content: unknown): string {
   let value = String(content ?? '');
@@ -348,6 +349,86 @@ function toolSummaryHtml (node: ToolNode) {
   return plain.length > MAX_SUMMARY_CHARS ? esc(clip(plain, MAX_SUMMARY_CHARS)) : renderToolText(raw);
 }
 
+function toolInputRecord (node: ToolNode): Record<string, unknown> | null {
+  const input = node.inputData;
+  return input !== null && typeof input === 'object' && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : null;
+}
+
+function commandDescription (node: ToolNode): string {
+  const value = toolInputRecord(node)?.description;
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function toolPath (value: unknown): string {
+  if (typeof value !== 'string' || !value.trim())
+    return '';
+  return workspacePath(value);
+}
+
+function toolRange (value: unknown): string {
+  if (!Array.isArray(value) || value.length !== 2)
+    return '';
+  const [start, end] = value;
+  if (typeof start !== 'number' || typeof end !== 'number')
+    return '';
+  return start === end ? `line ${thousands(start)}` : `lines ${thousands(start)}-${thousands(end)}`;
+}
+
+function curatedToolSummary (node: ToolNode): string {
+  const args = toolInputRecord(node);
+  if (!args)
+    return '';
+  const description = commandDescription(node);
+  if (node.command && description)
+    return description;
+  const tool = toolFriendly(node.toolId);
+  if (tool === 'view') {
+    const file = toolPath(args.path);
+    const range = toolRange(args.view_range);
+    if (file)
+      return `Read ${file}${range ? `, ${range}` : ''}`;
+  }
+  if (tool === 'grep' || tool === 'rg') {
+    if (typeof args.pattern === 'string' && args.pattern)
+      return args.pattern;
+  }
+  if (tool === 'glob') {
+    const pattern = typeof args.pattern === 'string' ? args.pattern : '';
+    const base = toolPath(args.path ?? args.paths);
+    if (pattern)
+      return `${pattern}${base ? ` in ${base}` : ''}`;
+  }
+  if (['edit', 'apply_patch', 'create_file', 'delete_file', 'replace_string_in_file'].includes(tool)) {
+    const file = toolPath(args.path ?? args.filePath ?? args.target_file);
+    if (file)
+      return `${tool === 'delete_file' ? 'Delete' : tool === 'create_file' ? 'Create' : 'Edit'} ${file}`;
+  }
+  return '';
+}
+
+function normalizedIntent (value: string): string {
+  return stripMarkdown(value).replaceAll('\\', '/').replace(/\s+/gu, ' ').trim().toLocaleLowerCase('en-US');
+}
+
+function repeatedIntent (node: ToolNode): boolean {
+  const intent = node.intent ? normalizedIntent(node.intent) : '';
+  if (!intent)
+    return false;
+  const curated = normalizedIntent(curatedToolSummary(node));
+  if (curated && intent === curated)
+    return true;
+  return !curated && (intent === normalizedIntent(node.invocation || '')
+    || intent === normalizedIntent(node.pastTense || ''));
+}
+
+function toolStatus (node: ToolNode): string {
+  if (node.failed || node.resultError || (node.exitCode !== null && node.exitCode !== 0))
+    return '⚠️ failed';
+  return node.isComplete ? '' : '⏳ in progress';
+}
+
 // A terminal command's full text is always shown in the Command fence below, so the header
 // only needs the first line - repeating the whole (possibly multi-line) command there too
 // just pushes the rest of the turn further down the page.
@@ -421,15 +502,17 @@ function renderSubagent (node: ToolNode, byCall: Map<string, Resource[]>) {
     sub.totalTokens != null ? `${thousands(sub.totalTokens)} tokens` : '',
     sub.usage ? `${fmtAiCredits(sub.usage.nanoAiu)} credits in ${thousands(sub.usage.calls)} call${sub.usage.calls === 1 ? '' : 's'}` : '',
     sub.cancelled ? 'cancelled' : '',
+    node.failed || node.resultError ? 'failed' : '',
     node.isComplete ? '' : 'not completed',
   ].filter(Boolean).join(' · ');
-  const head = `${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">🤖 SUB-AGENT</code>: ${esc(clip(title, 120))} (${esc(facts)})`;
+  const visibleTask = clip(node.promptText || sub.turns[0]?.prompt || '', 180);
+  const visibleResult = clip(node.resultText || node.output, 240);
   const body: string[] = [];
   const block = (label: string, value: string) => {
     const fence = fenceFor(value, 'text');
     body.push(`**${label}:**`, '', fence.open, redact(value), fence.close, '');
   };
-  node.intent && body.push(`**Intent:** ${esc(node.intent)}`, '');
+  node.intent && !repeatedIntent(node) && body.push(`**Intent:** ${esc(node.intent)}`, '');
   const task = sub.turns[0]?.prompt || node.promptText;
   task && block('Delegated task', task);
   const returned = node.resultText || node.output;
@@ -445,12 +528,21 @@ function renderSubagent (node: ToolNode, byCall: Map<string, Resource[]>) {
     '', ...indentBlock(conversation, NESTED_INDENT), '', '</details>', '',
   );
   return [
-    `<details><summary>${mutedSummary(head)}</summary>`,
-    '<div aria-hidden="true" style="height:0.35rem"></div>',
+    `<div style="border:2px solid #8250df;border-left-width:6px;border-radius:8px;padding:4px 16px;margin:10px 0;background:#8250df0d">`,
     '',
-    ...indentBlock(body),
+    `### 🤖 Sub-agent · ${esc(clip(title, 120))}`,
+    '',
+    ...(visibleTask ? [`**Task:** ${esc(visibleTask)}`, ''] : []),
+    ...(visibleResult ? [`**Result:** ${esc(visibleResult)}`, ''] : []),
+    `**Work:** ${esc(facts)}`,
+    '',
+    `<details><summary>${mutedSummary('📜 Full sub-agent conversation and recorded details')}</summary>`,
+    '',
+    ...indentBlock(body, NESTED_INDENT),
     '',
     '</details>',
+    '',
+    '</div>',
   ];
 }
 
@@ -688,25 +780,27 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, contin
   const resources = node.toolCallId && !continuation ? (byCall.get(node.toolCallId) ?? []) : [];
   const rawInput = node.toolSpecificData?.kind === 'input' ? node.toolSpecificData.rawInput : null;
   const inputText = node.command && isCommandEcho(node.inputText, node.command) ? '' : node.inputText;
-  // A completed call needs no marker; only the exceptions earn one.
-  const icon = node.isComplete ? '' : '⏳ ';
+  const curated = curatedToolSummary(node);
+  const description = commandDescription(node);
   const summaryHtml = node.command
-    ? `<code style="${COMMAND_CODE}">${esc(commandOneLiner(node.command))}</code>`
-    : toolSummaryHtml(node);
-  const head = `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: ${summaryHtml}`;
+    ? `${description ? `<span style="color:#d0b682">${esc(description)}</span> · ` : ''}<code style="${COMMAND_CODE}">${esc(commandOneLiner(node.command))}</code>`
+    : curated ? esc(curated) : toolSummaryHtml(node);
+  const status = toolStatus(node);
+  const head = `${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: ${summaryHtml}${status ? ` · ${status}` : ''}`;
   const hasDetails = node.toolSpecificData && node.toolSpecificData.kind !== 'terminal' && node.toolSpecificData.kind !== 'todoList';
   const resultDetails = unrenderedResultDetails(node);
-  const hasBody = continuation || node.images?.length || node.intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
+  const intent = node.intent && !repeatedIntent(node) ? node.intent : '';
+  const hasBody = continuation || node.images?.length || intent || node.command || node.promptText || inputText || rawInput || resources.length || hasDetails || node.output || node.resultText || node.resultError || node.detailText || resultDetails != null;
   const question = continuation ? undefined : node.question;
   // Nothing to expand: render a plain line rather than an empty collapsible.
   if (!hasBody && !question)
     return [`- ${mutedSummary(node.noRecordedContent
-      ? `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: No message, input or output was recorded.`
+      ? `${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: No message, input or output was recorded.${status ? ` · ${status}` : ''}`
       : head)}`];
   const body = [];
   if (continuation && !node.output)
     body.push(`**Terminal status:** ${node.isComplete ? 'completed' : 'in progress'}${node.exitCode != null ? `; exit ${node.exitCode}` : ''}${node.duration != null ? `; ${humanDuration(node.duration)}` : ''}.`, '');
-  node.intent && body.push(`**Intent:** ${esc(node.intent)}`, '');
+  intent && body.push(`**Intent:** ${esc(intent)}`, '');
   if (node.command) {
     const fence = fenceFor(node.command, 'powershell');
     body.push('**Command:**', '', fence.open, redact(node.command), fence.close, '');
@@ -778,7 +872,7 @@ function renderToolNode (node: ToolNode, byCall: Map<string, Resource[]>, contin
     Object.keys(detailsSource).length && body.push(`<details><summary>${mutedSummary('⚙️ Tool details')}</summary>`, '', ...indentBlock([fence.open, json, fence.close], NESTED_INDENT), '', '</details>', '');
   }
   if (question)
-    return renderQuestion(question, body, `${MARK.toolBadgePrefix}${icon}<code style="${MUTED_CODE}">${esc(question.source === 'guessed' ? String(node.toolId ?? 'tool') : toolFriendly(node.toolId))}</code>: `);
+    return renderQuestion(question, body, `${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(question.source === 'guessed' ? String(node.toolId ?? 'tool') : toolFriendly(node.toolId))}</code>: `);
   return [
     `<details><summary>${mutedSummary(head)}</summary>`,
     '<div aria-hidden="true" style="height:0.35rem"></div>',
@@ -973,8 +1067,8 @@ function continuationOf (node: ToolNode, turn: number, previous: Map<string, Pre
     return null;
   const history = previous.get(node.toolCallId) ?? [];
   const fields: Array<keyof ToolNode> = [
-    'toolId', 'invocation', 'pastTense', 'title', 'command', 'promptText', 'inputText', 'inputLanguage',
-    'resultDetails', 'todos', 'output', 'exitCode', 'duration', 'resultText', 'resultError',
+    'toolId', 'invocation', 'pastTense', 'title', 'command', 'promptText', 'inputText', 'inputData', 'inputLanguage',
+    'resultDetails', 'todos', 'output', 'exitCode', 'duration', 'resultText', 'resultError', 'failed',
     'detailText', 'intent', 'subagent', 'fileUri', 'patchFiles', 'toolSpecificData', 'isComplete', 'images',
   ];
   const original = history.find((entry) => entry.turn < turn
@@ -987,10 +1081,214 @@ function continuationOf (node: ToolNode, turn: number, previous: Map<string, Pre
   return original ? { turn: original.turn } : terminal ? { turn: terminal.turn, delta: terminalDelta(terminal.node, node) } : null;
 }
 
-export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '', options: { heading?: boolean; previousTools?: Map<string, PreviousTool[]> } = {}) {
+function renderStreamTool (
+  node: ToolNode,
+  turnNumber: number,
+  byCall: Map<string, Resource[]>,
+  previousTools?: Map<string, PreviousTool[]>,
+): string[] {
+  const from = previousTools ? continuationOf(node, turnNumber, previousTools) : null;
+  if (from === null)
+    return renderToolNode(node, byCall);
+  return [
+    from.delta
+      ? `> ${esc(toolFriendly(node.toolId))}: continued from turn ${from.turn}.`
+      : `- ${mutedSummary(`${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: continued from turn ${from.turn}.`)}`,
+    ...(from.delta ? ['', ...renderToolNode(from.delta, byCall, true)] : []),
+  ];
+}
+
+function toolBatchTitle (nodes: readonly ToolNode[]): string {
+  const tools = nodes.map((node) => toolFriendly(node.toolId));
+  const distinct = new Set(tools);
+  if (distinct.size === 1) {
+    const tool = tools[0]!;
+    if (tool === 'view')
+      return `Read ${nodes.length} file${nodes.length === 1 ? '' : 's'}`;
+    if (tool === 'grep' || tool === 'rg')
+      return `Run ${nodes.length} search quer${nodes.length === 1 ? 'y' : 'ies'}`;
+    if (tool === 'glob')
+      return `Find files in ${nodes.length} quer${nodes.length === 1 ? 'y' : 'ies'}`;
+    if (['edit', 'apply_patch', 'create_file', 'delete_file', 'replace_string_in_file'].includes(tool))
+      return `${nodes.length} file operation${nodes.length === 1 ? '' : 's'}`;
+  }
+  const command = new Set(['powershell', 'bash', 'shell', 'run_in_terminal']);
+  const reads = new Set(['view']);
+  const searches = new Set(['grep', 'rg', 'glob']);
+  const edits = new Set(['edit', 'apply_patch', 'create_file', 'delete_file', 'replace_string_in_file']);
+  const counts = {
+    commands: tools.filter((tool) => command.has(tool)).length,
+    reads: tools.filter((tool) => reads.has(tool)).length,
+    searches: tools.filter((tool) => searches.has(tool)).length,
+    edits: tools.filter((tool) => edits.has(tool)).length,
+  };
+  const classified = counts.commands + counts.reads + counts.searches + counts.edits;
+  const other = nodes.length - classified;
+  const phrases = [
+    counts.commands ? `Ran ${counts.commands} command${counts.commands === 1 ? '' : 's'}` : '',
+    counts.reads ? `read ${counts.reads} file${counts.reads === 1 ? '' : 's'}` : '',
+    counts.searches ? `${counts.searches} search${counts.searches === 1 ? '' : 'es'}` : '',
+    counts.edits ? `${counts.edits} edit${counts.edits === 1 ? '' : 's'}` : '',
+    other ? `${other} other step${other === 1 ? '' : 's'}` : '',
+  ].filter(Boolean);
+  const title = phrases.join(', ') || `${nodes.length} tool calls`;
+  return `${title[0]!.toLocaleUpperCase('en-US')}${title.slice(1)}`;
+}
+
+function toolBatchStatus (nodes: readonly ToolNode[]): string {
+  const failed = nodes.filter((node) => Boolean(toolStatus(node) === '⚠️ failed')).length;
+  const pending = nodes.filter((node) => !node.isComplete).length;
+  if (!failed && !pending)
+    return 'all completed';
+  return [
+    failed ? `${failed} failed` : '',
+    pending ? `${pending} in progress` : '',
+  ].filter(Boolean).join(' · ');
+}
+
+function renderToolBatch (
+  nodes: readonly ToolNode[],
+  turnNumber: number,
+  byCall: Map<string, Resource[]>,
+  previousTools?: Map<string, PreviousTool[]>,
+  order: ToolGroupOrder = 'request',
+): string[] {
+  const ordered = order === 'completion'
+    ? [...nodes].sort((left, right) => (left.completionOrder ?? Number.MAX_SAFE_INTEGER) - (right.completionOrder ?? Number.MAX_SAFE_INTEGER))
+    : nodes;
+  const children = ordered.flatMap((node) => [...renderStreamTool(node, turnNumber, byCall, previousTools), '']);
+  const orderLabel = order === 'completion' ? ' · completion order' : '';
+  return [
+    `<details class="tool-batch"><summary>${mutedSummary(`${MARK.toolBadgePrefix}${esc(toolBatchTitle(nodes))} · ${esc(toolBatchStatus(nodes))}${orderLabel}`)}</summary>`,
+    '',
+    ...indentBlock(children, NESTED_INDENT),
+    '',
+    '</details>',
+  ];
+}
+
+function callFigures (call: UsageCall): UsageFigures {
+  return {
+    calls: 1,
+    inputTokens: call.inputTokens,
+    cacheReadTokens: call.cacheReadTokens,
+    cacheWriteTokens: call.cacheWriteTokens,
+    outputTokens: call.outputTokens,
+    reasoningTokens: call.reasoningTokens,
+    nanoAiu: call.nanoAiu,
+    durationMs: call.durationMs,
+  };
+}
+
+function usageTokensText (figures: UsageFigures): string {
+  const fields = [
+    figures.inputTokens !== null ? `in ${thousands(figures.inputTokens)}` : '',
+    figures.outputTokens !== null ? `out ${thousands(figures.outputTokens)}` : '',
+    figures.reasoningTokens !== null && figures.reasoningTokens > 0 ? `reasoning ${thousands(figures.reasoningTokens)}` : '',
+    figures.durationMs !== null ? humanDuration(figures.durationMs) : '',
+  ].filter(Boolean);
+  return fields.length ? ` [${fields.join(', ')}]` : '';
+}
+
+function usageTelemetry (call: UsageCall): string {
+  const fields = call.provenance?.telemetry ?? [];
+  return fields.map((field) => `${field.field}=${Array.isArray(field.value) ? field.value.join(', ') : String(field.value)}`).join('; ');
+}
+
+function usageProvenance (call: UsageCall): string {
+  const provenance = call.provenance;
+  if (!provenance)
+    return 'not recorded';
+  return JSON.stringify({
+    source: provenance.source,
+    ...(provenance.accounting ? { accounting: provenance.accounting } : {}),
+    ...(provenance.fusion ? { fusion: provenance.fusion } : {}),
+    ...(provenance.parentToolCallId ? { parentToolCallId: provenance.parentToolCallId } : {}),
+    ...(provenance.reasoningEffort !== undefined ? { reasoningEffort: provenance.reasoningEffort } : {}),
+    ...(provenance.billingStatus ? { billingStatus: provenance.billingStatus } : {}),
+    ...(provenance.reportedNanoAiu !== undefined ? { reportedNanoAiu: provenance.reportedNanoAiu } : {}),
+    ...(provenance.durationEvidence ? { durationEvidence: provenance.durationEvidence } : {}),
+    ...(provenance.conflicted ? { conflicted: true } : {}),
+    ...(provenance.issues?.length ? { issues: provenance.issues } : {}),
+  });
+}
+
+function usageModelRows (usage: NonNullable<TurnScalars['usage']>): string[] {
+  const own = [...(usage.calls?.own ?? [])];
+  if (!own.length)
+    return [];
+  const runs: Array<{ model: string; figures: UsageFigures }> = [];
+  for (const call of own) {
+    const model = call.model || '(model not recorded)';
+    const last = runs.at(-1);
+    if (last?.model === model)
+      last.figures = sumUsageFigures(last.figures, callFigures(call));
+    else
+      runs.push({ model, figures: callFigures(call) });
+  }
+  const lines: string[] = [];
+  runs.forEach((run, index) => {
+    const prefix = index === 0 ? '🔢 Used' : '🔀 Model changed to';
+    lines.push(`> ${prefix} \`${esc(modelName(run.model))}\`${usageTokensText(run.figures)}`, '');
+  });
+  return lines;
+}
+
+function usageCallTable (usage: NonNullable<TurnScalars['usage']>): string[] {
+  const rows = [
+    ...(usage.calls?.own ?? []).map((call) => ({ call, scope: 'main' })),
+    ...(usage.calls?.agents ?? []).map((call) => ({ call, scope: 'delegated agent' })),
+  ];
+  if (!rows.length)
+    return [];
+  return [
+    `<details><summary>${mutedSummary(`🔢 Model usage receipts (${rows.length} call${rows.length === 1 ? '' : 's'})`)}</summary>`,
+    '',
+    '| Scope | Time | Requested model | Tokens | Duration | Credits | Finish and telemetry | Provenance |',
+    '|---|---|---|---|---:|---:|---|---|',
+    ...rows.map(({ call, scope }) => {
+      const requested = call.model || 'unknown';
+      const response = call.provenance?.telemetry?.find((item) => item.field === 'responseModel')?.value;
+      const model = response && response !== requested ? `${requested} / response ${response}` : requested;
+      const tokens = [
+        call.inputTokens !== null ? `in ${thousands(call.inputTokens)}` : 'in unknown',
+        call.cacheReadTokens !== null ? `cache read ${thousands(call.cacheReadTokens)}` : '',
+        call.cacheWriteTokens !== null ? `cache write ${thousands(call.cacheWriteTokens)}` : '',
+        call.outputTokens !== null ? `out ${thousands(call.outputTokens)}` : 'out unknown',
+        call.reasoningTokens !== null ? `reasoning ${thousands(call.reasoningTokens)}` : '',
+      ].filter(Boolean).join(', ');
+      const finish = [
+        call.provenance?.telemetry?.find((item) => item.field === 'finishReason')?.value,
+        usageTelemetry(call),
+        ...(call.provenance?.issues ?? []),
+      ].filter(Boolean).join('; ');
+      return `| ${esc(call.agentId ? `${scope} (${call.agentId})` : scope)} | ${esc(isoTimestamp(call.at))} | ${esc(model)} | ${esc(tokens)} | ${humanDuration(call.durationMs)} | ${fmtAiCredits(call.nanoAiu)} | ${esc(finish || 'not recorded')} | ${esc(usageProvenance(call))} |`;
+    }),
+    '',
+    '</details>',
+    '',
+  ];
+}
+
+function renderTurnUsage (usage: TurnUsage): string[] {
+  return [...usageModelRows(usage), ...usageCallTable(usage)];
+}
+
+function reasoningSummary (nodes: readonly ThinkNode[]): string {
+  const titles = nodes.map((node) => node.summaryTitle).filter((title): title is string => Boolean(title));
+  if (titles.length)
+    return clip(titles.join(' · '), 160);
+  const text = stripMarkdown((nodes[0]?.text ?? '').replace(/\s+/gu, ' ').trim());
+  const sentence = text.split(/(?<=[.!?])\s/u)[0] || text;
+  return clip(sentence, 160);
+}
+
+export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, outputPath = '', options: { heading?: boolean; previousTools?: Map<string, PreviousTool[]>; toolGroupOrder?: ToolGroupOrder } = {}) {
+  const toolGroupOrder = options.toolGroupOrder ?? renderedToolGroupOrder;
   const lines = options.heading === false ? [] : [MARK.assistantHeading, ''];
+  turn.scalar.usage && lines.push(...renderTurnUsage(turn.scalar.usage));
   let run: string[] = [];
-  let thoughts: string[] = [];
+  let thoughts: ThinkNode[] = [];
   // VS Code frames inline edit (textEditGroup) previews with bare ``` fences in
   // the response stream; strip a fence that hugs an edit marker so it does not
   // render as an empty code box around the "Edited <file>" note.
@@ -1035,9 +1333,13 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
     if (!tl)
       return;
     const notes: string[] = [];
-    const rendered = thoughts.map((thought) => `💡 ${closeUnbalancedFences(neutralizeStructuralHtml(escapeModelHtml(redact(thought), turn.number, notes)))}`);
+    const rendered = thoughts.map((thought) => `💡 ${closeUnbalancedFences(neutralizeStructuralHtml(escapeModelHtml(redact(thought.text), turn.number, notes)))}`);
+    const duration = thoughts.map((thought) => thought.modelCallDurationMs ?? null).filter((value): value is number => value !== null).at(-1);
+    const count = tl > 1 ? `, ${tl} thoughts` : '';
+    const timing = duration !== undefined ? `, model call ${humanDuration(duration)}` : '';
+    const summary = reasoningSummary(thoughts);
     lines.push(
-      `<details class="agent-reasoning"><summary>${mutedSummary(`🧠 Agent reasoning (${tl} thought${tl !== 1 ? 's' : ''})`)}</summary>`,
+      `<details class="agent-reasoning"><summary>${mutedSummary(`🧠 Agent reasoning: <strong>${esc(summary)}</strong>${count || timing ? ` (${[count.replace(/^, /u, ''), timing.replace(/^, /u, '')].filter(Boolean).join(', ')})` : ''}`)}</summary>`,
       '',
       '<div style="color:grey;margin-left:2em;margin-top:8px;">',
       '',
@@ -1056,10 +1358,11 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
     thoughts = [];
   };
 
-  for (const node of turn.body) {
+  for (let index = 0; index < turn.body.length; index += 1) {
+    const node = turn.body[index]!;
     if (node.type === 'think') {
       flush({ interrupter: 'think' });
-      thoughts.push(node.text);
+      thoughts.push(node);
     } else if (node.type === 'text') {
       flushThoughts();
       run.push(node.text);
@@ -1074,13 +1377,19 @@ export function renderTurnBody (turn: Turn, byCall: Map<string, Resource[]>, out
       flush({ interrupter: 'tool' });
       flushThoughts();
       stripLeadFence = false;
-      const from = options.previousTools ? continuationOf(node, turn.number, options.previousTools) : null;
-      lines.push(...(from === null ? renderToolNode(node, byCall) : [
-        from.delta
-          ? `> ${esc(toolFriendly(node.toolId))}: continued from turn ${from.turn}.`
-          : `- ${mutedSummary(`${MARK.toolBadgePrefix}<code style="${MUTED_CODE}">${esc(toolFriendly(node.toolId))}</code>: continued from turn ${from.turn}.`)}`,
-        ...(from.delta ? ['', ...renderToolNode(from.delta, byCall, true)] : []),
-      ]), '');
+      const batch = [node];
+      if (node.toolBatchId && !node.question && !node.subagent) {
+        while (index + 1 < turn.body.length) {
+          const next = turn.body[index + 1]!;
+          if (next.type !== 'tool' || next.toolBatchId !== node.toolBatchId || next.question || next.subagent)
+            break;
+          batch.push(next);
+          index += 1;
+        }
+      }
+      lines.push(...(batch.length > 1
+        ? renderToolBatch(batch, turn.number, byCall, options.previousTools, toolGroupOrder)
+        : renderStreamTool(node, turn.number, byCall, options.previousTools)), '');
     } else if (node.type === 'note') {
       if (node.images?.length && fenceOpen()) {
         held.push(...renderNote(node), '');
@@ -1268,6 +1577,8 @@ export interface DocumentContext {
   outputPath: string;
   gitStatus: string;
   generatedAt: string;
+  /** How ordinary Agent Host tool-batch children are ordered. Default: recorded request order. */
+  toolGroupOrder?: ToolGroupOrder;
   /** Where over-long tool text is saved in full. Omit it to keep every text inline. */
   overflow?: TextOverflow;
   /** Collects the code fences the renderer closed itself. */
@@ -1430,6 +1741,7 @@ function renderPrompt (turn: Turn): string[] {
 export function buildDocument (session: ParsedSession, context: DocumentContext) {
   overflow = context.overflow ?? null;
   fenceRepairs = context.fenceRepairs ?? null;
+  renderedToolGroupOrder = context.toolGroupOrder ?? 'request';
   const collect = (turns: Turn[], notes: readonly NoteNode[] = []): RecordedImage[] => [
     ...notes.flatMap(node => node.images ?? []),
     ...turns.flatMap((turn) => [
@@ -1452,6 +1764,7 @@ export function buildDocument (session: ParsedSession, context: DocumentContext)
   } finally {
     overflow = null;
     fenceRepairs = null;
+    renderedToolGroupOrder = 'request';
     imageReplacements = [];
     questionNumbers = new Map();
     warnedQuestions = new Map();
@@ -1550,6 +1863,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
     `- **Assistant reasoning turns:** ${reasoningTurns} (${totalThoughts} recovered thought(s))`,
     `- **Tool calls:** ${toolNodes.length}`,
     ...subagentSummaryLine(toolNodes),
+    ...(sdk ? [`- **Tool group child order:** \`${context.toolGroupOrder ?? 'request'}\`${context.toolGroupOrder === 'completion' ? ' (recorded completion events)' : ' (recorded request order)'}`] : []),
     `- **Persisted result resources:** ${resources.resources.length}`,
     `- **Models used:** ${modelsUsed.map((model) => `\`${modelName(model)}\``).join(', ') || 'unknown'}`,
     usage

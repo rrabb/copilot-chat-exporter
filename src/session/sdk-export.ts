@@ -1,7 +1,7 @@
 import { buildDocument } from '../markdown.ts';
 import type { FenceRepairs } from '../markdown.ts';
 import type { CompanionArtifact } from '../export-policy.ts';
-import type { ParsedSession } from '../types.ts';
+import type { ParsedSession, ToolGroupOrder } from '../types.ts';
 import { eventsInScope, readSdkEvents } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import type { SdkEventSource, SessionOccurrence } from './sources.ts';
@@ -18,6 +18,7 @@ export interface SdkExport {
   leftOut: Map<string, number>;
   /** Selected conversation and descendants, for the independent content check. Main selections cover the whole log. */
   events: SdkEvent[];
+  toolGroupOrder: ToolGroupOrder;
 }
 
 export interface SdkExportOptions {
@@ -26,6 +27,7 @@ export interface SdkExportOptions {
   assetsDirectory: string;
   outputPath: string;
   generatedAt: string;
+  toolGroupOrder?: ToolGroupOrder;
   /** Usage rows the CLI stored for this chat (see readUsageForSource). Without them the log's own usage events are used. */
   ledger?: readonly UsageCall[];
 }
@@ -57,6 +59,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     outputPath: options.outputPath,
     gitStatus: '',
     generatedAt: options.generatedAt,
+    toolGroupOrder: options.toolGroupOrder ?? 'request',
     source: 'sdk-events',
     sourceCopy: options.sourceCopy,
     overflow,
@@ -82,7 +85,7 @@ export function renderSdkExport (events: SdkEvent[], source: SdkEventSource, opt
     `Reasoning recorded only as an encrypted token and therefore not readable: ${opaque.toLocaleString('en-US')} assistant message(s).`,
     '',
   ];
-  return { markdown: `${base}${lines.join('\n')}`, companions: [...built.companions, ...overflow.companions], session: built.session, leftOut: built.leftOut, events: [...built.events], fenceRepairs };
+  return { markdown: `${base}${lines.join('\n')}`, companions: [...built.companions, ...overflow.companions], session: built.session, leftOut: built.leftOut, events: [...built.events], fenceRepairs, toolGroupOrder: options.toolGroupOrder ?? 'request' };
 }
 
 /** The usage rows the CLI stored for one chat's event log, read without changing the database. Empty when there are none. */

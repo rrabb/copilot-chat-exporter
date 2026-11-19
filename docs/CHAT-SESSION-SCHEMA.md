@@ -81,10 +81,20 @@ The reviewed catalog contains identity/provider metadata, availability/endpoints
 | Field | Meaning used by the exporter |
 | --- | --- |
 | `accounting.usageId`, `accounting.sourceSessionId`, `accounting.sequence` | Recorded accounting identity and sequence. Deduplication uses the source-session/usage-ID pair. |
-| `model`, `reasoningEffort`, `parentToolCallId`, top-level event `agentId` | Recorded call/model/agent attribution. Missing parent calls don't establish root-turn ownership. |
+| `model`, `responseModel`, `reasoningEffort`, `parentToolCallId`, top-level event `agentId`, `inferenceGateway` | Recorded call/model/agent attribution and reviewed transport metadata. Missing parent calls don't establish root-turn ownership. |
 | `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `reasoningTokens`, `duration` | Per-call metrics when valid. Missing or invalid values stay unknown. |
 | `copilotUsage.totalNanoAiu`, optional `aiCreditsStatus` | Recorded billable amount/status. Partial or unavailable status doesn't become a complete charge or zero. |
 | `fusion` | Optional Fusion ID, synthetic model, policy/pattern, phase ID/kind, role, conversation scope and source model |
+
+The parsed model keeps each `assistant.message` tool batch ID on `ToolNode.toolBatchId`. It keeps the structured input in `ToolNode.inputData` for deterministic summaries, including a terminal call's `description`. `ToolNode.completionOrder` records the first matching `tool.execution_complete` position. The full readable input still comes from `inputText`. The renderer never creates groups from timing or adjacency alone.
+
+`--tool-group-order request` is the default. `--tool-group-order completion` sorts ordinary children inside one batch by `completionOrder`. The group's position and all question, sub-agent, prose and reasoning positions stay recorded-order positions. SDK verification uses the selected order when checking tool-intent sequence.
+
+`ThinkNode.summaryTitle` keeps a leading bold title from a `reasoningBlocks.summary` item. Several summary items become separate thoughts, so every item gets a lightbulb marker. `ThinkNode.modelCallDurationMs` carries the immediately preceding valid `session.usage_record.data.usage.duration`. The value is the model-call duration, not measured thought-only time. A missing receipt leaves the field unset.
+
+Attributed `TurnUsage` keeps ordered own and delegated `UsageCall` rows. Markdown uses contiguous main-scope model runs for first-use and model-change lines.
+
+A collapsed table keeps each selected call's counters, telemetry and normalized provenance. Child usage stays a separate scope in the table and totals.
 
 Identical repeats of one accounting identity count once. Conflicting repeats keep one call with unknown counters and diagnostics. Equal counters on different identities remain different calls. The database ledger, receipts and legacy successes aren't added together. The nonempty ledger wins before child filtering, even when it covers fewer calls. See [SPEC](SPEC.md#agent-usage-and-credits-approved-october-14) for the full selection and cumulative-total rules.
 

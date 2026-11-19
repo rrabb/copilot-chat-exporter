@@ -6,7 +6,7 @@ import { buildDocument, copySource, markdownBody, renderTurnBody, toolFriendly, 
 import type { FenceRepairs } from '../src/markdown.ts';
 import { fenceFor, openFenceTicks } from '../src/text.ts';
 import type { CompanionArtifact } from '../src/export-policy.ts';
-import type { EditOperation, ToolNode, Turn, TurnNode } from '../src/types.ts';
+import type { EditOperation, ToolNode, Turn, TurnNode, UsageCall } from '../src/types.ts';
 import { testSession, testTool, testTurn } from './helpers.ts';
 import { buildRenderReport } from '../src/verify/layers.ts';
 import { buildLossAccount } from '../src/verify/loss-account.ts';
@@ -446,10 +446,131 @@ test('reasoning is collapsed and kept where it happened', () => {
     { type: 'think', text: 'second thought' },
     { type: 'text', text: 'the answer' },
   ]);
-  assert.match(output, /Agent reasoning \(2 thoughts\)/);
+  assert.match(output, /Agent reasoning: <strong>first thought<\/strong> \(2 thoughts\)/);
   assert.ok(output.indexOf('first thought') < output.indexOf('the answer'));
   // One thought must not say "thoughts".
-  assert.match(render([{ type: 'think', text: 'only one' }]), /\(1 thought\)/);
+  assert.doesNotMatch(render([{ type: 'think', text: 'only one' }]), /\bthoughts?\)/);
+  assert.match(render([{ type: 'think', text: 'only one', modelCallDurationMs: 1250 }]), /model call 1.3s/);
+});
+
+test('recorded reasoning summary titles stay in the header and every thought keeps a lightbulb', () => {
+  const output = render([
+    { type: 'think', text: '**Planning the check**\n\nCheck the source.', summaryTitle: 'Planning the check' },
+    { type: 'think', text: '**Reviewing the result**\n\nReview the output.', summaryTitle: 'Reviewing the result' },
+  ]);
+  assert.match(output, /Agent reasoning: <strong>Planning the check · Reviewing the result<\/strong> \(2 thoughts\)/);
+  assert.equal((output.match(/💡 /gu) ?? []).length, 2);
+});
+
+test('same-message tool calls group with quiet path and query headers', () => {
+  const output = render([
+    testTool({
+      toolId: 'view', toolCallId: 'a', toolBatchId: 'batch-1', inputData: { path: path.join(ROOT, 'src', 'a.ts'), view_range: [5, 8] },
+      invocation: 'view the file at /proj/src/a.ts', intent: 'view the file at /proj/src/a.ts', inputText: 'path: /proj/src/a.ts',
+    }),
+    testTool({
+      toolId: 'view', toolCallId: 'b', toolBatchId: 'batch-1', inputData: { path: path.join(ROOT, 'src', 'b.ts'), view_range: [1, 2] },
+      invocation: 'Read src/b.ts, lines 1-2', intent: 'Read src/b.ts, lines 1-2', inputText: 'path: /proj/src/b.ts',
+    }),
+  ]);
+  assert.match(output, /Read 2 files · all completed/u);
+  assert.match(output, /view<\/code>: Read src\/a\.ts, lines 5-8/u);
+  assert.match(output, /view<\/code>: Read src\/b\.ts, lines 1-2/u);
+  assert.equal((output.match(/class="tool-batch"/gu) ?? []).length, 1);
+  assert.match(output, /\*\*Intent:\*\* view the file at \/proj\/src\/a\.ts/u);
+  assert.doesNotMatch(output, /\*\*Intent:\*\* Read src\/b\.ts/u);
+});
+
+test('completion order only reorders children in an ordinary tool batch', () => {
+  const output = renderTurnBody(testTurn({
+    body: [
+      testTool({ toolId: 'view', toolCallId: 'late', toolBatchId: 'batch', completionOrder: 2, inputData: { path: 'late.ts' }, inputText: 'path: late.ts' }),
+      testTool({ toolId: 'view', toolCallId: 'first', toolBatchId: 'batch', completionOrder: 1, inputData: { path: 'first.ts' }, inputText: 'path: first.ts' }),
+    ],
+  }), new Map(), '', { toolGroupOrder: 'completion' }).join('\n');
+  assert.ok(output.indexOf('Read first.ts') < output.indexOf('Read late.ts'));
+  assert.match(output, /completion order/u);
+});
+
+test('mixed group titles summarize commands and file reads like the Copilot GUI', () => {
+  const output = render([
+    testTool({ toolId: 'powershell', toolCallId: 'command', toolBatchId: 'batch', command: 'git status', isComplete: true }),
+    testTool({ toolId: 'view', toolCallId: 'a', toolBatchId: 'batch', inputData: { path: 'a.ts' }, inputText: 'path: a.ts' }),
+    testTool({ toolId: 'view', toolCallId: 'b', toolBatchId: 'batch', inputData: { path: 'b.ts' }, inputText: 'path: b.ts' }),
+  ]);
+  assert.match(output, /Ran 1 command, read 2 files · all completed/u);
+});
+
+test('questions and sub-agents stay outside ordinary tool groups', () => {
+  const question = testTool({ toolId: 'ask_user', toolCallId: 'q', toolBatchId: 'batch-1', inputText: 'question' });
+  question.question = {
+    source: 'ask_user', message: 'Continue?', fields: [], outcome: 'answered', answerText: 'Yes',
+    raw: { question: {}, answer: {} },
+  };
+  const agent = testTool({
+    toolId: 'task', toolCallId: 'agent', toolBatchId: 'batch-1', isComplete: true,
+    subagent: {
+      agentId: 'child', name: 'worker', displayName: 'Worker', description: 'Inspect files', agentType: 'explore', model: 'claude-test',
+      durationMs: 1200, totalToolCalls: 2, totalTokens: 500, cancelled: false, turns: [],
+    },
+  });
+  const output = render([
+    testTool({ toolId: 'view', toolCallId: 'a', toolBatchId: 'batch-1', inputData: { path: 'a.ts' }, inputText: 'path: a.ts' }),
+    testTool({ toolId: 'view', toolCallId: 'b', toolBatchId: 'batch-1', inputData: { path: 'b.ts' }, inputText: 'path: b.ts' }),
+    question,
+    agent,
+  ]);
+  assert.match(output, /class="tool-batch"/u);
+  assert.match(output, /### ❓ Agent asked/u);
+  assert.match(output, /### 🤖 Sub-agent · Inspect files/u);
+  const groupEnd = output.indexOf('</details>');
+  assert.ok(groupEnd < output.indexOf('### ❓ Agent asked'));
+  assert.ok(output.indexOf('### ❓ Agent asked') < output.indexOf('### 🤖 Sub-agent'));
+});
+
+test('search, glob and failure state appear in one-line tool headers', () => {
+  const output = render([
+    testTool({ toolId: 'grep', toolCallId: 'g', inputData: { pattern: 'Decisions|guessed' }, inputText: 'pattern: Decisions|guessed' }),
+    testTool({ toolId: 'glob', toolCallId: 'f', inputData: { pattern: 'src/**/*.ts', path: path.join(ROOT, 'src') }, inputText: 'pattern: src/**/*.ts' }),
+    testTool({
+      toolId: 'powershell', toolCallId: 'x', failed: true, isComplete: true, command: 'git status',
+      inputData: { command: 'git status', description: 'Inventory staged changes' },
+      invocation: 'Inventory staged changes', intent: 'Inventory staged changes', resultText: '[tool error] failed',
+    }),
+  ]);
+  assert.match(output, /grep<\/code>: Decisions\|guessed/u);
+  assert.match(output, /glob<\/code>: src\/\*\*\/\*\.ts in src/u);
+  assert.match(output, /powershell<\/code>: <span style="color:#d0b682">Inventory staged changes<\/span> · <code[^>]*>git status<\/code> · ⚠️ failed/u);
+  assert.doesNotMatch(output, /\*\*Intent:\*\* Inventory staged changes/u);
+});
+
+test('usage lines show first model and later model changes while one table keeps call detail', () => {
+  const call = (model: string, outputTokens: number, at: number): UsageCall => ({
+    at, agentId: null, model, inputTokens: 100, cacheReadTokens: 10, cacheWriteTokens: 5,
+    outputTokens, reasoningTokens: 2, nanoAiu: 1_000_000_000, durationMs: 1500,
+    provenance: { source: 'usage-record', telemetry: [{ field: 'inferenceGateway', value: false }] },
+  });
+  const own = [call('claude-opus-5.5', 20, 1), call('claude-opus-5.5', 30, 2), call('gpt-6.1-sol', 40, 3)];
+  const output = render([], {
+    scalar: {
+      usage: {
+        own: {
+          calls: 3, inputTokens: 300, cacheReadTokens: 30, cacheWriteTokens: 15,
+          outputTokens: 90, reasoningTokens: 6, nanoAiu: 3_000_000_000, durationMs: 4500,
+        },
+        agents: {
+          calls: 0, inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
+          outputTokens: 0, reasoningTokens: 0, nanoAiu: 0, durationMs: 0,
+        },
+        calls: { own, agents: [] },
+        complete: true,
+      },
+    },
+  });
+  assert.match(output, /Used `Claude Opus 5\.5` \[in 200, out 50, reasoning 4, 3\.0s\]/u);
+  assert.match(output, /Model changed to `Gpt 6\.1 Sol` \[in 100, out 40, reasoning 2, 1\.5s\]/u);
+  assert.match(output, /Model usage receipts \(3 calls\)/u);
+  assert.match(output, /inferenceGateway=false/u);
 });
 
 test('an edit marker names the operation', () => {

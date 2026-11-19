@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Agent Host exports group tools from the same `assistant.message`, show quiet path/query headers and failed status, and keep questions and sub-agents outside ordinary groups. Sub-agents now use a prominent standalone block with a visible task, result and work summary (WI-071).
+- Agent Host tool groups now summarize command/read/search/edit counts like the GUI. Child tools use request order by default, while `--tool-group-order completion` selects recorded completion order without moving questions, sub-agents, prose or reasoning (WI-071).
+- Terminal tool headers show the recorded human-readable command `description` as a yellow summary beside the exact command. Matching Intent text isn't repeated.
+- Reasoning headers show a clipped readable summary and recorded model-call duration. Per-request usage shows first model use and every model change, while one collapsed table keeps the selected call rows, telemetry and provenance. Known `responseModel` and `inferenceGateway` fields no longer create repeated unsupported-payload notes (WI-071).
 - Local golden checks and updates use unique scratch runs under `temp-tool-output/`. Success removes that run's bundle. Failures keep it and print its path. Ordinary exports, SDK candidates and old baselines keep their existing retention rules.
 - SDK exports keep identifiable child conversations whose parent calls are missing in a labelled separate section. Ambiguous or incomplete identity mappings still omit the child with a warning.
 - Agent usage prefers a nonempty database ledger, then persisted receipts, then legacy model-call events. Source coverage, duplicate identities and unknown metrics stay visible. Detached child usage isn't assigned to an invented parent turn.

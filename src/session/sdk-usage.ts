@@ -169,7 +169,7 @@ export interface TurnStart { ts: number; number: number }
 
 /** Per-call usage matched to turns and delegated agents. Indexes follow the `starts` passed in. */
 export interface CallAttribution {
-  turns: Array<{ own: UsageFigures; agents: UsageFigures } | undefined>;
+  turns: Array<{ own: UsageFigures; agents: UsageFigures; ownCalls: UsageCall[]; agentCalls: UsageCall[] } | undefined>;
   byAgent: Map<string, UsageFigures>;
   recorded: UsageFigures;
   unattributed: UsageFigures;
@@ -280,8 +280,9 @@ export function attributeCalls (all: readonly SdkEvent[], starts: readonly TurnS
       addCall(unattributed, call);
       continue;
     }
-    const slot = turns[target.index] ??= { own: emptyFigures(), agents: emptyFigures() };
+    const slot = turns[target.index] ??= { own: emptyFigures(), agents: emptyFigures(), ownCalls: [], agentCalls: [] };
     addCall(slot[target.kind], call);
+    (target.kind === 'own' ? slot.ownCalls : slot.agentCalls).push(call);
     addCall(recorded, call);
     const model = call.model ?? '(model not recorded)';
     addCall(byModel.get(model) ?? byModel.set(model, emptyFigures()).get(model)!, call);
@@ -374,7 +375,12 @@ export function attachUsage (
   const attribution = attributeCalls(all, starts, calls, windowEnd, rootAgentId);
   const replies = all.filter((event) => event.type === 'assistant.message').length;
   const complete = usageComplete(calls, replies, selection);
-  attribution.turns.forEach((slot, index) => slot && (turns[index]!.scalar.usage = { ...slot, complete }));
+  attribution.turns.forEach((slot, index) => slot && (turns[index]!.scalar.usage = {
+    own: slot.own,
+    agents: slot.agents,
+    calls: { own: slot.ownCalls, agents: slot.agentCalls },
+    complete,
+  }));
   const walk = (list: readonly Turn[]) => {
     for (const turn of list)
       for (const node of turn.toolNodes)

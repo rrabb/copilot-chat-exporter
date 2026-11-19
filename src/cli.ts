@@ -213,7 +213,7 @@ const {
   workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
   userDataRoot: userDataRootArg,
   overwrite: overwriteMode,
-  keepSource, cache: cacheMode, clean: cleanMode, dryRun, olderThanDays, yes, includeCorpus,
+  keepSource, toolGroupOrder, cache: cacheMode, clean: cleanMode, dryRun, olderThanDays, yes, includeCorpus,
 } = parsed.options;
 
 if (cacheMode) {
@@ -361,7 +361,7 @@ if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefin
   const sdkExit = await runSdkCommand({
     root: selectedRoot ?? '', selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
     overwrite: overwriteMode, verify: verifyMode, strict: strictMode, json: jsonMode,
-    keepSource,
+    keepSource, toolGroupOrder,
   });
   sdkExit !== null && process.exit(sdkExit);
 }
@@ -412,7 +412,7 @@ if (verifyMode) {
   }
   const overflow = { assetsDirectory: 'assets', companions: [] as CompanionArtifact[] };
   const fenceRepairs: FenceRepairs = { early: [], turnEnd: 0, html: [] };
-  const built = renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), overflow, fenceRepairs });
+  const built = renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), overflow, fenceRepairs, toolGroupOrder });
   !jsonMode && printFenceRepairs(fenceRepairs);
   const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown ?? built}\n${renderedMarkdown === null
     ? overflow.companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')
@@ -451,7 +451,7 @@ if (verifyMode) {
 // Renders in memory rather than writing an export: the digest is the artifact, and nothing in it
 // depends on where the file would have gone.
 if (snapshotAction) {
-  const preview = renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString() });
+  const preview = renderSession(loaded, { outputPath: '', gitStatus: '', generatedAt: new Date().toISOString(), toolGroupOrder });
   const fresh = buildDigest(session, buildRenderReport(session, preview).counts);
   const target = snapshotPath(location.sessionId);
   const shape = `${fresh.turns} turn(s), ${fresh.toolCalls.total} tool call(s), ${fresh.thoughts} thought(s), ${Object.keys(fresh.census.seen).length} kind(s)`;
@@ -532,6 +532,7 @@ try {
         outputPath: artifactPath,
         gitStatus: loaded.host.gitStatus(),
         generatedAt: new Date().toISOString(),
+        toolGroupOrder,
         overflow,
         fenceRepairs: exportFenceRepairs,
       });

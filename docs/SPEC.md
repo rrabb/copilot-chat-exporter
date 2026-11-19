@@ -46,13 +46,27 @@ Verification applies the same fence-repair rules to SDK and Local exports: early
 
 The exporter keeps tool calls that VS Code hides (`presentation: 'hidden'`). A later copy of the same tool-call ID that adds no rendered content becomes a one-line "continued from turn N" note. Terminal updates with new content get that note plus a delta: unchanged text and metadata are not repeated, appended terminal output emits its suffix, and non-prefix replacement output stays in full. New commands, errors, images, metadata and status remain visible. The comparison uses the latest earlier turn with the same ID, never another call with similar text. Persisted resources already linked for that ID are not repeated. Other tool updates remain in full. Parsed records are unchanged.
 
+Agent Host tool calls requested by one `assistant.message.toolRequests[]` stay in one source-backed group. The parser keeps the assistant message identity, arguments, first completion position and failure state. The group label summarizes commands, file reads, searches, edits and other steps. The outer group stays at its recorded request position.
+
+Ordinary children default to recorded request order. `--tool-group-order completion` changes only those children to their first `tool.execution_complete` order. The flag is recorded in Session Metadata and the saved export receipt. Saved-file verification reuses the receipt value. Questions and sub-agents close the ordinary group and render at their own level. A batch never crosses assistant message or scope boundaries. Local journal grouping remains separate research because its persisted boundary isn't established.
+
+Ordinary tools use quiet one-line headers. Reviewed `view`, `grep`/`rg`, `glob` and edit arguments supply paths, line ranges or queries. Complete input and output stay in the expanded call. An expanded `Intent` line is omitted only when the header already carries the same recorded identifying text. Non-duplicate intent stays. Failed, unfinished and cancelled states appear in the header, so a collapsed call can't look successful.
+
+Terminal calls use their recorded `description` as a highlighted summary when present. The exact command remains beside it in code styling. If the Intent exactly matches that description, the body doesn't repeat it.
+
 Layer D independently reads raw terminal IDs and output across requests. It checks newly appended output separately, including mid-line suffixes. It never combines different IDs or same-request snapshots into a cross-turn delta. Repeated-content and ordering checks for other categories remain unchanged.
 
 For Local tool records, an explicit missing-data representation is allowed only after checking the complete record against the reviewed metadata fields. It renders the tool name once and "No message, input or output was recorded." The census reports these under `representationCounts.tool-no-content`, separately from Layer D content pieces. Unfamiliar fields fall back to JSON and fail strict rather than claiming no content.
 
 Container fence repairs repeat list indentation and blockquote prefixes. Fence whitespace excludes BOM characters. Outside code, unclosed comments and `script`, `style`, `textarea` and `pre` tags are escaped and recorded as representation changes.
 
-Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backing id>/events.jsonl`. The export is selected like a Local chat (`copilot-chat-export <id>`), by the chat UUID, the backing ID, a unique prefix of at least 8 hex characters, or the exact qualified chat key shown by `--list`. The main conversation is exported, and each sub-agent conversation with a verified tool-call/agent-ID mapping is nested inline at the recorded delegation point (collapsed, labelled as a sub-agent with its title, summary and full conversation). Nesting is followed up to 8 levels. An ambiguous or incomplete identity mapping omits that child conversation and adds an archive warning. The warning marks an intentional omission, so `--strict` still checks the main conversation, verified children and other failure conditions without treating the unverified candidate text as loss. Usage is exported as AI credits (see "Agent usage and credits" below); where none was recorded it shows "not recorded", never zero.
+Agent Host and Copilot CLI chats are read from `~/.copilot/session-state/<backing id>/events.jsonl`.
+
+Select an export like a Local chat with `copilot-chat-export <id>`. The selector can use the chat UUID, backing ID or unique 8-character prefix. It can also use the qualified chat key from `--list`.
+
+The main conversation is exported. A sub-agent with a verified tool-call/agent-ID mapping is nested inline at the recorded delegation point.
+
+The sub-agent gets a prominent standalone heading with its task, returned summary and work facts. Its full conversation remains collapsible. It never joins an ordinary tool batch. Nesting is followed up to 8 levels. An ambiguous or incomplete identity mapping omits that child conversation and adds an archive warning. The warning marks an intentional omission. `--strict` still checks the main conversation, verified children and other failure conditions. It doesn't treat the unverified candidate text as loss. Usage is exported as AI credits (see "Agent usage and credits" below). Where none was recorded, it shows "not recorded", never zero.
 
 An unambiguous child identity with no recorded parent call is different from an ambiguous mapping. Main exports keep these children under **Recorded child conversations - parent call missing**, ordered by their first event in the log. Each child keeps its internal order, complete recorded prompts and the shared renderer's reasoning, tools, images, nested children, redaction and text companions. The exporter invents neither a parent call nor a parent-turn position. Actual call ownership prevents an already nested child, including one beyond the nesting limit, from being moved into this section. Remaining unplaced events are counted under "Left out of this export". Selecting a child limits content to that child and descendants linked by recorded calls, not unrelated root or sibling conversations.
 
@@ -60,13 +74,13 @@ An unambiguous child identity with no recorded parent call is different from an 
 | --- | --- | --- |
 | User prompts and attachment names (`user.message`) | Keep | Turn prompt; attachments in Turn info |
 | Injected context (`transformedContent` when it differs from what was typed) | Keep, collapsed | "Injected context" under Turn info |
-| Assistant text, readable reasoning (`reasoningText`, falling back to thinking or summary blocks), one-line tool intent | Keep | Reasoning block, assistant text, "Intent" line in the tool call |
+| Assistant text, readable reasoning (`reasoningText`, falling back to thinking or summary blocks), one-line tool intent | Keep | Reasoning block with a one-line recorded-text summary and labelled model-call duration. Assistant text. A non-duplicate "Intent" line in the tool call. |
 | Reasoning recorded only as an encrypted token | Count, never reconstruct | Turn info and the closing "Left out" section |
 | Tool calls with arguments (shown as readable lines, not escaped JSON), output, errors, exit codes, duration and detailed results such as diffs | Keep | Tool call blocks |
 | Compaction summaries, model and effort changes, Auto model choice, mode changes, plan changes, resume markers, task-complete summary, aborts, errors, notifications | Keep | Notes at their recorded positions, before or within turns |
 | Seven reviewed Fusion selection, completed/failed phase, commit, change-checkpoint, completion and handoff families | Keep supported fields in order; diagnose unsupported fields | Readable notes, including phase output, errors and handoff text |
 | `instruction.update`, `session.mode_notice_delivered`, `model.turn_retry` | Keep reviewed content and typed metadata, without inferring execution or application | Ordered notes, including full reviewed model catalogs |
-| Persisted `session.usage_record` receipts | Normalize for usage accounting; diagnose unsupported fields | Cost and turn/agent usage, not raw event dumps |
+| Persisted `session.usage_record` receipts | Normalize for usage accounting; diagnose unsupported fields | First-use/model-change lines, one collapsed per-request call table, and Cost/turn/agent usage. Repeated unsupported notes stay out of the stream |
 | Turn and model-call boundary records | Used only for turn timing | Turn info elapsed time |
 | System prompts | Keep each distinct version once | Companion file `system-prompt-<n>-<hash>.md`, with a note at its recorded position, including before a prompt |
 | Skill files | Keep once per distinct text | Companion file `skill-<name>-<hash>.md`, linked from a "Skill used" note at its recorded position |
@@ -129,7 +143,9 @@ The collection isn't a user turn. Notes-only SDK archives have zero recorded req
 
 The receipt parser keeps `websocketFallbackErrorKind`/`websocketFallbackReason` as strings, `websocketFallbackAfterMs`/`websocketFallbackStatusCode` as finite nonnegative numbers and `websocketFallbackReconnectAttempted`/`websocketFallbackStartedThisCall` as literal booleans. Zero and false are kept. Absence creates no telemetry entry; null and coercible wrong types diagnose. Status codes have no invented HTTP-only range or integer rule. Unknown future keys remain diagnostic.
 
-This is parsed receipt telemetry, not full per-call Markdown archival. Receipts contribute selected-call provenance when they win source selection; a preferred ledger can replace that call set. The current cost table doesn't print every telemetry field or archive every nonselected receipt. Source priority, accounting identities/conflicts, unknown counters, detached ownership and nano-AIU credit conversion stay unchanged.
+This is parsed receipt telemetry, with selected-call rows in the conversation's collapsed usage table. Each row includes reviewed telemetry and provenance.
+
+Receipts contribute those rows when they win source selection. A preferred ledger replaces the call set. Nonselected receipt streams aren't printed or added. Source priority, accounting identities/conflicts, unknown counters, detached ownership and nano-AIU credit conversion stay unchanged.
 
 ### Recorded image policy
 

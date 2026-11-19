@@ -131,7 +131,7 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   const repeated = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(repeated.status, 0, 'SDK verification keeps the saved snapshot after further live writes');
   const savedMarkdown = await fs.readFile(activeOutput, 'utf8');
-  await fs.writeFile(activeOutput, savedMarkdown.replace('The compiler error points at the parser.', 'Removed recorded reasoning.'));
+  await fs.writeFile(activeOutput, savedMarkdown.replaceAll('The compiler error points at the parser.', 'Removed recorded reasoning.'));
   const edited = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(edited.status, 2, 'SDK verification checks the saved Markdown, not a new rendering');
   assert.ok(JSON.parse(edited.stdout).failureReasons.includes('layer-d'));

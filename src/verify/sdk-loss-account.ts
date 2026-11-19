@@ -8,6 +8,7 @@ import { childScopes, isRecord } from '../session/sdk-events.ts';
 import type { SdkEvent } from '../session/sdk-events.ts';
 import type { CompanionArtifact } from '../export-policy.ts';
 import { scanFences } from '../text.ts';
+import type { ToolGroupOrder } from '../types.ts';
 
 const LINES = new Set(['tool-input', 'tool-output', 'tool-detail']);
 
@@ -26,11 +27,12 @@ function strings (value: unknown, depth = 0): string[] {
 }
 
 /** The pieces of recorded content in SDK events, with independent order groups for each agent scope. */
-export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
+export function sdkLossPieces (events: readonly SdkEvent[], toolGroupOrder: ToolGroupOrder = 'request'): LossPiece[] {
   const pieces: LossPiece[] = [];
   const companionPieces: LossPiece[] = [];
   const companionKeys = new Set<string>();
   const toolStartsWithArguments = new Set<string>();
+  const completionOrder = new Map<string, number>();
   const turns = new Map<string, number>();
   const childScopeResult = childScopes(events);
   // The archive warns when it omits ambiguous child text, so Layer D checks only verified scopes.
@@ -72,6 +74,11 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
     const args = record(event.data.arguments);
     id && args && strings(args).join('\n').trim() && toolStartsWithArguments.add(callKey(event, id));
   }
+  for (const [index, event] of events.entries())
+    if (event.type === 'tool.execution_complete') {
+      const key = callKey(event, str(event.data.toolCallId));
+      !completionOrder.has(key) && completionOrder.set(key, index);
+    }
   for (const event of events) {
     if (isUnresolvedChild(event))
       continue;
@@ -84,11 +91,24 @@ export function sdkLossPieces (events: readonly SdkEvent[]): LossPiece[] {
       case 'assistant.message': {
         const reasoning = record(data.reasoningBlocks);
         const blocks = Array.isArray(reasoning?.blocks) ? reasoning.blocks.filter(isRecord) : [];
-        const fallback = blocks.flatMap((block) => [str(block.thinking), ...(Array.isArray(block.summary)
-          ? block.summary.filter(isRecord).map((item) => str(item.text)) : [])]).join('\n\n');
-        add('reasoning', str(data.reasoningText) || fallback, event, true);
+        const thinking = blocks.map((block) => str(block.thinking).trim()).filter(Boolean);
+        const summaries = blocks.flatMap((block) => Array.isArray(block.summary)
+          ? block.summary.filter(isRecord).map((item) => str(item.text).trim()).filter(Boolean) : []);
+        const structured = thinking.length ? thinking : summaries;
+        const direct = str(data.reasoningText).trim();
+        const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim();
+        const pieces = structured.length && normalized(structured.join('\n\n')) === normalized(direct)
+          ? structured : direct ? [direct] : structured;
+        for (const text of pieces)
+          add('reasoning', text, event, true);
         add('assistant-text', str(data.content), event, true);
-        for (const request of Array.isArray(data.toolRequests) ? data.toolRequests.filter(isRecord) : []) {
+        const requests = Array.isArray(data.toolRequests) ? data.toolRequests.filter(isRecord) : [];
+        if (toolGroupOrder === 'completion') {
+          requests.sort((left, right) =>
+            (completionOrder.get(callKey(event, str(left.toolCallId))) ?? Number.MAX_SAFE_INTEGER)
+            - (completionOrder.get(callKey(event, str(right.toolCallId))) ?? Number.MAX_SAFE_INTEGER));
+        }
+        for (const request of requests) {
           add('tool-intent', str(request?.intentionSummary), event, true);
           const args = record(request?.arguments);
           !toolStartsWithArguments.has(callKey(event, str(request?.toolCallId))) && args && add('tool-input', strings(args).join('\n'), event);
@@ -184,7 +204,12 @@ function withLinkedCompanions (markdown: string, companions: readonly CompanionA
 }
 
 /** Artifact objects keep link positions and repeated references. Legacy concatenated text supports presence checks but cannot prove link order. */
-export function buildSdkLossAccount (events: readonly SdkEvent[], markdown: string, companions: string | readonly CompanionArtifact[] = []): LossAccount {
+export function buildSdkLossAccount (
+  events: readonly SdkEvent[],
+  markdown: string,
+  companions: string | readonly CompanionArtifact[] = [],
+  toolGroupOrder: ToolGroupOrder = 'request',
+): LossAccount {
   const evidence = typeof companions === 'string' ? `${markdown}\n${companions}` : withLinkedCompanions(markdown, companions);
-  return scoreLossPieces(sdkLossPieces(events), evidence, LINES);
+  return scoreLossPieces(sdkLossPieces(events, toolGroupOrder), evidence, LINES);
 }

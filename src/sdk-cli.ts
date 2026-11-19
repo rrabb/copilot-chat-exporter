@@ -22,6 +22,7 @@ import type { SdkCapture } from './session/sdk-capture.ts';
 import { discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, sourceCacheRoot } from './session/source-cache.ts';
 import { exportFailureFromReport, failureDetails, verificationException, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
+import type { ToolGroupOrder } from './types.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -33,6 +34,7 @@ export interface SdkCommandOptions {
   strict: boolean;
   json?: boolean;
   keepSource?: boolean;
+  toolGroupOrder?: ToolGroupOrder;
 }
 
 /** Returns an exit code, or null when the selector is not an Agent Host or Copilot CLI chat. */
@@ -48,12 +50,13 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
 async function runSdkCommandFromCopy (options: SdkCommandOptions): Promise<number | null> {
   const receipt = options.verify && options.outputArgument
     ? await readExportCopy(path.resolve(options.outputArgument), options.selector) : null;
+  const resolvedOptions = { ...options, toolGroupOrder: receipt?.toolGroupOrder ?? options.toolGroupOrder ?? 'request' };
   if (receipt && !receipt.sdk && !receipt.root)
     return null;
   if (receipt?.sdk) {
     const release = await leaseCapture(receipt.sdk.directory);
     try {
-      return await runSdkSnapshotCommand(options, receipt.sdk);
+      return await runSdkSnapshotCommand(resolvedOptions, receipt.sdk);
     } finally {
       await release();
     }
@@ -73,7 +76,7 @@ async function runSdkCommandFromCopy (options: SdkCommandOptions): Promise<numbe
   const capture = await snapshotSdkSelection(selection);
   let kept = false;
   try {
-    return await runSdkSnapshotCommand(options, capture, () => { kept = true; });
+    return await runSdkSnapshotCommand(resolvedOptions, capture, () => { kept = true; });
   } finally {
     if (!kept)
       await discardCapture(capture.directory);
@@ -108,6 +111,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     console.error(`Export verification failed; private source copy kept at: ${capture.directory}`);
     await keepFailedExportCopy(outputPath, {
       selector: options.selector, sdk: capture, captureDirectory: capture.directory, copy: sourceCopy,
+      toolGroupOrder: options.toolGroupOrder ?? 'request',
     }, failure);
   };
   try {
@@ -117,7 +121,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     versions.copilotVersion = typeof recordedVersions?.copilotVersion === 'string' ? recordedVersions.copilotVersion : 'not recorded';
     const ledger = readUsageForSource(source);
     if (options.verify) {
-      const preview = renderSdkExport(events, displaySource, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger, sourceCopy });
+      const preview = renderSdkExport(events, displaySource, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger, sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' });
       if (options.outputArgument) {
         const outputPath = path.resolve(options.outputArgument);
         preview.markdown = await fs.readFile(outputPath, 'utf8');
@@ -163,7 +167,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
         },
       },
       plan: (assetsDirectory, artifactPath) => {
-        last = renderSdkExport(events, displaySource, { title, assetsDirectory, outputPath: artifactPath, generatedAt, ledger, sourceCopy });
+        last = renderSdkExport(events, displaySource, { title, assetsDirectory, outputPath: artifactPath, generatedAt, ledger, sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' });
         return { markdown: last.markdown, companions: last.companions, diagnostics: [], policy: { ...DEFAULT_EXPORT_POLICY } };
       },
     });
@@ -179,8 +183,8 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     }
     else {
       await saveExportCopy(outputPath, options.keepSource
-        ? { selector: options.selector, status: 'kept', sdk: capture, captureDirectory: capture.directory, copy: sourceCopy }
-        : { selector: options.selector, status: 'not-kept' });
+        ? { selector: options.selector, status: 'kept', sdk: capture, captureDirectory: capture.directory, copy: sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' }
+        : { selector: options.selector, status: 'not-kept', toolGroupOrder: options.toolGroupOrder ?? 'request' });
       options.keepSource && keepSnapshot?.();
     }
     for (const line of formatExportSummary({
@@ -210,7 +214,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
 
 async function verifyReport (preview: SdkExport, strict: boolean, json: boolean, savedArchive: boolean,
   onReport?: (report: ReturnType<typeof buildSdkVerifyJson>, account: ReturnType<typeof buildSdkLossAccount>) => void): Promise<number> {
-  const account = buildSdkLossAccount(preview.events, preview.markdown, preview.companions);
+  const account = buildSdkLossAccount(preview.events, preview.markdown, preview.companions, preview.toolGroupOrder);
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
   const drift = preview.session.census.unhandled;
