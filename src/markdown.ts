@@ -414,7 +414,7 @@ function normalizedIntent (value: string): string {
 
 function repeatedIntent (node: ToolNode): boolean {
   const intent = node.intent ? normalizedIntent(node.intent) : '';
-  if (!intent)
+  if (!intent || node.question)
     return false;
   const curated = normalizedIntent(curatedToolSummary(node));
   if (curated && intent === curated)

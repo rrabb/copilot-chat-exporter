@@ -6,6 +6,7 @@ import { buildSdkLossAccount } from '../src/verify/sdk-loss-account.ts';
 import { detailedOccurrence } from './detailed-listing-fixture.ts';
 import type { SdkEvent } from '../src/session/sdk-events.ts';
 import type { SdkEventSource, SessionOccurrence } from '../src/session/sources.ts';
+import type { CompanionArtifact } from '../src/export-policy.ts';
 
 let line = 0;
 const event = (type: string, data: Record<string, unknown>, timestamp = '2026-10-14T10:00:00.000Z'): SdkEvent =>
@@ -23,6 +24,35 @@ test('pending SDK shell calls keep shell IDs and other arguments alongside the c
   })];
   const preview = renderSdkExport(events, source(), {
     title: 'Pending shell', assetsDirectory: 'assets', outputPath: '', generatedAt: '2026-10-21T00:00:00Z',
+  });
+
+  test('Layer D follows companion links after unrelated table code spans', () => {
+    const body = 'Complete system prompt body that must be checked as a whole.';
+    const events = [event('system.message', { content: body })];
+    const markdown = [
+      '`unmatched opening shift',
+      '| `one` | 1 |',
+      '| `two` | 2 |',
+      '',
+      '[system prompt](assets/system.md)',
+      '',
+    ].join('\n');
+    const companions: CompanionArtifact[] = [{
+      id: 'system', kind: 'metadata', relativePath: 'assets/system.md', mediaType: 'text/markdown',
+      bytes: new TextEncoder().encode(body), location: { sourceId: 'sdk-events', field: 'system-prompt' },
+    }];
+    assert.equal(buildSdkLossAccount(events, markdown, companions).failed, false);
+  });
+
+  test('Layer D does not follow a companion-looking link inside inline code', () => {
+    const body = 'System prompt hidden inside inline code must still count as missing.';
+    const events = [event('system.message', { content: body })];
+    const markdown = '`[system prompt](assets/system.md)`';
+    const companions: CompanionArtifact[] = [{
+      id: 'system', kind: 'metadata', relativePath: 'assets/system.md', mediaType: 'text/markdown',
+      bytes: new TextEncoder().encode(body), location: { sourceId: 'sdk-events', field: 'system-prompt' },
+    }];
+    assert.equal(buildSdkLossAccount(events, markdown, companions).failed, true);
   });
 
   test('completion order is optional and keeps source verification aligned with the rendered order', () => {

@@ -180,12 +180,48 @@ function withLinkedCompanions (markdown: string, companions: readonly CompanionA
   const lines = markdown.split(/\r?\n/u);
   const document = lines.join('\n');
   const { inside } = scanFences(lines);
-  // Keep offsets while hiding fenced text and backtick spans, including spans across lines.
-  const live = lines.map((line, index) => inside[index] ? ' '.repeat(line.length) : line).join('\n')
-    .replace(/(`+)(?:(?!\1)[\s\S])*?\1(?!`)/gu, (span: string) => span.split('\n').map((line) => ' '.repeat(line.length)).join('\n'));
+  const starts: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1;
+  }
+  const lineAt = (position: number) => {
+    let low = 0;
+    let high = starts.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (starts[middle]! <= position)
+        low = middle + 1;
+      else
+        high = middle;
+    }
+    return low - 1;
+  };
+  // Check inline code only within the link's Markdown paragraph. Global matching can pair
+  // unrelated backticks across tables and then hide thousands of lines of live companion links.
+  const inInlineCode = (line: number, column: number) => {
+    let start = line;
+    while (start > 0 && lines[start - 1]!.trim())
+      start -= 1;
+    let open = 0;
+    for (let current = start; current <= line; current += 1) {
+      const text = lines[current]!;
+      for (const match of text.matchAll(/`+/gu)) {
+        if (current === line && match.index >= column)
+          break;
+        const backslashes = /\\+$/u.exec(text.slice(0, match.index))?.[0].length ?? 0;
+        if (backslashes % 2 !== 0)
+          continue;
+        open = open === 0 ? match[0].length : open === match[0].length ? 0 : open;
+      }
+    }
+    return open !== 0;
+  };
   return document.replace(/!?\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu, (link: string, encoded: string, index: number) => {
     const escapes = /\\+$/u.exec(document.slice(0, index))?.[0].length ?? 0;
-    if (link.startsWith('!') || escapes % 2 !== 0 || live.slice(index, index + link.length) !== link)
+    const line = lineAt(index);
+    if (link.startsWith('!') || escapes % 2 !== 0 || inside[line] || inInlineCode(line, index - starts[line]!))
       return link;
     let target: string;
     try {

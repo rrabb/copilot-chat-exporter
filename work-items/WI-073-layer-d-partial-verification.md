@@ -6,12 +6,15 @@ Part of [WI-021](WI-021-source-aware-verification.md), found while accepting WI-
 
 - **Goal:** explain each real Layer D `partial` result and decide whether the renderer, verifier or source interpretation is wrong.
 - **Scope:** the final WI-071 Agent Host export and its frozen source pair from 261118.
-- **Current count:** 22 partials, 0 absences.
+- **Current count before the fix:** 22 partials, 0 absences.
+- **Current count after both fixes:** 0 partials, 0 absences, 0 missing repetitions.
 - **Breakdown:** 8 compaction summaries, 12 system prompts, 1 tool input and 1 tool output.
 - **Not in scope:** the 852 tool-intent absences found during the WI-071 review. WI-071 fixed them. The final report has 1,737 tool intents present and 0 absent.
 - **Not in scope:** the separate `withLinkedCompanions` stack overflow in the 261118 Inbox item.
 - **Policy:** WI-021 rejects blanket partial-match exceptions. Every result needs a piece-level cause and evidence.
-- **Next:** inspect the source text and best matching output slice for every location, starting with one item from each category.
+- **Next:** none. Track the separate companion-scanning stack overflow through its Inbox item.
+- **Result 261119:** the implementation fixed the 22 partials and the 14 repetitions. It passes the focused suite, full verification and a fresh frozen-source render.
+- **Status 261119:** accepted and done.
 
 ## Original goal
 
@@ -84,15 +87,65 @@ The final log records a frozen source hash of `519b9da41b733df54b95f8dceb0b9a857
 - **Existing limit from WI-021:** Layer D can match text elsewhere in the export. A `present` result isn't proof of placement. A `partial` needs comparison with the expected source fragment and the nearest rendered/companion text.
 - **Existing policy from WI-021:** no category-wide exception exists for clipping or command echo.
 
+### Initial root-cause finding 261119
+
+**Observed here:** all 22 failures reproduce from the frozen 261118 source and final review export without reading live chat data.
+
+The inline-code mask in `withLinkedCompanions` pairs backticks across a large share of the Markdown. A table row with many separate code spans starts one recorded match near the Tool Usage table. That match continues for about 297 KB and blanks a later system-prompt link. The same failure hides compaction, terminal-output and other companion links.
+
+The four representative cases classify as follows:
+
+| Category | Representative result | Cause found |
+| --- | --- | --- |
+| `compaction-summary` | 24,615 source bytes equal the linked note after normalization | Verifier didn't expand the live link |
+| `system-prompt` | 79,423 source bytes equal the linked prompt after normalization | Verifier didn't expand the live link |
+| `tool-output` | 15,867 source bytes equal the terminal companion after normalization | Verifier didn't expand the live link |
+| `tool-input` | 9 of 10 meaningful lines found without companion expansion | The missing agent name appears in linked prompt evidence after live-link expansion |
+
+A read-only probe replaced the global mask with line-aware inline-code detection. It expanded 43 text companions and left no partials in the four categories. This established the verifier false-positive root cause and supported the approved fix below.
+
+**Caveat:** Layer D checks text presence. It doesn't prove that the missing `question-records-research` token appears at the exact sub-agent position. The new control keeps the renderer's Intent behavior visible, but placement remains outside this text-presence claim.
+
 ## Plan
 
-1. **Freeze the input.** Read only the failed export receipt, source snapshot and failure log. Confirm hashes and companion links.
-2. **Extract 22 evidence rows.** Record each source event line and category. Add the normalized source text, best match and matched prefix/suffix.
-3. **Classify one control per category.** Use a minimal synthetic source for tool input, tool output, compaction summary and system prompt.
-4. **Check companion accounting.** Confirm long system prompts and compaction text exist at live links and how `withLinkedCompanions` adds their bytes.
-5. **Check renderer transformations.** Compare redaction, `neutralizeStructuralHtml`, Markdown escaping, fence handling and text-companion thresholds.
-6. **Check scoring.** Verify partial-line and multiplicity rules with exact, reordered and repeated controls.
-7. **Propose the smallest owner-specific fix.** Keep independent renderer bugs and verifier bugs separate. Create child build items only if approved.
+1. ✅ **Freeze the input.** Read only the failed export receipt, source snapshot and failure log.
+2. ✅ **Extract 22 evidence rows.** Record each category, request and representative source/output text.
+3. ✅ **Classify one control per category.** Compare tool input, tool output, compaction summary and system prompt.
+4. ✅ **Check companion accounting.** Confirm the source text exists in linked companion bytes.
+5. ✅ **Check renderer transformations.** Compare normalized and redacted text.
+6. ✅ **Check scoring.** Reproduce the false positives and add normal/inline-code controls.
+7. ✅ **Review the remaining multiplicity failures.** Keep them separate from resolved partials and fix the question-Intent case.
+
+### Implemented verifier fix 261119
+
+1. Replace the global backtick regex with a line-aware inline-code mask.
+2. Keep fenced-code masking unchanged.
+3. Never expand an image link or a link inside a same-line code span.
+4. Added a regression that places paired table code spans before a live companion link.
+5. Added a control for a companion link inside inline code. It doesn't expand.
+6. Frozen rerun confirms 0 partials and 0 absences for these four categories.
+
+Effort estimate: S, about 2-4 hours for a focused test, helper change, frozen rerun and full verification.
+
+**Observed here:** the fix expanded 43 text companions in the frozen archive. The real result is:
+
+- 7,641 pieces checked.
+- 0 partial.
+- 0 absent.
+- 0 out-of-order pieces.
+- 14 missing repeated occurrences.
+
+The 14 repetitions are a separate multiplicity finding. Further frozen analysis found one repeated text. Thirty-two question tool intents say "Waiting for response", while the pre-fix saved export contains 18 occurrences. The renderer incorrectly applied ordinary invocation deduplication to question calls. A narrow follow-up keeps those question Intents in the collapsed recorded section.
+
+A fresh in-memory render from the same frozen source now passes Layer D. It checks 7,641 pieces with 0 unaccounted, 0 out-of-order and 0 missing repetitions. The old saved review file stays as historical evidence because it was produced before this final renderer fix.
+
+## Completion 261119
+
+The implementation, focused controls, full verification and frozen-source check are complete. The dev accepted the item on 261119.
+
+The separate companion-scanning stack overflow stays open through its Inbox item. It wasn't part of WI-073's approval.
+
+**Final evidence:** `pnpm run verify` passes all 821 tests, both typechecks and the build. The local golden matches 1,066 normalized lines. The fresh frozen render checks 7,641 pieces with no partials, absences, order errors or missing repeats.
 
 ## Risks and limits
 

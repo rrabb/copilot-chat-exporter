@@ -19,7 +19,7 @@ Canonical entry: [WI-021](../work-log.md#wi-021). The dashboard owns status and 
 - The old tool-call gap remains a separate question in [WI-025](../work-log.md#wi-025).
 - The parser's outdated install hint is tracked in [WI-032](../work-log.md#wi-032).
 - Rejected: a generic missing-whitespace detector and one flattened order sequence (see [Decisions](#decisions-and-tradeoffs)).
-- Work tree: 0 of 2 children done. [WI-032](../work-log.md#wi-032) and [WI-073](../work-log.md#wi-073) are open follow-ups.
+- Work tree: 1 of 2 children done. [WI-032](../work-log.md#wi-032) remains open. [WI-073](../work-log.md#wi-073) is accepted and done.
 
 ## Original goal
 
@@ -35,7 +35,7 @@ Old item #10 called for source-aware verification and a schema census for agent 
 
 ## Work tree
 
-Progress as of 261118: 0 of 2 children done.
+Progress as of 261119: 1 of 2 children done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -46,7 +46,7 @@ The unfinished child's who and size are proposed estimates for the dev to confir
 
 **Related, not children:** [WI-025](../work-log.md#wi-025) investigates the old tool-call gap. [WI-030](../work-log.md#wi-030) covers independent verification of persisted resource text after WI-029.
 
-WI-073 now owns root-cause research for the 22 real partials in the final WI-071 export. WI-071 stays accepted. The current failures are 8 compaction summaries, 12 system prompts, 1 tool input and 1 tool output.
+WI-073 resolved 22 false partials and 14 missing repeated question Intents from the final WI-071 export. The companion-link mask and question-Intent fix were accepted on 261119. WI-071 stays accepted.
 
 ## Current understanding
 

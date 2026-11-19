@@ -528,6 +528,20 @@ test('questions and sub-agents stay outside ordinary tool groups', () => {
   assert.ok(output.indexOf('### ❓ Agent asked') < output.indexOf('### 🤖 Sub-agent'));
 });
 
+test('question intent is kept when the displayed question replaces the generic invocation', () => {
+  const question = testTool({
+    toolId: 'ask_user', toolCallId: 'question', invocation: 'Waiting for response',
+    intent: 'Waiting for response', inputText: 'question: Continue?',
+  });
+  question.question = {
+    source: 'ask_user', message: 'Continue?', fields: [], outcome: 'answered', answerText: 'Yes',
+    raw: { question: {}, answer: {} },
+  };
+  const output = render([question]);
+  assert.match(output, /### ❓ Agent asked/u);
+  assert.match(output, /\*\*Intent:\*\* Waiting for response/u);
+});
+
 test('search, glob and failure state appear in one-line tool headers', () => {
   const output = render([
     testTool({ toolId: 'grep', toolCallId: 'g', inputData: { pattern: 'Decisions|guessed' }, inputText: 'pattern: Decisions|guessed' }),
