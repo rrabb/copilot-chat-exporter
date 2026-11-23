@@ -19,7 +19,7 @@ Canonical entry: [WI-021](../work-log.md#wi-021). The dashboard owns status and 
 - The old tool-call gap remains a separate question in [WI-025](../work-log.md#wi-025).
 - The parser's outdated install hint is tracked in [WI-032](../work-log.md#wi-032).
 - Rejected: a generic missing-whitespace detector and one flattened order sequence (see [Decisions](#decisions-and-tradeoffs)).
-- Work tree: 1 of 2 children done. [WI-032](../work-log.md#wi-032) remains open. [WI-073](../work-log.md#wi-073) is accepted and done.
+- Work tree: 2 of 5 children done. [WI-032](../work-log.md#wi-032) remains open. [WI-073](../work-log.md#wi-073) and [WI-076](../work-log.md#wi-076) are accepted and done. [WI-077](../work-log.md#wi-077) plans an AI repair bundle. [WI-078](../work-log.md#wi-078) plans reusable public report fixtures.
 
 ## Original goal
 
@@ -35,18 +35,27 @@ Old item #10 called for source-aware verification and a schema census for agent 
 
 ## Work tree
 
-Progress as of 261119: 1 of 2 children done.
+Progress as of 261123: 2 of 5 children done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
 | 1 | [WI-032 Parser install hint](../work-log.md#wi-032) | [build] | S | - |
 | 2 | [WI-073 Layer D partial failures](../work-log.md#wi-073) | [research] | S | - |
+| 3 | [WI-076 Plain-English verification report](../work-log.md#wi-076) | [build] | M | - |
+| 4 | [WI-077 AI verification diagnostics](../work-log.md#wi-077) | [research] | M | WI-076 |
+| 5 | [WI-078 Reusable verification report fixtures](../work-log.md#wi-078) | [research] | S | WI-076 |
 
 The unfinished child's who and size are proposed estimates for the dev to confirm. The build item doesn't approve implementation.
 
 **Related, not children:** [WI-025](../work-log.md#wi-025) investigates the old tool-call gap. [WI-030](../work-log.md#wi-030) covers independent verification of persisted resource text after WI-029.
 
 WI-073 resolved 22 false partials and 14 missing repeated question Intents from the final WI-071 export. The companion-link mask and question-Intent fix were accepted on 261119. WI-071 stays accepted.
+
+WI-076 implements a sibling Markdown explanation for saved verification output. `--verify` owns the main trigger, and failed verification receives the same plain-language treatment as a pass. The dev accepted v4 on 261123.
+
+WI-077 plans an AI-ready repair bundle. It depends on WI-076's structured report model, then adds bounded samples, field structures, source evidence, reproduction details and an explicit privacy mode.
+
+WI-078 keeps the useful report scenarios as small synthetic fixtures. It is separate from the private v1-v4 review bundles and doesn't block the WI-076 feature.
 
 ## Current understanding
 

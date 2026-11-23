@@ -59,7 +59,7 @@ The final summary can use either of these forms:
 | `N unsupported SDK payload variant(s) - name=count` | The event handler exists, but a field or value changed |
 | `name:unsupported=count` | The older combined format for a supported event with unsupported fields |
 
-Examples from `output1.txt`:
+Examples:
 
 | Item | Explanation |
 | --- | --- |
@@ -117,7 +117,7 @@ The test can use companion files for long text. A companion can make the text pa
 - It doesn't decrypt opaque reasoning.
 - Images have a separate byte check.
 
-### `output1.txt` example
+### Example failed run
 
 | Output result | Plain explanation |
 | --- | --- |
@@ -128,7 +128,7 @@ The test can use companion files for long text. A companion can make the text pa
 | 1 `tool-output` partial | One tool output wasn't fully found |
 | 14 repeated occurrences missing | The source repeated the same eligible text 14 more times than the export accounted for |
 
-Those findings describe that historical run. WI-073 later showed that the 22 partials and 14 missing occurrences were verifier/rendering bugs, not source loss. The saved failed archive remains useful evidence.
+That failed run shows why a verifier failure needs investigation. Partial and absent text can come from a real export loss, a companion-accounting problem, or a verifier bug. Keep the failure log and failed archive until the cause is reviewed.
 
 ## 4. Images
 
@@ -318,9 +318,9 @@ The verification sidecar links the exact log path when one exists. Normal export
 
 An older run can have a valid failure log without a sidecar because the plain-English report didn't exist yet.
 
-## 12. What the next report should explain
+## 12. What the report explains
 
-The enhanced WI-076 report should mirror every major terminal section:
+The report mirrors every major terminal section:
 
 1. Verdict
 2. Source census
