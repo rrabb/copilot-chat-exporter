@@ -82,6 +82,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     includeCorpus: false,
     olderThanDays: null,
     verify: false,
+    explain: false,
     strict: false,
     json: false,
     golden: null,
@@ -224,4 +225,10 @@ test('--json is a verify-only option that sets json', () => {
   assert.equal(ok(['--verify', 'the-session']).json, false);
   assert.match(err(['the-session', '--json']), /--json is available only with --verify/);
   assert.match(err(['--list', '--json']), /--json is available only with --verify/);
+});
+
+test('--explain is available for chat export and verification only', () => {
+  assert.equal(ok(['synthetic', '--explain']).explain, true);
+  assert.equal(ok(['--verify', 'synthetic', '--explain']).explain, true);
+  assert.match(err(['--list', '--explain']), /chat export or verification/u);
 });

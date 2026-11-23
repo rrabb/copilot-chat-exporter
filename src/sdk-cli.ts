@@ -3,7 +3,7 @@
 import { DEFAULT_EXPORT_POLICY } from './export-policy.ts';
 import { writeArchive } from './archive-writer.ts';
 import { createHostContext, resolveOutputPath, setWorkspaceRoot, workspacePath } from './host.ts';
-import { formatExportSummary } from './export-summary.ts';
+import { buildExportSummary, formatExportSummary } from './export-summary.ts';
 import { inventorySessions } from './session/inventory.ts';
 import { questionWarningLines } from './session/questions.ts';
 import { readSdkScope, readUsageForSource, renderSdkExport, selectSdkSession } from './session/sdk-export.ts';
@@ -24,6 +24,9 @@ import { exportFailureFromReport, failureDetails, verificationException, writeFa
 import type { ExportFailure } from './verify/export-failure.ts';
 import type { ToolGroupOrder } from './types.ts';
 import { splitSdkSchemaDrift } from './session/sdk-schema.ts';
+import { renderVerificationExplanation, writeVerificationExplanation } from './verify/explanation.ts';
+import type { SdkVerificationJson } from './verify/json-report.ts';
+import type { VerificationExplanationInput } from './verify/explanation.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -32,10 +35,22 @@ export interface SdkCommandOptions {
   outDir: string | null;
   overwrite: boolean;
   verify: boolean;
+  explain?: boolean;
   strict: boolean;
   json?: boolean;
   keepSource?: boolean;
   toolGroupOrder?: ToolGroupOrder;
+}
+
+async function writeExplanationForCli (input: VerificationExplanationInput, quiet = false): Promise<boolean> {
+  try {
+    const reportPath = await writeVerificationExplanation(input);
+    reportPath && !quiet && console.log(`Verification report: ${workspacePath(reportPath)}`);
+    return true;
+  } catch (error) {
+    console.error(`Verification report could not be written: ${errorLabel(error)}`);
+    return false;
+  }
 }
 
 /** Returns an exit code, or null when the selector is not an Agent Host or Copilot CLI chat. */
@@ -106,6 +121,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     console.error(`Export verification failed; private source copy kept at: ${capture.directory}`);
     console.error(failureDetails(failure));
     console.error(`Failure log: ${log}`);
+    return log;
   };
   const keepFailure = async (outputPath: string, failure: string) => {
     keepSnapshot?.();
@@ -129,9 +145,47 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
         preview.companions = await readLinkedArchiveCompanions(preview.markdown, outputPath);
       }
       let failure: ExportFailure | null = null;
+      let verification: SdkVerificationJson | null = null;
       const exitCode = await verifyReport(preview, options.strict, options.json === true, Boolean(options.outputArgument),
-        (report, account) => { failure = exportFailureFromReport(report, account.unaccounted); });
-      failure && await keepVerificationFailure(failure);
+        (report, account) => {
+          verification = report;
+          failure = exportFailureFromReport(report, account.unaccounted);
+        });
+      const failureLog = failure ? await keepVerificationFailure(failure) : null;
+      if (verification) {
+        const explanation = {
+          report: verification,
+          failure,
+          generatedAt: new Date().toISOString(),
+          archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
+          failureLog,
+          sourceWarnings: preview.session.errors,
+          sourceHash: sourceCopy.sha256,
+          summary: options.outputArgument
+            ? buildExportSummary({
+              sessionId: occurrence.sessionId,
+              session: preview.session,
+              resourceCount: preview.companions.length,
+              outputPath: path.resolve(options.outputArgument),
+              outputSize: Buffer.byteLength(preview.markdown, 'utf8'),
+              verificationFailed: failure !== null,
+            })
+            : null,
+          companionCount: preview.companions.length,
+          assetsPath: options.outputArgument && preview.companions.length
+            ? path.join(path.dirname(path.resolve(options.outputArgument)), preview.companions[0]!.relativePath.split('/')[0]!)
+            : null,
+          capturePath: failure ? capture.directory : null,
+        };
+        if (options.outputArgument) {
+          const written = await writeExplanationForCli(explanation, options.json === true);
+          if (!written)
+            return exitCode || 1;
+        } else if (!options.json) {
+          console.log('');
+          console.log(renderVerificationExplanation(explanation));
+        }
+      }
       return exitCode;
     }
     const host = await createHostContext({ hashRoot: '', workspaceRoot: null, outDir: options.outDir });
@@ -146,6 +200,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     const outputPath = resolveOutputPath(options.outputArgument, naming, { sessionId: nativeId, sessionPath: source.path, hashRoot: '' }, host.outDir);
     let last: SdkExport | null = null;
     const generatedAt = new Date().toISOString();
+    let exportVerification: SdkVerificationJson | null = null;
     const written = await writeArchive({
       outputPath, generatedAt, overwrite: options.overwrite,
       verification: {
@@ -162,6 +217,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           last.companions = await readLinkedArchiveCompanions(last.markdown, outputPath);
           let failure: ExportFailure | null = null;
           await verifyReport(last, options.strict, false, true, (report, account) => {
+            exportVerification = report;
             failure = exportFailureFromReport(report, account.unaccounted);
           });
           return failure;
@@ -187,6 +243,30 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
         ? { selector: options.selector, status: 'kept', sdk: capture, captureDirectory: capture.directory, copy: sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' }
         : { selector: options.selector, status: 'not-kept', toolGroupOrder: options.toolGroupOrder ?? 'request' });
       options.keepSource && keepSnapshot?.();
+    }
+    let explanationFailed = false;
+    if (options.explain && (exportVerification || written.verificationFailure)) {
+      explanationFailed = !await writeExplanationForCli({
+        report: exportVerification,
+        failure: written.verificationFailure,
+        generatedAt,
+        archivePath: written.outputPath,
+        assetsPath: written.assetsPath,
+        failureLog: written.failureLog,
+        sourceWarnings: result.session.errors,
+        sourceHash: sourceCopy.sha256,
+        summary: buildExportSummary({
+          sessionId: occurrence.sessionId,
+          session: result.session,
+          resourceCount: written.companionPaths.length,
+          outputPath: written.outputPath,
+          outputSize: written.markdownBytes,
+          verificationFailed: written.verificationFailure !== null,
+        }),
+        companionCount: written.companionPaths.length,
+        capturePath: written.verificationFailure ? capture.directory : null,
+        olderFailedArchive: written.olderFailedArchive,
+      });
     }
     for (const line of formatExportSummary({
       sessionId: occurrence.sessionId, session: result.session, resourceCount: written.companionPaths.length,
@@ -215,10 +295,29 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     questionWarnings.length && console.log(`Questions not fully read: ${questionWarnings.map(([key, count]) => `${key}=${count}`).join(', ')}. Their boxes show a warning and the recorded data.`);
     for (const line of questionWarningLines(result.session.census.questionWarningDetails ?? [], 5))
       console.log(`  ${line}`);
-    return exitCode;
+    return explanationFailed && exitCode === 0 ? 1 : exitCode;
   } catch (error) {
     console.error(errorLabel(error));
-    options.verify && await keepVerificationFailure(verificationException(error));
+    if (options.verify) {
+      const failure = verificationException(error);
+      const failureLog = await keepVerificationFailure(failure);
+      const explanation = {
+        report: null,
+        failure,
+        generatedAt: new Date().toISOString(),
+        archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
+        failureLog,
+        sourceWarnings: [],
+        sourceHash: sourceCopy.sha256,
+        capturePath: capture.directory,
+      };
+      if (options.outputArgument) {
+        await writeExplanationForCli(explanation, options.json === true);
+      } else if (!options.json) {
+        console.log('');
+        console.log(renderVerificationExplanation(explanation));
+      }
+    }
     writtenOutput && await keepFailure(writtenOutput, errorLabel(error));
     return 1;
   }

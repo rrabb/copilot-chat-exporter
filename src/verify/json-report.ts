@@ -12,7 +12,8 @@ import type { ImageAccount } from './images.ts';
 
 // Version 2 added the `parser` section and the `parser-check` failure reason.
 // Version 3 adds independent image accounting and the `image-loss` failure reason.
-export const VERIFY_JSON_VERSION = 3;
+// Version 4 adds dropped-kind and tool-data counts for the plain-English report.
+export const VERIFY_JSON_VERSION = 4;
 
 interface VerificationCounts {
   rawRequestCount: number;
@@ -62,6 +63,8 @@ export function lossJson (account: LossAccount) {
 
 const censusJson = (census: Census) => ({
   seen: Object.fromEntries(census.seen),
+  dropped: Object.fromEntries(census.dropped),
+  toolData: Object.fromEntries(census.toolData),
   unhandled: Object.fromEntries(census.unhandled),
   unrecognizedToolData: Object.fromEntries(census.unrecognizedToolData),
   questionWarnings: Object.fromEntries(census.questionWarnings ?? []),
@@ -167,3 +170,7 @@ export function buildSdkVerifyJson (input: {
     parser: parserCheckJson(input.parser),
   };
 }
+
+export type LocalVerificationJson = ReturnType<typeof buildLocalVerifyJson>;
+export type SdkVerificationJson = ReturnType<typeof buildSdkVerifyJson>;
+export type VerificationJson = LocalVerificationJson | SdkVerificationJson;

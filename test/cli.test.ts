@@ -99,11 +99,17 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, events.map((event) => JSON.stringify(event)).join('\n'));
   const output = path.join(home, 'agent-export.md');
-  const result = invoke('aaaaaaaa', output, '--user-data-root', root);
+  const result = invoke('aaaaaaaa', output, '--explain', '--user-data-root', root);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /Exported session agent-host-copilotcli:\/aaaaaaaa/u);
   assert.match(result.stdout, /Left out \(counted, not exported\): permission prompts 1/u);
   assert.match(result.stdout, /Every checked piece of recorded content appears in the export\./u);
+  assert.match(result.stdout, /Verification report:/u);
+  const explanation = await fs.readFile(path.join(home, 'agent-export.verification.md'), 'utf8');
+  assert.match(explanation, /# Verification report/u);
+  assert.match(explanation, /## Source census/u);
+  assert.match(explanation, /## Export summary/u);
+  assert.match(explanation, /## Recorded text by category/u);
   const markdown = await fs.readFile(output, 'utf8');
   assert.equal((await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-')).length, 0);
   assert.match(markdown, /The compiler error points at the parser\./u);
@@ -116,6 +122,7 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   const verify = invoke('--verify', '--strict', 'aaaaaaaa', '--user-data-root', root);
   assert.equal(verify.status, 0, verify.stdout + verify.stderr);
   assert.match(verify.stdout, /Unhandled event types: none/u);
+  assert.match(verify.stdout, /# Verification report/u);
   await fs.appendFile(file, '\n{"id":"active","type":"assistant.message","data":{"content":');
   const activeOutput = path.join(home, 'active-sdk.md');
   const active = invoke('aaaaaaaa', activeOutput, '--strict', '--keep-source', '--user-data-root', root);
@@ -125,6 +132,10 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   const frozen = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(frozen.status, 0, frozen.stdout + frozen.stderr);
   assert.deepEqual(JSON.parse(frozen.stdout).failureReasons, []);
+  const savedExplanation = await fs.readFile(path.join(home, 'active-sdk.verification.md'), 'utf8');
+  assert.match(savedExplanation, /# Verification report/u);
+  assert.match(savedExplanation, /## Image check/u);
+  assert.match(savedExplanation, /## Markdown structure/u);
   await fs.appendFile(file, '{"invalid":\n{"still":"invalid preceding record"}\n');
   const broken = invoke('aaaaaaaa', path.join(home, 'bad-sdk.md'), '--user-data-root', root);
   assert.notEqual(broken.status, 0);
@@ -313,12 +324,13 @@ test('ambiguous child content is omitted with an archive warning while --strict 
   assert.doesNotMatch(markdown, /Private child (?:prompt|answer)/u);
 });
 
-test('--verify prints the independent content check and --strict fails only when content is missing', async (context) => {
+test('--verify prints the independent content check, explanation and --strict fails only when content is missing', async (context) => {
   const { invoke } = await fixture(context);
   const clean = invoke('--verify', UUID);
   assert.equal(clean.status, 0, clean.stdout + clean.stderr);
   assert.match(clean.stdout, /Layer D - recorded content vs the Markdown this build would write/u);
   assert.match(clean.stdout, /Every checked piece of recorded content appears in the export\./u);
+  assert.match(clean.stdout, /# Verification report/u);
   assert.equal(invoke('--verify', '--strict', UUID).status, 0);
 });
 
@@ -329,7 +341,7 @@ test('--verify --json writes one JSON document with counts and the same exit cod
   const lines = result.stdout.trim().split('\n');
   assert.equal(lines.length, 1, 'JSON mode prints nothing but the document');
   const report = JSON.parse(lines[0]!);
-  assert.equal(report.version, 3);
+  assert.equal(report.version, 4);
   assert.equal(report.path, 'local');
   assert.equal(report.parser.failed, false);
   assert.equal(report.parser.skipped, null, 'the dev parser is installed, so the check runs');
@@ -372,8 +384,9 @@ test('--json is refused without --verify', async (context) => {
 test('default export verifies before discarding its source and later file verification explains --keep-source', async (context) => {
   const { home, sessionPath, raw, env, invoke } = await fixture(context);
   const output = path.join(home, 'default.md');
-  const exported = invoke(sessionPath, output);
+  const exported = invoke(sessionPath, output, '--explain');
   assert.equal(exported.status, 0, exported.stderr + exported.stdout);
+  assert.match(await fs.readFile(path.join(home, 'default.verification.md'), 'utf8'), /# Verification report/u);
   assert.match(exported.stdout, /Every checked piece of recorded content/u);
   assert.doesNotMatch(await fs.readFile(output, 'utf8'), /private source copy was kept/u);
   assert.equal((await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-')).length, 0);
@@ -535,7 +548,7 @@ fs.readFile = async function (file, ...args) {
       const previousNodeOptions = env.NODE_OPTIONS;
       env.NODE_OPTIONS = `${previousNodeOptions} --import=${pathToFileURL(preload).href}`;
       await fs.writeFile(output, 'Existing successful archive');
-      const result = invoke(selector, output, '--overwrite', ...(keepSource ? ['--keep-source'] : []), '--user-data-root', root);
+      const result = invoke(selector, output, '--overwrite', '--explain', ...(keepSource ? ['--keep-source'] : []), '--user-data-root', root);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
       assert.equal(createHash('sha256').update(await fs.readFile(sourceFile)).digest('hex'), sourceHash);
       const captures = (await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-'));
@@ -546,6 +559,11 @@ fs.readFile = async function (file, ...args) {
       assert.equal(await fs.readFile(output, 'utf8'), 'Existing successful archive');
       const failed = path.join(home, 'failed.verify-failed.md');
       const failedMarkdown = await fs.readFile(failed, 'utf8');
+      const explanation = await fs.readFile(path.join(home, 'failed.verify-failed.verification.md'), 'utf8');
+      assert.match(explanation, /# Verification report/u);
+      assert.match(explanation, /## Failed checks/u);
+      assert.match(explanation, /failure log/u);
+      assert.match(explanation, /frozen source/u);
       assert.match(failedMarkdown, /^>.*Verification failed/iu);
       assert.ok(failedMarkdown.includes(capture));
       assert.match(failedMarkdown, /### Chat Export Artifact\s+- `[^`]*failed\.verify-failed\.md`/u);

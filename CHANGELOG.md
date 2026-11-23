@@ -22,6 +22,7 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- `--verify <source> <archive.md>` writes a plain-English `<archive>.verification.md` sidecar. In-memory verification prints the explanation. Add `--explain` to write the same report for a normal export. It covers passed and failed verification. The report explains the source census, schema drift, every content category, Local checks, images, parser, repairs, export summary, omissions, failed checks and evidence links. It uses structured results instead of parsing console text. `Parse warning` in archive provenance is now `Export warning` (WI-076).
 - Questions to the user render as open, never-collapsed boxes with the chosen option and the answer, plus a decision index near the top. Covers agent `ask_user`, Local question carousels, MCP forms and MCP confirmations (`elicitationSerialized`). **Local exports now show the user's answer**, which was dropped before. Raw records stay in a collapsed block (WI-068).
 - Unrecognized tools with a question word in their name get a best-effort question box. `--verify` lists questions that weren't fully read, and `--strict` fails on them with `question-not-read` (WI-069). Each one is listed with its turn, title and argument names. The export itself shows a warning under the decision index, linked to a list of the affected boxes.
 - Seven reviewed Fusion families render as ordered readable notes, including failed-phase errors and degradation metadata. **Selected rule ID** stays distinct from **Rule ID**. Unknown fields and versions are diagnosed.

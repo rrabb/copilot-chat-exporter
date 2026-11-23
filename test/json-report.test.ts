@@ -100,7 +100,7 @@ test('a failed parser check is a failure reason with or without --strict', () =>
     assert.equal(json.parser.checks[0].ok, false);
   }
   assert.equal(local(true).parser.failed, false);
-  assert.equal(local(true).version, 3);
+  assert.equal(local(true).version, 4);
 });
 
 test('SDK repairs fail strict only for early closes, not turn-end closes or HTML escapes', () => {

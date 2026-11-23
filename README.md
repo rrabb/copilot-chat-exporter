@@ -56,6 +56,8 @@ node src/cli.ts --verify <sdk-session-selector> export.md --tool-group-order com
 
 `node src/cli.ts --verify --strict --json <session-selector> [export.md]` writes a machine-readable report. Local journals accept exact `.jsonl` paths. SDK chats use an exact qualified chat key from `--list`. Strict verification requires the pinned `markdown-it` dev dependency; it fails if the parser is unavailable. Exporting without verification still has no runtime dependencies.
 
+`--verify <session> <export.md>` writes `<export>.verification.md` beside the checked archive. `--verify <session>` prints the same plain-English explanation without creating a sidecar because no saved archive was checked. Add `--explain` to a normal export to write a sidecar after its internal verification.
+
 Run `node scripts/verify-corpus.mjs --user-data-root "<Code user-data root>" --concurrency 6` to verify every source selected by the inventory. `--out` is optional. The default is `reports/corpus/corpus-<generatedAt in local time with UTC offset>.json`, with colons and periods replaced by hyphens. For example, `corpus-2026-10-20T23-32-34-259-04-00.json`. The full timestamp avoids overwriting an earlier run on the same date. Reports keep `generatedAt` in UTC for comparison. Reports are local-only and gitignored. They record per-source exit reasons, text categories, parser checks, image hashes, Local export sizes, and size/mtime before and after each run. Changed live originals are listed, but their frozen copies remain in totals. Only `--live` excludes changing sources. The 64-KiB Base64 heuristic remains a separate review trigger for other payloads.
 
 Local prompt attachments and tool-result images now use the same companion helper as SDK image assets. Recorded bytes are saved unchanged, deduplicated by SHA-256, and linked at their prompt or tool position. Links show byte size and a short hash. No image is read from its recorded disk path or fetched from a URL. Unknown MIME types use `.bin` with a representation-change note. Images bypass text redaction and can contain private information. `--inline-images` is deferred.
@@ -262,6 +264,8 @@ non-zero exit code, and `--verify` prints the full schema census.
 
 `--verify` also prints **Layer D**, an independent check that recorded content (prompts, answers, reasoning, tool input and output, errors) is present in the Markdown. It reports per category how many pieces are present, partial or absent. Partial or absent text fails even without `--strict`. Order and repeated occurrences are checked for Local prompts/prose and SDK prompt/reasoning/prose/tool-intent/Fusion phase/handoff, failed-phase reason/error, instruction-content and retry-reason streams grouped by agent scope. SDK text companions contribute at their live links. This checks text coverage, not every metadata value or text companion checksum. Other text is presence-only. See [SPEC section 9](docs/SPEC.md) for its limits.
 
+The plain-English report follows the terminal run. It explains the source census, schema drift, each recorded-content category, order, repeats, images, parser checks, repairs, export summary, intentional omissions, failed checks and evidence links. It uses the same structured results as the console report. Existing sidecars use collision suffixes instead of being replaced. See [Verification output guide](docs/VERIFICATION.md) for explanations of every warning and failure term.
+
 ### Historical verification limitations
 
 - Earlier verification of saved SDK files regenerated the export instead of reading the supplied file. A passing result did not prove the saved file or its companions were intact. Re-verify with the corrected file check.
@@ -339,7 +343,8 @@ These defaults avoid the temporary directory. Manual removal or OS cache policie
 | Export with `--keep-source` | Keeps the capture and adds a header notice |
 | Export verification fails or throws | Keeps a warning-marked `.verify-failed.md`, companions, diagnostic log, capture and receipt; exits nonzero |
 | `--verify <source>` | Checks a temporary capture; removes it on success and keeps it with a diagnostic log on failure |
-| `--verify <source> <export.md>` | Requires the kept capture associated with that output path and exact selector; never substitutes live data |
+| `--verify <source> <export.md>` | Requires the exact kept capture and selector, never substitutes live data, and writes a sibling plain-English report |
+| Normal export with `--explain` | Writes the normal archive plus a sibling plain-English verification report |
 | Re-export to the same output | Removes the old capture and its receipt before installing the new receipt |
 
 Without `--keep-source`, a small receipt records that the source wasn't kept. Later file verification explains this and suggests re-exporting with `--keep-source`. A missing kept capture is a separate error. Kept captures have no automatic age expiry or size cap. Manual/OS removal can still make them unavailable.

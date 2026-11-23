@@ -12,14 +12,34 @@ export function localCompactTimestamp (value: number | null | undefined) {
   return `${pad(date.getFullYear() % 100)}${pad(date.getMonth() + 1)}${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function formatExportSummary (options: {
+export interface ExportSummaryOptions {
   sessionId: string;
   session: ParsedSession;
   resourceCount: number;
   outputPath: string;
   outputSize: number;
   verificationFailed?: boolean;
-}) {
+}
+
+export interface ExportSummary {
+  sessionId: string;
+  title: string;
+  customTitle: string | null;
+  defaultTitle: string | null;
+  firstPrompt: string;
+  lastPrompt: string;
+  startedAt: string;
+  endedAt: string;
+  turns: number;
+  toolCalls: number;
+  reasoningThoughts: number;
+  resources: number;
+  outputPath: string;
+  outputBytes: number;
+  verificationFailed: boolean;
+}
+
+export function buildExportSummary (options: ExportSummaryOptions): ExportSummary {
   const { sessionId, session, resourceCount, outputPath, outputSize } = options;
   const firstPrompt = session.turns[0]?.prompt ?? '';
   const lastPrompt = session.turns.at(-1)?.prompt ?? '';
@@ -31,31 +51,39 @@ export function formatExportSummary (options: {
   const toolCallCount = session.turns.reduce((sum, turn) => sum + turn.toolNodes.length, 0);
   const thoughtCount = session.turns.reduce((sum, turn) => sum + turn.reasoning.length, 0);
   const title = session.title || '(untitled)';
-  const lines = [
-    options.verificationFailed ? `Export failed verification; written as ${outputPath}` : `Exported session ${sessionId}:`,
-    `Title: ${title}`,
-  ];
-
-  if (session.customTitle && session.customTitle !== title)
-    lines.push(`Custom Title: ${session.customTitle}`);
-
-  // VS Code's default title normally repeats the first prompt's first 200 characters. Surface
-  // it only if a future or imported session supplies a genuinely different value.
   const firstPromptDefault = defaultSessionTitle(firstPrompt);
-  if (
-    session.defaultTitle
+  const customTitle = session.customTitle && session.customTitle !== title ? session.customTitle : null;
+  const defaultTitle = session.defaultTitle
     && session.defaultTitle !== title
     && session.defaultTitle !== session.customTitle
     && session.defaultTitle !== firstPromptDefault
-  )
-    lines.push(`Default Title: ${session.defaultTitle}`);
+    ? session.defaultTitle : null;
+  return {
+    sessionId, title, customTitle, defaultTitle,
+    firstPrompt: promptPreview(firstPrompt), lastPrompt: promptPreview(lastPrompt),
+    startedAt: localCompactTimestamp(firstTimestamp), endedAt: localCompactTimestamp(lastTimestamp),
+    turns: session.turns.length, toolCalls: toolCallCount, reasoningThoughts: thoughtCount,
+    resources: resourceCount, outputPath, outputBytes: outputSize,
+    verificationFailed: options.verificationFailed === true,
+  };
+}
+
+export function formatExportSummary (options: ExportSummaryOptions) {
+  const summary = buildExportSummary(options);
+  const { sessionId, title, customTitle, defaultTitle, firstPrompt, lastPrompt } = summary;
+  const lines = [
+    summary.verificationFailed ? `Export failed verification; written as ${summary.outputPath}` : `Exported session ${sessionId}:`,
+    `Title: ${title}`,
+  ];
+  customTitle && lines.push(`Custom Title: ${customTitle}`);
+  defaultTitle && lines.push(`Default Title: ${defaultTitle}`);
 
   lines.push(
-    `First Prompt: ${promptPreview(firstPrompt)}`,
-    `Last Prompt: ${promptPreview(lastPrompt)}`,
-    `Session from ${localCompactTimestamp(firstTimestamp)} to ${localCompactTimestamp(lastTimestamp)}`,
-    `Turns: ${session.turns.length}; tool calls: ${toolCallCount}; reasoning thoughts: ${thoughtCount}; resources: ${resourceCount}.`,
-    `Output: ${outputPath} (${thousands(outputSize)} bytes)`,
+    `First Prompt: ${firstPrompt}`,
+    `Last Prompt: ${lastPrompt}`,
+    `Session from ${summary.startedAt} to ${summary.endedAt}`,
+    `Turns: ${summary.turns}; tool calls: ${summary.toolCalls}; reasoning thoughts: ${summary.reasoningThoughts}; resources: ${summary.resources}.`,
+    `Output: ${summary.outputPath} (${thousands(summary.outputBytes)} bytes)`,
   );
 
   return lines;

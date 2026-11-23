@@ -27,6 +27,7 @@ export interface CliOptions {
   includeCorpus: boolean;
   olderThanDays: number | null;
   verify: boolean;
+  explain: boolean;
   strict: boolean;
   /** With --verify: print one machine-readable JSON object instead of the text report. */
   json: boolean;
@@ -45,7 +46,7 @@ export type ParsedArgs =
   | { ok: false; error: string };
 
 const BOOLEAN_FLAGS = new Set([
-  '--list', '--current', '--overwrite', '--verify', '--audit', '--strict', '--json',
+  '--list', '--current', '--overwrite', '--verify', '--audit', '--explain', '--strict', '--json',
   '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed', '--compressed',
   '--keep-source', '--cache', '--clean', '--dry-run', '--yes', '--include-corpus',
 ]);
@@ -136,6 +137,9 @@ export function parseArgs (argv: string[]): ParsedArgs {
     return { ok: false, error: '--compressed / --compression cannot be combined with --no-html.' };
   if (booleans.has('--no-html') && values.has('--html-output'))
     return { ok: false, error: '--no-html cannot be combined with --html-output.' };
+  if (booleans.has('--explain') && (listRequested || booleans.has('--cache') || booleans.has('--clean')
+    || values.has('--golden') || values.has('--snapshot') || values.has('--install-skill')))
+    return { ok: false, error: '--explain is available only for chat export or verification.' };
   if (booleans.has('--json') && !(booleans.has('--verify') || booleans.has('--audit')))
     return { ok: false, error: '--json is available only with --verify.' };
   const groupOrder = values.get('--tool-group-order');
@@ -175,6 +179,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       includeCorpus: booleans.has('--include-corpus'),
       olderThanDays: olderThan === undefined ? null : Number(olderThan),
       verify: booleans.has('--verify') || booleans.has('--audit'),
+      explain: booleans.has('--explain'),
       strict: booleans.has('--strict'),
       json: booleans.has('--json'),
       golden: (values.get('--golden') ?? null) as CliOptions['golden'],

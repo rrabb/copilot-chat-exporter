@@ -2114,7 +2114,7 @@ function buildDocumentBody (session: ParsedSession, context: DocumentContext) {
       ? '- Reasoning shown is the readable thinking text or model-written summary the SDK recorded. Reasoning stored only as an encrypted token is counted but cannot be read and is not reconstructed.'
       : '- Reasoning shown is the journal\'s recorded `thinking` text (the agent\'s own notes); no hidden model chain-of-thought is reconstructed.',
     ...(sdk ? [] : [`- Parse validated against: ${VALIDATED_AGAINST}.`]),
-    ...session.errors.map((error) => `- Parse warning: ${redact(error)}`),
+    ...session.errors.map((error) => `- Export warning: ${redact(error)}`),
     ...questionWarningList(),
     ...(session.census.unhandled.length ? ['', ...schemaDriftWarnings] : []),
     '',

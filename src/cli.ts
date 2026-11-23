@@ -11,7 +11,7 @@ import { parseArgs } from './args.ts';
 import { installAgentFiles } from './install.ts';
 import { loadSession, renderSession } from './index.ts';
 import type { FenceRepairs } from './index.ts';
-import { formatExportSummary } from './export-summary.ts';
+import { buildExportSummary, formatExportSummary } from './export-summary.ts';
 import { getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
 import { looksLikeSessionArgument } from './session/locate.ts';
 import { questionWarningLines } from './session/questions.ts';
@@ -35,6 +35,8 @@ import { readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImag
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { runSdkCommand } from './sdk-cli.ts';
+import { renderVerificationExplanation, writeVerificationExplanation } from './verify/explanation.ts';
+import type { LocalVerificationJson } from './verify/json-report.ts';
 import {
   GOLDEN_DIGEST_PATH,
   GOLDEN_EXPECTED_RENDER_PATH,
@@ -48,6 +50,7 @@ import {
   snapshotPath,
 } from './verify/golden.ts';
 import { clip, errorLabel, thousands } from './text.ts';
+import type { VerificationExplanationInput } from './verify/explanation.ts';
 
 // Command line front end. Turns a VS Code Copilot chat session into one human-readable Markdown
 // archive, or checks an existing one. Full contract, layout, and visual-design rules live in
@@ -66,6 +69,17 @@ async function siblingCompanionText (output: string, markdown: string): Promise<
   const companions = await readLinkedArchiveCompanions(markdown, output);
   return companions.filter((item) => item.mediaType.startsWith('text/'))
     .map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n');
+}
+
+async function writeExplanationForCli (input: VerificationExplanationInput, quiet = false): Promise<boolean> {
+  try {
+    const reportPath = await writeVerificationExplanation(input);
+    reportPath && !quiet && console.log(`Verification report: ${workspacePath(reportPath)}`);
+    return true;
+  } catch (error) {
+    console.error(`Verification report could not be written: ${errorLabel(error)}`);
+    return false;
+  }
 }
 
 function printVerificationReport (report: ReturnType<typeof buildVerificationReport>) {
@@ -206,6 +220,7 @@ if (!parsed.ok) {
 }
 const {
   list: listMode, current: currentMode, verify: verifyMode, strict: strictMode, json: jsonMode,
+  explain: explainMode,
   showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, noHtml: noHtmlMode, detailed: detailedMode,
   compression: compressionMode,
   golden: goldenAction, snapshot: snapshotAction,
@@ -361,7 +376,7 @@ if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefin
   const sdkExit = await runSdkCommand({
     root: selectedRoot ?? '', selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
     overwrite: overwriteMode, verify: verifyMode, strict: strictMode, json: jsonMode,
-    keepSource, toolGroupOrder,
+    explain: explainMode, keepSource, toolGroupOrder,
   });
   sdkExit !== null && process.exit(sdkExit);
 }
@@ -432,15 +447,54 @@ if (verifyMode) {
     process.stdout.write(`${JSON.stringify(json)}\n`);
   process.exitCode = json.exitCode;
   const verificationFailure = exportFailureFromReport(json, lossAccount.unaccounted);
+  let failureLog: string | null = null;
   if (verificationFailure && loaded.copiedSource.captureDirectory) {
     await finishCapture(loaded.copiedSource.captureDirectory, true);
     const diagnostics = path.join(sourceCacheRoot(), 'failures');
     await fs.mkdir(diagnostics, { recursive: true });
-    const log = await writeFailureLog(path.join(diagnostics, 'verification.md'), location.sessionId,
+    failureLog = await writeFailureLog(path.join(diagnostics, 'verification.md'), location.sessionId,
       verificationFailure, loaded.copiedSource.captureDirectory, new Date().toISOString(), loaded.copiedSource.sha256, loaded.versions);
     console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
     console.error(failureDetails(verificationFailure));
-    console.error(`Failure log: ${log}`);
+    console.error(`Failure log: ${failureLog}`);
+  }
+  const explanation = {
+    report: json,
+    failure: verificationFailure,
+    generatedAt: new Date().toISOString(),
+    archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
+    failureLog,
+    sourceWarnings: session.errors,
+    sourceHash: loaded.copiedSource.sha256,
+    summary: outputArgument
+      ? buildExportSummary({
+        sessionId: location.sessionId,
+        session,
+        resourceCount: loaded.resources.resources.length,
+        outputPath: path.resolve(getWorkspaceRoot(), outputArgument),
+        outputSize: Buffer.byteLength(renderedMarkdown ?? built, 'utf8'),
+        verificationFailed: verificationFailure !== null,
+      })
+      : null,
+    companionCount: outputArgument && renderedMarkdown
+      ? (await readLinkedArchiveCompanions(renderedMarkdown, path.resolve(getWorkspaceRoot(), outputArgument))).length
+      : overflow.companions.length,
+    assetsPath: outputArgument && renderedMarkdown
+      ? await (async () => {
+        const companions = await readLinkedArchiveCompanions(renderedMarkdown, path.resolve(getWorkspaceRoot(), outputArgument));
+        return companions.length
+          ? path.join(path.dirname(path.resolve(getWorkspaceRoot(), outputArgument)), companions[0]!.relativePath.split('/')[0]!)
+          : null;
+      })()
+      : null,
+    capturePath: verificationFailure ? loaded.copiedSource.captureDirectory : null,
+  };
+  if (outputArgument) {
+    if (!await writeExplanationForCli(explanation, jsonMode) && !process.exitCode)
+      process.exitCode = 1;
+  } else if (!jsonMode) {
+    console.log('');
+    console.log(renderVerificationExplanation(explanation));
   }
   await releaseSavedCopy?.();
   if (!json.exitCode && !outputArgument && loaded.copiedSource.captureDirectory)
@@ -494,9 +548,11 @@ let outputSize: number;
 let companionCount = 0;
 let assetsPath: string | null = null;
 let exportFailure: ExportFailure | null = null;
+let exportVerification: LocalVerificationJson | null = null;
+const exportGeneratedAt = new Date().toISOString();
 try {
   const written = await writeArchive({
-    outputPath, generatedAt: new Date().toISOString(), overwrite: goldenMode || overwriteMode,
+    outputPath, generatedAt: exportGeneratedAt, overwrite: goldenMode || overwriteMode,
     ...(!goldenMode ? { verification: {
       capture: loaded.copiedSource.captureDirectory!, sessionId: location.sessionId, sourceHash: loaded.copiedSource.sha256,
       versions: loaded.versions,
@@ -520,6 +576,7 @@ try {
           render: buildRenderReport(session, savedMarkdown), renderSkipReason: null,
           fenceRepairs: exportFenceRepairs, loss: account, lossTarget: 'file', parser, images,
         });
+        exportVerification = result;
         return exportFailureFromReport(result, account.unaccounted);
       },
     } } : {}),
@@ -555,6 +612,30 @@ try {
     process.exitCode = 2;
   }
   written.olderFailedArchive && console.log(`An older .verify-failed.md archive exists: ${written.olderFailedArchive}. It was not deleted.`);
+  if (explainMode && (exportVerification || written.verificationFailure)) {
+    if (!await writeExplanationForCli({
+      report: exportVerification,
+      failure: written.verificationFailure,
+      generatedAt: exportGeneratedAt,
+      archivePath: written.outputPath,
+      assetsPath: written.assetsPath,
+      failureLog: written.failureLog,
+      sourceWarnings: session.errors,
+      sourceHash: loaded.copiedSource.sha256,
+      summary: buildExportSummary({
+        sessionId: location.sessionId,
+        session,
+        resourceCount: loaded.resources.resources.length,
+        outputPath: written.outputPath,
+        outputSize: written.markdownBytes,
+        verificationFailed: written.verificationFailure !== null,
+      }),
+      companionCount: written.companionPaths.length,
+      capturePath: written.verificationFailure ? loaded.copiedSource.captureDirectory : null,
+      olderFailedArchive: written.olderFailedArchive,
+    }) && !process.exitCode)
+      process.exitCode = 1;
+  }
 } catch (error) {
   if (goldenMode)
     throw error;

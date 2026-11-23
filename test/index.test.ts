@@ -132,7 +132,7 @@ test('an unhandled kind raises a warning in the export itself, not only on the c
 test('parse warnings reach the provenance section', () => {
   const loaded = loadedFixture();
   loaded.session.errors = ['line 4: unparseable'];
-  assert.match(renderSession(loaded, renderOptions), /- Parse warning: line 4: unparseable/);
+  assert.match(renderSession(loaded, renderOptions), /- Export warning: line 4: unparseable/);
 });
 
 test('Local terminal output over 300 lines and 15 KiB is previewed with a companion; without a sink it stays whole', () => {
