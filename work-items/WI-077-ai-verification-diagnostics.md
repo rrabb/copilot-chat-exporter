@@ -9,7 +9,7 @@ Part of [WI-021](WI-021-source-aware-verification.md), found while planning the 
 - **Shared model:** use the same structured verification result planned for WI-076.
 - **Privacy:** the dev prefers exact local capture with manual review. Automatic upload is out of scope.
 - **Failure evidence:** include enough selected source and output data for offline triage without the full capture. Link the full frozen capture when it exists.
-- **Status 261124:** the approved fixes (F1-F6, F8, F10, F12) are implemented and verified. A real-CLI demo and a second blind eval followed. The item waits for dev acceptance. Coverage work moved to child WI-079.
+- **Status 261124:** accepted. The approved fixes (F1-F6, F8, F10, F12) are implemented and verified. A real-CLI demo and a second blind eval followed. Child WI-079 and follow-up WI-081 are accepted too.
 - **Trigger:** create a bundle for verification warnings or failures and exporter or verifier exceptions. Don't create one for a normal recorded tool failure when verification is clean.
 - **Output:** collision-safe Markdown, JSON and selected-evidence artifacts. Schema samples keep names and types while private values are redacted. A clean run creates nothing.
 
@@ -558,22 +558,22 @@ Every scenario runs `node src/cli.ts` against a sandbox `COPILOT_HOME` built fro
 | 03 same, `--verify --strict` | 2 | failure | ✅ Same, report stored once |
 | 04 assistant paragraph deleted from archive | 2 | failure | ⚠️ Exact text, but the only locator is "request 1" in a 213-turn chat |
 | 05 unclosed fence before `## Tool Usage` | 2 | failure | ✅ Names the opener at line 129 and excerpts each swallowed marker |
-| 06 linked companion deleted | 0 | none | ❌ Verify passes. See G24 |
+| 06 linked companion deleted | 0 | none | ❌ Historical result. WI-081 now returns 2 with `companion-loss` |
 | 07 tool result references an unrecorded image asset | 0 | warning | ✅ `line 20 ... binaryResultsForLlm[1]`, asset `demo-asset-lost` |
 | 08 truncated JSON at event 201 | 1 | exception | ⚠️ Stage and frames are right. No excerpt of the bad record |
-| 09 selector typo | 1 | exception | ❌ Noise. See G22 |
+| 09 selector typo | 1 | exception | ❌ Historical result. WI-079 now exits 1 without a bundle |
 
 ### Gaps found by the demo
 
 | # | Gap | Evidence |
 | --- | --- | --- |
-| G20 | A load exception names the bad record number but keeps no clipped excerpt of it. The task also asks for a "source fix" when the input is corrupt | `08-load-exception` task file |
-| G21 | SDK content findings locate only by request. An SDK chat often has one request, so an agent must grep for the text. No event line and no expected archive position | `04-content-loss` manifest `samples.content.groups[0]` |
-| G22 | Every load error writes a bundle, including "No ... session matching" user errors. This predates the fixes | `09-not-found`, `src/cli.ts` load catch |
+| G20 | Fixed in WI-079. A malformed SDK event now keeps its line number and a 600-character excerpt with string values redacted | `08-load-exception` plus `SdkEventLineError` tests |
+| G21 | Fixed in WI-079. SDK content findings now keep the event line and print it in task locators | `04-content-loss` manifest `samples.content.groups[0]` |
+| G22 | Fixed in WI-079. Typed selection and user-data-root errors exit without diagnostic noise. Real load and parse errors still write bundles | demo scenario `09-not-found`, `src/cli.ts` load catch |
 | G23 | Saved-file verify needs `--keep-source` at export time. A copied archive gives "snapshot unavailable" with exit 1 and no bundle. This is correct, but it's easy to miss when building fixtures | demo run log |
-| G24 | 🐛 Verify didn't notice a deleted `detailed-result-0ef30c20.txt` companion from this real chat. Layer D still counted all 82 tool outputs as present. **Narrowed later on 261124:** the committed demo deletes a synthetic text companion and an image companion, and both fail as expected. The deleted text doesn't appear anywhere else in the real archive, so a duplicate match doesn't explain it. The cause is unknown | `06-companion-loss.console.txt`, then `pnpm run demo:diagnostics` scenarios 06 and 11 |
+| G24 | Fixed in WI-081. The verifier treated every companion as one global text bag. An unrelated full-source companion supplied the deleted diff's lines. A missing live link now fails as `companion-loss`, independent of Layer D text matching. The original demo chat exits 2 and names the deleted target | `06-companion-loss.console.txt`, `pnpm test test\cli.test.ts` |
 
-**Not done:** G20-G24 aren't approved scope. They're in the Inbox for a decision.
+**Limits:** G23 is documented behavior. G26 is deferred because image and content records carry secondary evidence. Resume it only when a repair still fails after locators, hash state and the replay command are used.
 
 ### Blind-agent eval 2 261124
 
@@ -591,12 +591,12 @@ Same 5 fault types as the baseline, from the real-CLI demo. **Stricter than the 
 
 | # | Gap | Evidence |
 | --- | --- | --- |
-| G25 | 🐛 The bundle doesn't say whether the archive still matches the export. The receipt already stores `outputSha256` from export time, so the check is one hash compare. Without it, an agent can't tell a hand-edited archive from a renderer bug, and may weaken the verifier | cases 2 and 3, `src/session/source-snapshot.ts:346` |
+| G25 | Fixed in WI-079. Diagnostic tasks and manifests record `matches-export`, `differs-from-export` or `no-export-hash`. Failed exports have no export hash baseline | cases 2 and 3, `checkExportOutputHash` regression |
 | G26 | Raw records cover only schema records. Image and content findings have none, so agents couldn't see the line 20 record or the record behind the absent text | cases 2 and 4 |
 
 ### Committed diagnostics demo 261124
 
-The demo2 driver used a frozen slice of a real chat, so it couldn't be committed. `pnpm run demo:diagnostics` reruns its scenarios on synthetic events built inside the script. Anyone can run it on a fresh clone.
+The demo2 driver used a frozen slice of a real chat, so it couldn't be committed. `pnpm run demo:diagnostics` reruns its scenarios on synthetic events. Anyone can run it on a fresh clone.
 
 - **Shared sandbox:** `scripts/lib/cli-sandbox.mjs` holds the sandbox setup that `failure-demo.mjs` had inline. Both demos use it. `pnpm run demo:failure` gave the same summary fields for all 5 cases before and after the move.
 - **Index keys:** a `copilotcli:/<id>` index key needs no `session.db`. Only `agent-host-copilotcli:/<id>` does. This comes from `src/session/provider-sources.ts`. An earlier note here said `session.db` was always needed.
@@ -607,21 +607,21 @@ The demo2 driver used a frozen slice of a real chat, so it couldn't be committed
   | Local content loss | The first Local bundle run through the real CLI |
   | Image companion deletion | Splits G24 by companion type |
 
-- **Results:** all 11 match their expectations. G22 (typo writes a bundle) is still marked as a known gap.
+- **Results:** all 11 match their expectations. Scenario 09 now proves G22 no longer writes a bundle. The original WI-081 case now fails `companion-loss`.
 - **Limits:**
   - The demo isn't a test and doesn't run in `pnpm run verify`.
   - It checks exit codes, categories and counts, not the quality of the task text.
-  - Synthetic chats are small, so the demo can't reproduce real-chat effects such as the G24 pass.
+  - Synthetic chats are small. They reproduced the missing-link policy, but only the frozen real-chat slice proved the original global-bag masking case.
 
 How to run it is in the [README](../README.md#cli-sandbox).
 
 ## Work tree
 
-Progress as of 261124: 0 of 1 done
+Progress as of 261124: 1 of 1 done
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
-| 1 | [WI-079](../work-log.md#wi-079) Diagnostic bundle coverage and robustness | [build] | M | - |
+| 1 | [WI-079](../work-log.md#wi-079) Diagnostic bundle coverage and robustness | [build] | L | - |
 
 ## Non-goals
 
@@ -685,15 +685,11 @@ Each run keeps a timestamped, collision-safe pair. It doesn't replace older evid
 - GitHub Actions debug logging: https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging
 - npm logging and sensitive-information limits: https://docs.npmjs.com/cli/v11/using-npm/logging/
 
-## Resume point 261124
+## Outcome 261124
 
-The approved fixes are implemented. `pnpm run verify` passes. The real-CLI demo and blind eval 2 are recorded above. A committed version of the demo now runs on synthetic chats with `pnpm run demo:diagnostics`. The item waits for dev acceptance.
+The dev accepted WI-077, WI-079 and WI-081 on 261124. `pnpm run verify` passes 866 tests and both goldens. `pnpm run demo:diagnostics` passes all 11 scenarios.
 
-Next:
-
-1. Decide on G20-G26 (Inbox). G25 (archive changed since export) is the cheapest and fixes the harmful case 2 answer. G24 needs a cause first, because synthetic companion deletions fail as expected.
-2. Accept the fixes or request changes.
-3. Start [WI-079](../work-log.md#wi-079) when approved. Use `scripts/lib/cli-sandbox.mjs` for its end-to-end tests.
+The bundle now gives a repair agent a useful first pass without claiming to contain a complete replay. G26 remains deferred because those raw records increase private-data exposure while current evidence points to the needed stage, locator and next command. Resume G26 if a measured repair case fails for lack of the underlying image or content record.
 
 ## Resume point 261123
 

@@ -19,7 +19,7 @@ Canonical entry: [WI-021](../work-log.md#wi-021). The dashboard owns status and 
 - The old tool-call gap remains a separate question in [WI-025](../work-log.md#wi-025).
 - The parser's outdated install hint is tracked in [WI-032](../work-log.md#wi-032).
 - Rejected: a generic missing-whitespace detector and one flattened order sequence (see [Decisions](#decisions-and-tradeoffs)).
-- Work tree: 3 of 6 children done. [WI-032](../work-log.md#wi-032) remains open. [WI-073](../work-log.md#wi-073), [WI-076](../work-log.md#wi-076) and [WI-082](../work-log.md#wi-082) are accepted and done. [WI-077](../work-log.md#wi-077) plans an AI repair bundle. [WI-078](../work-log.md#wi-078) plans reusable public report fixtures.
+- Work tree: 5 of 7 children done. [WI-032](../work-log.md#wi-032) and [WI-078](../work-log.md#wi-078) remain open. [WI-073](../work-log.md#wi-073), [WI-076](../work-log.md#wi-076), [WI-077](../work-log.md#wi-077), [WI-081](../work-log.md#wi-081) and [WI-082](../work-log.md#wi-082) are accepted and done.
 
 ## Original goal
 
@@ -35,16 +35,17 @@ Old item #10 called for source-aware verification and a schema census for agent 
 
 ## Work tree
 
-Progress as of 261124: 3 of 6 children done.
+Progress as of 261124: 5 of 7 children done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
 | 1 | [WI-032 Parser install hint](../work-log.md#wi-032) | [build] | S | - |
 | 2 | [WI-073 Layer D partial failures](../work-log.md#wi-073) | [research] | S | - |
 | 3 | [WI-076 Plain-English verification report](../work-log.md#wi-076) | [build] | M | - |
-| 4 | [WI-077 AI verification diagnostics](../work-log.md#wi-077) | [research] | M | WI-076 |
-| 5 | [WI-078 Reusable verification report fixtures](../work-log.md#wi-078) | [research] | S | WI-076 |
-| 6 | [WI-082 Verifier Markdown-link stack overflow](../work-log.md#wi-082) | [build] | S | - |
+| 4 | [WI-077 AI verification diagnostics](../work-log.md#wi-077) | [build] | M | - |
+| 5 | [WI-078 Reusable verification report fixtures](../work-log.md#wi-078) | [research] | S | - |
+| 6 | [WI-081 Deleted companion passed Layer D](../work-log.md#wi-081) | [research] | S | - |
+| 7 | [WI-082 Verifier Markdown-link stack overflow](../work-log.md#wi-082) | [build] | S | - |
 
 The unfinished child's who and size are proposed estimates for the dev to confirm. The build item doesn't approve implementation.
 
@@ -57,6 +58,7 @@ WI-076 implements a sibling Markdown explanation for saved verification output. 
 WI-077 plans an AI-ready repair bundle. It depends on WI-076's structured report model, then adds bounded samples, field structures, source evidence, reproduction details and an explicit privacy mode.
 
 WI-078 keeps the useful report scenarios as small synthetic fixtures. It is separate from the private v1-v4 review bundles and doesn't block the WI-076 feature.
+
 WI-082 reproduced the large-chat stack overflow on the pre-WI-073 code. The cause was the global backtick-mask regex. A linear Markdown-link scanner replaced the remaining regex-based text and image scans. It keeps CRLF fence positions aligned and ignores image links inside inline code. Focused tests, full verification and the 12.5 million-character real chat passed. The dev accepted the fix on 261124.
 
 ## Current understanding
