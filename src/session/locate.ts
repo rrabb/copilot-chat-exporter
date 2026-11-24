@@ -206,6 +206,13 @@ export interface SessionSelectionOptions {
   current?: boolean;
 }
 
+export class SessionSelectionError extends Error {
+  constructor (message: string) {
+    super(message);
+    this.name = 'SessionSelectionError';
+  }
+}
+
 async function validateJournalIdentity (sessionPath: string, sessionId: string) {
   const header = parseJson(await readFirstLine(sessionPath));
   assertLocalJournalSnapshot(header, sessionId);
@@ -218,18 +225,18 @@ function withinRoot (filePath: string, root: string) {
 
 export async function resolveSession (sourceArgument?: string, options: SessionSelectionOptions = {}): Promise<SessionLocation> {
   if (options.current && sourceArgument)
-    throw new Error('Select either an explicit session or --current, not both.');
+    throw new SessionSelectionError('Select either an explicit session or --current, not both.');
   if (!sourceArgument && !options.current)
-    throw new Error('Choose an explicit session UUID or .jsonl path, or request --current. Use --list to discover sessions.');
+    throw new SessionSelectionError('Choose an explicit session UUID or .jsonl path, or request --current. Use --list to discover sessions.');
   if (sourceArgument?.endsWith('.jsonl')) {
     const sessionPath = path.resolve(sourceArgument);
     const sessionId = path.basename(sessionPath, '.jsonl');
     if (!SESSION_ID_PATTERN.test(sessionId))
-      throw new Error(`Transcript filename must be a session UUID: ${sourceArgument}`);
+      throw new SessionSelectionError(`Transcript filename must be a session UUID: ${sourceArgument}`);
     if (options.userDataRoot !== undefined) {
       const root = await resolveUserDataRoot({ userDataRoot: options.userDataRoot });
       if (!withinRoot(sessionPath, root))
-        throw new Error('Explicit journal path conflicts with --user-data-root.');
+        throw new SessionSelectionError('Explicit journal path conflicts with --user-data-root.');
     }
     await validateJournalIdentity(sessionPath, sessionId);
     const hashRoot = path.dirname(path.dirname(sessionPath));
@@ -251,22 +258,22 @@ export async function resolveSession (sourceArgument?: string, options: SessionS
     const matches = [...distinctByPath.values()];
     const matchingIds = [...new Set(matches.map((match) => match.sessionId))];
     if (isPrefix && matchingIds.length > 1)
-      throw new Error(`Session ID prefix ${sourceArgument} is ambiguous. Matching Local IDs:\n${matchingIds.map((id) => `  ${id}`).join('\n')}\nPass a longer unique prefix or an exact .jsonl path.`);
+      throw new SessionSelectionError(`Session ID prefix ${sourceArgument} is ambiguous. Matching Local IDs:\n${matchingIds.map((id) => `  ${id}`).join('\n')}\nPass a longer unique prefix or an exact .jsonl path.`);
     if (matches.length > 1)
-      throw new Error(`Session ${sourceArgument} occurs in multiple journal files. Pass an exact .jsonl path to select one:\n${matches.map((match) => `  ${match.sessionPath}`).join('\n')}`);
+      throw new SessionSelectionError(`Session ${sourceArgument} occurs in multiple journal files. Pass an exact .jsonl path to select one:\n${matches.map((match) => `  ${match.sessionPath}`).join('\n')}`);
     if (matches.length === 1) {
       await validateJournalIdentity(matches[0].sessionPath, matches[0].sessionId);
       return matches[0];
     }
-    throw new Error(`No Local chat session matching ${sourceArgument} was found under ${root}. Run --list to see available sessions, set --user-data-root to the correct VS Code profile, or pass the exact .jsonl path.`);
+    throw new SessionSelectionError(`No Local chat session matching ${sourceArgument} was found under ${root}. Run --list to see available sessions, set --user-data-root to the correct VS Code profile, or pass the exact .jsonl path.`);
   }
   const current = currentSessionFromEnv();
   if (!current)
-    throw new Error('--current requires a verified Local VSCODE_TARGET_SESSION_LOG identity. No current session could be identified; pass an explicit source.');
+    throw new SessionSelectionError('--current requires a verified Local VSCODE_TARGET_SESSION_LOG identity. No current session could be identified; pass an explicit source.');
   const storageRoot = path.join(root, 'User', 'workspaceStorage');
   const hashRelative = path.relative(storageRoot, current.hashRoot);
   if (!withinRoot(current.hashRoot, storageRoot) || !hashRelative || hashRelative.includes(path.sep))
-    throw new Error('Current-session evidence conflicts with the selected VS Code user-data root.');
+    throw new SessionSelectionError('Current-session evidence conflicts with the selected VS Code user-data root.');
   const sessionPath = path.join(current.hashRoot, 'chatSessions', `${current.sessionId}.jsonl`);
   await validateJournalIdentity(sessionPath, current.sessionId);
   return { sessionId: current.sessionId, sessionPath, hashRoot: current.hashRoot, indexedTitle: readIndexedTitles(current.hashRoot).get(current.sessionId) };

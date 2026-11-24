@@ -100,7 +100,29 @@ test('a failed parser check is a failure reason with or without --strict', () =>
     assert.equal(json.parser.checks[0].ok, false);
   }
   assert.equal(local(true).parser.failed, false);
-  assert.equal(local(true).version, 4);
+  assert.equal(local(true).version, 5);
+});
+
+test('a missing linked companion is a verification failure with its target', () => {
+  const json = buildSdkVerifyJson({
+    strict: false,
+    census: census(),
+    leftOut: new Map(),
+    loss: loss(),
+    parser: parser(),
+    fenceRepairs: { early: [], turnEnd: 0, html: [] },
+    companionLinks: [{
+      assetsFolder: 'archive_assets_1',
+      linked: 1,
+      present: [],
+      missing: ['archive_assets_1/detailed-result.txt'],
+      unlinked: [],
+    }],
+  });
+  assert.equal(json.exitCode, 2);
+  assert.deepEqual(json.failureReasons, ['companion-loss']);
+  assert.equal(json.companionLinks?.missing, 1);
+  assert.doesNotMatch(JSON.stringify(json), /detailed-result\.txt/u);
 });
 
 test('SDK repairs fail strict only for early closes, not turn-end closes or HTML escapes', () => {

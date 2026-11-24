@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { createProviderSourceResolver } from '../src/session/provider-sources.ts';
 import { chatDataKey, defaultChat, parseAgentHostIdentity } from '../src/session/provider-identity.ts';
-import { eventsInScope, readSdkEvents } from '../src/session/sdk-events.ts';
+import { eventsInScope, readSdkEvents, SdkEventLineError } from '../src/session/sdk-events.ts';
 import { inventorySessions } from '../src/session/inventory.ts';
 
 async function fixture (context: test.TestContext) {
@@ -270,6 +270,20 @@ test('SDK reader rejects duplicate/unsupported headers and retains full unknown 
   await assert.rejects(readSdkEvents(file, 'one'), /identity\/version/);
   await fs.writeFile(file, '{"type":"session.start","data":{"sessionId":"one","version":999}}');
   await assert.rejects(readSdkEvents(file, 'one'), /identity\/version/);
+});
+
+test('SDK reader attaches a redacted excerpt to a malformed source line', async (context) => {
+  const { events } = await fixture(context);
+  const file = await events('one');
+  await fs.appendFile(file, '\n{"type":"future.event","data":{"private-session-key":"private value","prompt":"private prompt","unfinished":"');
+  await assert.rejects(readSdkEvents(file, 'one'), (error) => {
+    assert.ok(error instanceof SdkEventLineError);
+    assert.equal(error.sourceLine, 2);
+    assert.match(error.excerpt, /"type":"future.event"/u);
+    assert.match(error.excerpt, /"prompt":"<redacted>"/u);
+    assert.doesNotMatch(error.excerpt, /private prompt|private-session-key|private value/u);
+    return true;
+  });
 });
 
 test('original SDK JSON remains available without numeric precision or whitespace rewriting', async (context) => {

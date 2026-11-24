@@ -9,11 +9,13 @@ import type { LossAccount } from './loss-account.ts';
 import { parserCheckJson } from './parser-check.ts';
 import type { ParserCheckResult } from './parser-check.ts';
 import type { ImageAccount } from './images.ts';
+import type { CompanionLinkStatus } from './images.ts';
 
 // Version 2 added the `parser` section and the `parser-check` failure reason.
 // Version 3 adds independent image accounting and the `image-loss` failure reason.
 // Version 4 adds dropped-kind and tool-data counts for the plain-English report.
-export const VERIFY_JSON_VERSION = 4;
+// Version 5 adds linked-companion availability and the `companion-loss` failure reason.
+export const VERIFY_JSON_VERSION = 5;
 
 interface VerificationCounts {
   rawRequestCount: number;
@@ -76,6 +78,16 @@ function fenceRepairsJson (repairs: FenceRepairs) {
   return { early: repairs.early.length, earlyByKind: tally(repairs.early, (item) => item.kind), turnEnd: repairs.turnEnd, htmlEscaped: repairs.html.length, htmlEscapedByKind: tally(repairs.html, (item) => item.kind) };
 }
 
+function companionLinksJson (statuses: readonly CompanionLinkStatus[]) {
+  const missing = statuses.reduce((total, status) => total + status.missing.length, 0);
+  return {
+    linked: statuses.reduce((total, status) => total + status.linked, 0),
+    present: statuses.reduce((total, status) => total + status.present.length, 0),
+    missing,
+    unlinked: statuses.reduce((total, status) => total + status.unlinked.length, 0),
+  };
+}
+
 export function buildLocalVerifyJson (input: {
   strict: boolean;
   report: VerificationCounts;
@@ -88,6 +100,7 @@ export function buildLocalVerifyJson (input: {
   lossTarget: 'file' | 'in-memory';
   parser: ParserCheckResult;
   images?: ImageAccount;
+  companionLinks?: readonly CompanionLinkStatus[];
 }) {
   const { strict, report, census, crossCheck, render, fenceRepairs, loss } = input;
   // Same conditions as the text report's exit code, named so a corpus run can group failures.
@@ -98,6 +111,7 @@ export function buildLocalVerifyJson (input: {
   render?.failed && reasons.push('layer-c');
   input.parser.failed && reasons.push('parser-check');
   input.images?.failed && reasons.push('image-loss');
+  input.companionLinks?.some((status) => status.missing.length) && reasons.push('companion-loss');
   input.renderSkipReason === 'unreadable-output' && reasons.push('unreadable-output');
   if (strict) {
     census.unhandled.length && reasons.push('unhandled-kind');
@@ -134,6 +148,7 @@ export function buildLocalVerifyJson (input: {
     fenceRepairs: fenceRepairsJson(fenceRepairs),
     layerD: { target: input.lossTarget, ...lossJson(loss) },
     ...(input.images ? { images: input.images } : {}),
+    ...(input.companionLinks ? { companionLinks: companionLinksJson(input.companionLinks) } : {}),
     parser: parserCheckJson(input.parser),
   };
 }
@@ -146,12 +161,14 @@ export function buildSdkVerifyJson (input: {
   parser: ParserCheckResult;
   fenceRepairs: FenceRepairs;
   images?: ImageAccount;
+  companionLinks?: readonly CompanionLinkStatus[];
   lossTarget?: 'file' | 'in-memory';
 }) {
   const { strict, census, loss } = input;
   const reasons: string[] = [];
   input.parser.failed && reasons.push('parser-check');
   input.images?.failed && reasons.push('image-loss');
+  input.companionLinks?.some((status) => status.missing.length) && reasons.push('companion-loss');
   strict && census.unhandled.length && reasons.push('unhandled-kind');
   strict && census.questionWarnings?.length && reasons.push('question-not-read');
   loss.failed && reasons.push('layer-d');
@@ -167,6 +184,7 @@ export function buildSdkVerifyJson (input: {
     fenceRepairs: fenceRepairsJson(input.fenceRepairs),
     layerD: { target: input.lossTarget ?? 'in-memory', ...lossJson(loss) },
     ...(input.images ? { images: input.images } : {}),
+    ...(input.companionLinks ? { companionLinks: companionLinksJson(input.companionLinks) } : {}),
     parser: parserCheckJson(input.parser),
   };
 }

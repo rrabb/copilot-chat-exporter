@@ -317,7 +317,7 @@ export function sourceCopyNotice (copy: SourceCopy | undefined): string[] {
   ];
 }
 
-interface ExportCopyReceipt {
+export interface ExportCopyReceipt {
   selector: string;
   outputSha256: string | null;
   verificationFailure?: string;
@@ -329,6 +329,33 @@ interface ExportCopyReceipt {
   source?: string;
   copy?: SourceCopy;
   toolGroupOrder?: ToolGroupOrder;
+}
+
+export interface ExportOutputHashCheck {
+  state: 'matches-export' | 'differs-from-export' | 'no-export-hash';
+  expectedSha256: string | null;
+  actualSha256: string;
+}
+
+export async function checkExportOutputHash (output: string, receipt: { outputSha256?: string | null }): Promise<ExportOutputHashCheck | undefined> {
+  let bytes: Buffer;
+  try {
+    bytes = await fs.readFile(output);
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : null;
+    if (code === 'ENOENT' || code === 'EACCES' || code === 'EPERM' || code === 'EISDIR')
+      return undefined;
+    throw error;
+  }
+  const expectedSha256 = receipt.outputSha256 ?? null;
+  const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+  return {
+    state: expectedSha256 === null
+      ? 'no-export-hash'
+      : expectedSha256 === actualSha256 ? 'matches-export' : 'differs-from-export',
+    expectedSha256,
+    actualSha256,
+  };
 }
 
 const receiptFile = (output: string) => path.join(sourceCacheRoot(), 'receipts',

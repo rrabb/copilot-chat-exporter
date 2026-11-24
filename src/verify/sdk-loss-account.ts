@@ -57,6 +57,7 @@ export function sdkLossPieces (events: readonly SdkEvent[], toolGroupOrder: Tool
     const scope = scopeOf(event);
     pieces.push({
       request: Math.max(turns.get(scope) ?? 0, 1), category, text,
+      sourceLine: event.line,
       ...(inSequence ? { orderGroup: scope, checkMultiplicity: true } : {}),
     });
   };
@@ -65,7 +66,7 @@ export function sdkLossPieces (events: readonly SdkEvent[], toolGroupOrder: Tool
     if (!text.trim() || companionKeys.has(key))
       return;
     companionKeys.add(key);
-    companionPieces.push({ request: Math.max(turns.get(scopeOf(event)) ?? 0, 1), category, text });
+    companionPieces.push({ request: Math.max(turns.get(scopeOf(event)) ?? 0, 1), category, text, sourceLine: event.line });
   };
   for (const event of events) {
     if (isUnresolvedChild(event))

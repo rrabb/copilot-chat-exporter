@@ -20,6 +20,8 @@ import type { CompanionLinkStatus, ImageLocator } from './images.ts';
 import type { LossItem } from './loss-account.ts';
 import type { LossSequenceEvidence } from './loss-account.ts';
 import type { VerificationJson } from './json-report.ts';
+import type { ExportOutputHashCheck } from '../session/source-snapshot.ts';
+import { SdkEventLineError } from '../session/sdk-events.ts';
 import { redactText } from '../redaction.ts';
 import { MARK, scanFences } from '../text.ts';
 import { exporterCommit, exporterVersion } from '../version.ts';
@@ -33,6 +35,7 @@ const EXCERPT_LINE_CHARS = 240;
 
 /** Maps verifier failure reasons to the finding categories that drive hints and deduplication. */
 const REASON_CATEGORY: Readonly<Record<string, string>> = {
+  'companion-loss': 'layer-d',
   'early-fence-close': 'representation',
   'image-loss': 'images',
   'layer-a-tool-ids': 'structure',
@@ -100,9 +103,9 @@ interface DiagnosticTaskManifest {
   redaction: { commonPatternsFound: number };
   command: string[];
   source: { hash?: string; capturePath?: string };
-  archive: { path: string | null; failureLog?: string | null };
+  archive: { path: string | null; failureLog?: string | null; outputHash?: ExportOutputHashCheck };
   runtime: { copilotVersion: string; vscodeVersion: string; exporterVersion: string; exporterCommit: string; sourceCheckout?: { commit: string; dirtyFiles: number | null } };
-  exception: { name: string; message: string; stage: string; frames: string[]; partialReport: boolean } | null;
+  exception: { name: string; message: string; stage: string; frames: string[]; partialReport: boolean; sourceLine?: number; excerpt?: string } | null;
   parserEvidence: ParserEvidence[];
   images: ReturnType<typeof imageEvidence>;
   companions: ReturnType<typeof companionEvidence>;
@@ -124,6 +127,7 @@ export interface DiagnosticBundleInput {
   exceptionStage?: DiagnosticExceptionStage;
   imageLocators?: readonly ImageLocator[];
   archivePath?: string | null;
+  outputHash?: ExportOutputHashCheck;
   diagnosticsDirectory?: string | null;
   assetsPath?: string | null;
   failureLog?: string | null;
@@ -216,7 +220,7 @@ function warningFindings (report: VerificationJson, sourceWarnings: readonly str
       stage: 'render',
       category: 'representation',
       check: 'markdown-repair',
-      message: `${report.fenceRepairs.early} early fence close(s), ${report.fenceRepairs.turnEnd} turn-end close(s), ${report.fenceRepairs.htmlEscaped} HTML escape(s).`,
+      message: `${report.fenceRepairs.early} early fence close(s), ${report.fenceRepairs.turnEnd} turn-end close(s), ${report.fenceRepairs.htmlEscaped} HTML escape(s). Early kinds: ${Object.entries(report.fenceRepairs.earlyByKind).map(([kind, count]) => `${kind}=${count}`).join(', ') || 'none'}.`,
     });
   if (report.images && (report.images.unresolved || report.images.referenceOnly))
     findings.push({
@@ -311,9 +315,15 @@ export function sanitizeDiagnosticArguments (args: readonly string[]): string[] 
   return output;
 }
 
-function exceptionData (error: unknown): { name: string; message: string; stack?: string } {
-  if (error instanceof Error)
-    return { name: error.name, message: error.message, ...(error.stack ? { stack: error.stack } : {}) };
+function exceptionData (error: unknown): { name: string; message: string; stack?: string; sourceLine?: number; excerpt?: string } {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      ...(error.stack ? { stack: error.stack } : {}),
+      ...(error instanceof SdkEventLineError ? { sourceLine: error.sourceLine, excerpt: error.excerpt } : {}),
+    };
+  }
   return { name: typeof error, message: String(error) };
 }
 
@@ -461,6 +471,16 @@ function number (value: number): string {
   return value.toLocaleString('en-US');
 }
 
+function archiveHashSummary (hash: ExportOutputHashCheck | undefined): string[] {
+  if (!hash)
+    return [];
+  if (hash.state === 'differs-from-export')
+    return ['- Archive bytes differ from the completed export. Restore or re-export from the frozen source before changing renderer code. A byte difference does not prove who or what changed the file.'];
+  if (hash.state === 'matches-export')
+    return ['- Archive bytes match the completed export. The saved file has not changed byte-for-byte since export. Investigate exporter or verifier behavior.'];
+  return ['- No completed-export hash is available. Do not infer that the archive is unchanged.'];
+}
+
 function renderTask (manifest: DiagnosticTaskManifest, result: DiagnosticBundlePaths): string {
   const model = manifest.model;
   const verification = manifest.verification;
@@ -486,6 +506,7 @@ function renderTask (manifest: DiagnosticTaskManifest, result: DiagnosticBundleP
       ? `- Verification exit code: ${verification.exitCode}.`
       : '- The exporter or verifier stopped before a complete verification result existed.',
     ...(verification?.failureReasons.length ? [`- Failure reasons: ${verification.failureReasons.map((reason) => `\`${reason}\``).join(', ')}.`] : []),
+    ...archiveHashSummary(manifest.archive.outputHash),
     `- Findings: ${number(model.findings.length)} distinct signature(s).`,
     `- Schema groups: ${number(model.schema.groups.length)}.`,
     `- Content groups: ${number(model.content.groups.length)}.`,
@@ -497,7 +518,7 @@ function renderTask (manifest: DiagnosticTaskManifest, result: DiagnosticBundleP
     '',
     ...(model.findings.length
       ? model.findings.map((finding) =>
-        `- \`${finding.stage}/${finding.category}/${finding.check}\` (${finding.severity}, ${finding.count}): ${finding.message}`)
+        `- \`${finding.stage}/${finding.category}/${finding.check}\` (${finding.severity}, ${finding.count}): ${finding.message}${finding.locators.length ? ` Locations: ${finding.locators.map((locator) => `\`${locator}\``).join(', ')}.` : ''}`)
       : ['- No structured warning or failure detail was available. Start with the exception section.']),
     ...renderException(manifest.exception),
     ...(failedChecks.length ? ['', '## Failed parser checks', '', ...renderParser(manifest.parserEvidence)] : []),
@@ -528,6 +549,9 @@ function renderTask (manifest: DiagnosticTaskManifest, result: DiagnosticBundleP
     ...(result.rawRecordsPath ? [`- Raw records: \`${result.rawRecordsPath}\`.`] : []),
     ...(manifest.source.capturePath ? [`- Frozen source capture: \`${manifest.source.capturePath}\`.`] : []),
     ...(manifest.archive.path ? [`- Archive: \`${manifest.archive.path}\`.`] : []),
+    ...(manifest.archive.outputHash
+      ? [`- Archive bytes: ${manifest.archive.outputHash.state}. Expected export hash: \`${manifest.archive.outputHash.expectedSha256 ?? 'not recorded'}\`. Current hash: \`${manifest.archive.outputHash.actualSha256}\`.`]
+      : []),
     ...(manifest.archive.failureLog ? [`- Failure log: \`${manifest.archive.failureLog}\`.`] : []),
     '',
     '## Reproduction facts',
@@ -567,6 +591,7 @@ function renderException (exception: DiagnosticTaskManifest['exception']): strin
     '',
     `- Stage: ${exception.stage}. ${exception.stage === 'verify' ? 'The verifier threw, so suspect verifier code before exporter code.' : 'The exporter threw before verification finished.'}`,
     `- Error: \`${exception.name}\`: ${exception.message}`,
+    ...(exception.sourceLine !== undefined ? [`- Source line: ${exception.sourceLine}. Redacted excerpt: \`${exception.excerpt ?? 'unavailable'}\`.`] : []),
     `- Partial verification report: ${exception.partialReport ? 'yes, see `verification` in the manifest' : 'no'}.`,
     ...(exception.frames.length
       ? ['- Project frames, innermost first:', ...exception.frames.map((frame) => `  - \`${frame}\``)]
@@ -699,7 +724,8 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
       category: 'layer-d',
       check: group.category,
       message: `${group.count} ${group.status} content piece${group.count === 1 ? '' : 's'}.`,
-      locators: group.requests.map((request) => `request ${request} ${group.category}`),
+      locators: group.locations.map((location) =>
+        `${location.sourceLine === undefined ? '' : `event line ${location.sourceLine}, `}request ${location.request} ${group.category}`),
       contentSignatures: [group.signature],
     })),
     ...sequence.order.map((item) => ({
@@ -709,7 +735,7 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
       category: 'layer-d',
       check: 'source-order',
       message: `Out-of-order ${item.category} evidence was found.`,
-      locators: [`request ${item.request} ${item.category}`],
+      locators: [`${item.sourceLine === undefined ? '' : `event line ${item.sourceLine}, `}request ${item.request} ${item.category}`],
     })),
     ...sequence.multiplicity.map((item) => ({
       provider: input.provider,
@@ -718,7 +744,7 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
       category: 'layer-d',
       check: 'source-multiplicity',
       message: `${item.expected - item.found} repeated ${item.category} occurrence(s) were missing.`,
-      locators: [`request ${item.request} ${item.category}`],
+      locators: [`${item.sourceLine === undefined ? '' : `event line ${item.sourceLine}, `}request ${item.request} ${item.category}`],
     })),
   ];
   const warnings = input.report ? warningFindings(input.report, input.sourceWarnings ?? []) : [];
@@ -735,7 +761,10 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
       category: exceptionStage === 'verify' ? 'verifier' : 'exporter',
       check: 'exception',
       message: `${exception.name}: ${exception.message}`,
-      locators: projectFrames(exception.stack),
+      locators: [
+        ...(exception.sourceLine !== undefined ? [`event line ${exception.sourceLine}`] : []),
+        ...projectFrames(exception.stack),
+      ],
     } satisfies DiagnosticFindingInput] : []),
   ];
   const generic = input.report
@@ -770,6 +799,7 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
     sha256: archiveFile?.sha256,
     assetsPath: input.assetsPath,
     failureLog: input.failureLog,
+    ...(input.outputHash ? { outputHash: input.outputHash } : {}),
   };
   const companions = archiveFile && input.archivePath
     ? companionEvidence(await companionLinkStatus(archiveFile.markdown, path.resolve(input.archivePath)))

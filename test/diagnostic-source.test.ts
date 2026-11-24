@@ -70,6 +70,24 @@ test('SDK diagnostics recompute unsupported payload reasons and keep unknown eve
   assert.deepEqual(records.map((record) => record.locator), ['line 1', 'line 2']);
 });
 
+test('unsupported usage receipts keep the failing field in diagnostic records', () => {
+  const receipt = event(9, 'session.usage_record', {
+    usage: {
+      accounting: { usageId: 'call-one', sourceSessionId: 'source-one', sequence: 1 },
+      model: 'future-model',
+      inputTokens: 10,
+      outputTokens: 2,
+      websocketFallbackStatusCode: 'future-code',
+    },
+  });
+  const records = sdkDiagnosticSchemaRecords([receipt],
+    census([['session.usage_record:unsupported', 1]]));
+  assert.equal(records.length, 1);
+  assert.equal(records[0]!.type, 'session.usage_record');
+  assert.equal(records[0]!.line, 9);
+  assert.ok(records[0]!.issues.includes('usage.websocketFallbackStatusCode: expected a finite nonnegative number'));
+});
+
 test('question diagnostics keep guessed tool structure for offline fixture work', () => {
   const events = [
     event(1, 'user.message', { content: 'Private user prompt', messageId: 'm1' }),

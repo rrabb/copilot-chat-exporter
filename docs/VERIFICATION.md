@@ -265,6 +265,7 @@ These names can appear in `Failed checks`, JSON output or the failure log.
 | `turn-count` | Raw request count differs from parsed turn count | Inspect missing or extra turns |
 | `layer-c` | The saved Local Markdown structure doesn't match parsed turns | Inspect the named structural check |
 | `layer-d` | Recorded text is partial, absent, out of order or missing a repeated occurrence | Compare the named category and request with the archive and companions |
+| `companion-loss` | A live archive link points to a missing text or image companion | Restore the exact companion or re-export |
 | `image-loss` | A required recorded image didn't match linked bytes | Inspect the archive's image links and companion folder |
 | `parser-check` | Markdown parser checks failed, or the parser is unavailable in strict mode | Install the pinned dependencies or fix the generated structure |
 | `unreadable-output` | The requested saved archive couldn't be read | Check the path, permissions and file integrity |
@@ -352,6 +353,16 @@ A verification warning, verification failure or exporter exception writes:
 - an optional `<archive>.diagnostics-<timestamp>.raw-records.jsonl` with the exact recorded records behind each finding
 
 Clean verification writes none. A normal failed shell command doesn't trigger a bundle when verification is clean.
+Known selection errors, such as a selector typo or ambiguous Local prefix, exit without a bundle.
+They are command errors, not exporter failures.
+
+For saved-file verification, the task records whether the current archive bytes match the completed export receipt:
+
+- `matches-export`
+- `differs-from-export`
+- `no-export-hash`
+
+The last state applies to failed exports and older receipts without a hash. It is a check of file bytes, not a promise that unchanged bytes contain complete history.
 
 The manifest separates two evidence types:
 
@@ -368,10 +379,11 @@ The task file is written for a repair agent. It lists these sections when they a
 | --- | --- |
 | Failure reasons | Each verifier reason mapped to a category (`images`, `parser`, `schema-drift`, `structure` and so on) and its likely source modules |
 | Exception | The stage that threw (`load`, `verify` or `export`), the first project stack frames and the partial report |
+| Bad SDK record | For a malformed or unsupported event line, the line number and a 600-character excerpt with string values redacted |
 | Failed parser checks | The expected marker, where it landed inside a code fence, the fence opener line and a short excerpt |
 | Missing or unresolved images | The recorded line and JSON path of each image whose bytes didn't reach the archive |
 | Companion links | Linked companion files that are missing, and files in the assets folder that nothing links |
-| Exact content | JSON paths into the manifest for the exact recorded and rendered text |
+| Exact content | JSON paths into the manifest for the exact recorded and rendered text, plus an SDK event-line locator when available |
 | Raw records | Line numbers in the raw records file |
 | Replay | A `node src/cli.ts --verify` command for the saved archive, the exporter commit and, for source runs, the checkout status |
 

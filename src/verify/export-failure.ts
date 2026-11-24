@@ -26,12 +26,14 @@ export function exportFailureFromReport (report: {
   failureReasons: string[];
   layerD: { totals: ExportFailure['categories'] };
   images?: { missing: number; unresolved: number };
+  companionLinks?: { missing: number };
   parser: { checks: Array<{ ok: boolean }> };
 }, missing: readonly Pick<LossItem, 'request' | 'category'>[] = []): ExportFailure | null {
   if (!report.exitCode)
     return null;
   const counts = Object.fromEntries(report.failureReasons.map((reason) => [reason,
     reason === 'image-loss' ? (report.images?.missing ?? 0) + (report.images?.unresolved ?? 0)
+      : reason === 'companion-loss' ? report.companionLinks?.missing ?? 0
       : reason === 'parser-check' ? report.parser.checks.filter((check) => !check.ok).length
         : reason === 'layer-d' ? Math.max(1, Object.values(report.layerD.totals).reduce((sum, item) => sum + item.partial + item.absent, 0)) : 1]));
   return {

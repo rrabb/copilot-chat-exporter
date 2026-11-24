@@ -13,10 +13,12 @@ import { printLossAccount } from './verify/loss-report.ts';
 import { buildSdkVerifyJson } from './verify/json-report.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { errorLabel } from './text.ts';
-import { readLinkedArchiveCompanions, sdkImageLocators, verifySdkImages } from './verify/images.ts';
+import { companionLinkStatus, readLinkedArchiveCompanions, sdkImageLocators, verifySdkImages } from './verify/images.ts';
+import type { CompanionLinkStatus } from './verify/images.ts';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { existingUserDataSnapshot, keepFailedExportCopy, readExportCopy, saveExportCopy, verifySourceCopy } from './session/source-snapshot.ts';
+import { checkExportOutputHash, existingUserDataSnapshot, keepFailedExportCopy, readExportCopy, saveExportCopy, verifySourceCopy } from './session/source-snapshot.ts';
+import type { ExportOutputHashCheck } from './session/source-snapshot.ts';
 import { snapshotSdkSelection } from './session/sdk-capture.ts';
 import type { SdkCapture } from './session/sdk-capture.ts';
 import { discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, sourceCacheRoot } from './session/source-cache.ts';
@@ -31,6 +33,8 @@ import { shouldWriteDiagnosticBundle, writeDiagnosticBundle } from './verify/dia
 import type { DiagnosticBundleInput } from './verify/diagnostic-bundle.ts';
 import { questionDiagnosticSchemaRecords, sdkDiagnosticSchemaRecords } from './verify/diagnostic-source.ts';
 import type { SchemaDiagnosticRecord } from './verify/diagnostic-evidence.ts';
+import { SessionSelectionError } from './session/locate.ts';
+import { UserDataRootError } from './session/roots.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -44,6 +48,7 @@ export interface SdkCommandOptions {
   json?: boolean;
   keepSource?: boolean;
   toolGroupOrder?: ToolGroupOrder;
+  outputHash?: ExportOutputHashCheck;
 }
 
 async function writeExplanationForCli (input: VerificationExplanationInput, quiet = false): Promise<boolean> {
@@ -84,17 +89,19 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
     return await runSdkCommandFromCopy(options);
   } catch (error) {
     console.error(errorLabel(error));
-    await writeDiagnosticsForCli({
-      generatedAt: new Date().toISOString(),
-      provider: 'sdk',
-      sessionId: options.selector,
-      command: process.argv.slice(2),
-      report: null,
-      exception: error,
-      exceptionStage: 'load',
-      archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
-      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
-    }, options.json === true);
+    if (!(error instanceof SessionSelectionError || error instanceof UserDataRootError)) {
+      await writeDiagnosticsForCli({
+        generatedAt: new Date().toISOString(),
+        provider: 'sdk',
+        sessionId: options.selector,
+        command: process.argv.slice(2),
+        report: null,
+        exception: error,
+        exceptionStage: 'load',
+        archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
+        diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+      }, options.json === true);
+    }
     return 1;
   }
 }
@@ -102,7 +109,14 @@ export async function runSdkCommand (options: SdkCommandOptions): Promise<number
 async function runSdkCommandFromCopy (options: SdkCommandOptions): Promise<number | null> {
   const receipt = options.verify && options.outputArgument
     ? await readExportCopy(path.resolve(options.outputArgument), options.selector) : null;
-  const resolvedOptions = { ...options, toolGroupOrder: receipt?.toolGroupOrder ?? options.toolGroupOrder ?? 'request' };
+  const outputHash = receipt && options.outputArgument
+    ? await checkExportOutputHash(options.outputArgument, receipt)
+    : undefined;
+  const resolvedOptions = {
+    ...options,
+    toolGroupOrder: receipt?.toolGroupOrder ?? options.toolGroupOrder ?? 'request',
+    outputHash,
+  };
   if (receipt && !receipt.sdk && !receipt.root)
     return null;
   if (receipt?.sdk) {
@@ -180,10 +194,12 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     const ledger = readUsageForSource(source);
     if (options.verify) {
       const preview = renderSdkExport(events, displaySource, { title, assetsDirectory: 'assets', outputPath: '', generatedAt: new Date().toISOString(), ledger, sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' });
+      let companionLinks: CompanionLinkStatus[] | undefined;
       if (options.outputArgument) {
         const outputPath = path.resolve(options.outputArgument);
         preview.markdown = await fs.readFile(outputPath, 'utf8');
         preview.companions = await readLinkedArchiveCompanions(preview.markdown, outputPath);
+        companionLinks = await companionLinkStatus(preview.markdown, outputPath);
       }
       let failure: ExportFailure | null = null;
       let verification: SdkVerificationJson | null = null;
@@ -194,7 +210,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           diagnosticLossItems = account.unaccounted;
           diagnosticSequenceEvidence = account.sequenceEvidence;
           failure = exportFailureFromReport(report, account.unaccounted);
-        });
+        }, companionLinks);
       const failureLog = failure ? await keepVerificationFailure(failure) : null;
       if (verification) {
         diagnosticSchemaRecords = [
@@ -252,6 +268,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           lossItems: diagnosticLossItems,
           sequenceEvidence: diagnosticSequenceEvidence,
           imageLocators: sdkImageLocators(events),
+          outputHash: options.outputHash,
         }, options.json === true);
         diagnosticsWritten = diagnosticStatus === 'written';
         if (diagnosticsWritten) {
@@ -334,6 +351,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       lossItems: diagnosticLossItems,
       sequenceEvidence: diagnosticSequenceEvidence,
       imageLocators: sdkImageLocators(events),
+      outputHash: options.outputHash,
     }, options.json === true);
     diagnosticsWritten = diagnosticStatus === 'written';
     if (diagnosticsWritten) {
@@ -427,6 +445,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       schemaRecords: diagnosticSchemaRecords,
       lossItems: diagnosticLossItems,
       sequenceEvidence: diagnosticSequenceEvidence,
+      outputHash: options.outputHash,
     }, options.json === true);
     if (diagnosticStatus === 'written') {
       keepSnapshot?.();
@@ -457,12 +476,13 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
 }
 
 async function verifyReport (preview: SdkExport, strict: boolean, json: boolean, savedArchive: boolean,
-  onReport?: (report: ReturnType<typeof buildSdkVerifyJson>, account: ReturnType<typeof buildSdkLossAccount>) => void): Promise<number> {
+  onReport?: (report: ReturnType<typeof buildSdkVerifyJson>, account: ReturnType<typeof buildSdkLossAccount>) => void,
+  companionLinks?: readonly CompanionLinkStatus[]): Promise<number> {
   const account = buildSdkLossAccount(preview.events, preview.markdown, preview.companions, preview.toolGroupOrder, { captureFailedText: true });
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
   const drift = preview.session.census.unhandled;
-  const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, lossTarget: savedArchive ? 'file' : 'in-memory', parser, fenceRepairs: preview.fenceRepairs, images });
+  const report = buildSdkVerifyJson({ strict, census: preview.session.census, leftOut: preview.leftOut, loss: account, lossTarget: savedArchive ? 'file' : 'in-memory', parser, fenceRepairs: preview.fenceRepairs, images, companionLinks });
   onReport?.(report, account);
   if (json) {
     process.stdout.write(`${JSON.stringify(report)}\n`);
@@ -483,6 +503,12 @@ async function verifyReport (preview: SdkExport, strict: boolean, json: boolean,
     console.log(`    ${line}`);
   console.log(`- Left out on purpose: ${[...preview.leftOut].map(([name, count]) => `${name} ${count}`).join('; ') || 'nothing'}`);
   printLossAccount(account, savedArchive ? 'the given file and its linked companions' : 'the Markdown this build would write');
+  if (companionLinks) {
+    const missing = companionLinks.flatMap((status) => status.missing);
+    console.log(`Companion links: ${companionLinks.reduce((sum, status) => sum + status.linked, 0)} linked, ${missing.length} missing.`);
+    for (const target of missing)
+      console.log(`- Missing: ${target}`);
+  }
   console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved, ${images.referenceOnly} reference-only.`);
   console.log(formatParserCheck(parser, savedArchive ? 'the given file' : 'in-memory build').join('\n'));
   const { early, turnEnd, html } = preview.fenceRepairs;

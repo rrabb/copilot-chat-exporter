@@ -2,7 +2,7 @@ import { createHash, createHmac } from 'node:crypto';
 import type { SdkEvent } from '../session/sdk-events.ts';
 import type { LossItem } from './loss-account.ts';
 
-export const DIAGNOSTIC_EVIDENCE_VERSION = 1;
+export const DIAGNOSTIC_EVIDENCE_VERSION = 2;
 
 const DEFAULT_SAFE_PATHS = [
   'type',
@@ -120,8 +120,10 @@ export interface ContentDiagnosticGroup {
   status: LossItem['status'];
   count: number;
   requests: number[];
+  locations: Array<{ request: number; sourceLine?: number }>;
   sample: {
     request: number;
+    sourceLine?: number;
     chars: number;
     lines?: LossItem['lines'];
     evidence: NonNullable<LossItem['evidence']>;
@@ -579,8 +581,13 @@ export function collectContentDiagnosticEvidence (items: readonly LossItem[]): C
       status: first.status,
       count: entries.length,
       requests: entries.map((item) => item.request),
+      locations: entries.map((item) => ({
+        request: item.request,
+        ...(item.sourceLine !== undefined ? { sourceLine: item.sourceLine } : {}),
+      })),
       sample: {
         request: first.request,
+        ...(first.sourceLine !== undefined ? { sourceLine: first.sourceLine } : {}),
         chars: first.chars,
         ...(first.lines ? { lines: first.lines } : {}),
         evidence: first.evidence!,

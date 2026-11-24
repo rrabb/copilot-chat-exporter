@@ -9,6 +9,7 @@ import { buildSdkVerifyJson } from '../src/verify/json-report.ts';
 import type { Census } from '../src/types.ts';
 import type { LossAccount } from '../src/verify/loss-account.ts';
 import type { SchemaDiagnosticRecord } from '../src/verify/diagnostic-evidence.ts';
+import { SdkEventLineError } from '../src/session/sdk-events.ts';
 
 const census = (unhandled: Array<[string, number]> = []): Census => ({
   seen: new Map([['user.message', 1]]),
@@ -81,10 +82,16 @@ test('writer keeps a collision-safe task and manifest with redacted schema and e
     archivePath,
     sourceHash: 'source-hash',
     capturePath: path.join(root, 'capture'),
+    outputHash: {
+      state: 'differs-from-export',
+      expectedSha256: 'a'.repeat(64),
+      actualSha256: 'b'.repeat(64),
+    },
     sourceWarnings: [],
     schemaRecords,
     lossItems: [{
       request: 2,
+      sourceLine: 27,
       category: 'tool-output',
       status: 'absent',
       chars: 31,
@@ -99,6 +106,7 @@ test('writer keeps a collision-safe task and manifest with redacted schema and e
     sequenceEvidence: {
       order: [{
         request: 3,
+        sourceLine: 99,
         category: 'assistant-text',
         recordedText: 'Second recorded message.',
         comparedText: 'Second recorded message.',
@@ -132,9 +140,36 @@ test('writer keeps a collision-safe task and manifest with redacted schema and e
   assert.match(task, /Do not upload/u);
   assert.match(task, /future\.event/u);
   assert.match(task, /tool-output/u);
+  assert.match(task, /event line 27, request 2 tool-output/u);
+  assert.match(task, /Archive bytes differ from the completed export/u);
+  assert.match(task, /Restore or re-export from the frozen source before changing renderer code/u);
   assert.match(task, /Out-of-order failures: 1/u);
+  assert.match(task, /event line 99, request 3 assistant-text/u);
   assert.match(task, /src\/session\/sdk-session\.ts/u);
   assert.match(task, /Frozen source capture:/u);
+});
+
+test('load exceptions retain a safe clipped source-line excerpt', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-diagnostics-source-line-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const raw = '{"type":"future.event","data":{"prompt":"private prompt","unfinished":"';
+  const result = await writeDiagnosticBundle({
+    generatedAt: '2026-11-23T18:00:00.000Z',
+    provider: 'sdk',
+    sessionId: 'private-session-id',
+    command: ['private-session-id', path.join(root, 'broken.md')],
+    report: null,
+    exception: new SdkEventLineError('SDK event line 201 is not valid JSON.', 201, raw),
+    exceptionStage: 'load',
+    diagnosticsDirectory: root,
+  });
+  const manifest = JSON.parse(await fs.readFile(result!.manifestPath, 'utf8'));
+  const task = await fs.readFile(result!.taskPath, 'utf8');
+  assert.equal(manifest.exception.sourceLine, 201);
+  assert.match(manifest.exception.excerpt, /"prompt":"<redacted>"/u);
+  assert.doesNotMatch(JSON.stringify(manifest.exception), /private prompt/u);
+  assert.match(task, /Source line: 201/u);
+  assert.match(task, /event line 201/u);
 });
 
 test('large fidelity evidence moves into a collision-safe evidence folder', async (context) => {
@@ -266,6 +301,34 @@ test('parser failures map to parser hints, store the report once and show the sw
   assert.match(task, /code block opened at line 3: `````text`/u);
   assert.match(task, /src\/verify\/parser-check\.ts/u);
   assert.match(task, /Replay: `node src\/cli\.ts --verify <session-id> /u);
+});
+
+test('strict fence-repair failures produce a representation finding and keep the turn', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-diagnostics-fence-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const verification = buildSdkVerifyJson({
+    strict: true,
+    census: census(),
+    leftOut: new Map(),
+    loss: loss(),
+    parser: report().parser,
+    fenceRepairs: { early: [{ turn: 2, kind: 'tool-result' }], turnEnd: 1, html: [] },
+  });
+  const result = await writeDiagnosticBundle({
+    generatedAt: '2026-11-23T18:00:00.000Z',
+    provider: 'sdk',
+    sessionId: 'private-session-id',
+    command: ['--verify', '--strict', 'private-session-id'],
+    report: verification,
+    failure: { failureReasons: verification.failureReasons, categories: {}, details: verification },
+    diagnosticsDirectory: root,
+  });
+  const manifest = JSON.parse(await fs.readFile(result!.manifestPath, 'utf8'));
+  const task = await fs.readFile(result!.taskPath, 'utf8');
+  assert.deepEqual(verification.failureReasons, ['early-fence-close']);
+  assert.equal(manifest.model.findings[0].category, 'representation');
+  assert.match(task, /early-fence-close/u);
+  assert.match(task, /tool-result/u);
 });
 
 test('a specific strict failure replaces the generic reason finding for the same category', async (context) => {

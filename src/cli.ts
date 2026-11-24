@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
-import { keepFailedExportCopy, readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
+import { checkExportOutputHash, keepFailedExportCopy, readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
+import type { ExportOutputHashCheck } from './session/source-snapshot.ts';
 import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listFailureLogs, listSourceCache, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
 import { exportFailureFromReport, failureDetails, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
@@ -13,9 +14,9 @@ import { loadSession, renderSession } from './index.ts';
 import type { FenceRepairs } from './index.ts';
 import { buildExportSummary, formatExportSummary } from './export-summary.ts';
 import { getWorkspaceRoot, resolveOutputPath, workspacePath } from './host.ts';
-import { looksLikeSessionArgument } from './session/locate.ts';
+import { looksLikeSessionArgument, SessionSelectionError } from './session/locate.ts';
 import { questionWarningLines } from './session/questions.ts';
-import { resolveUserDataRoot } from './session/roots.ts';
+import { resolveUserDataRoot, UserDataRootError } from './session/roots.ts';
 import { inventorySessions } from './session/inventory.ts';
 import { formatSessionListing, formatSessionListingHtml } from './session/listing.ts';
 import { collectListingEvidence } from './session/listing-evidence.ts';
@@ -31,7 +32,7 @@ import {
 import { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
 import { buildLossAccount } from './verify/loss-account.ts';
 import { buildLocalVerifyJson } from './verify/json-report.ts';
-import { localImageLocators, readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
+import { companionLinkStatus, localImageLocators, readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { runSdkCommand } from './sdk-cli.ts';
@@ -343,9 +344,12 @@ if (!listMode && !goldenMode && ((!currentMode && !firstIsSource) || (currentMod
 }
 let selectedRoot: string | undefined;
 let fileVerificationReceipt: Awaited<ReturnType<typeof readExportCopy>> | null = null;
+let fileOutputHash: ExportOutputHashCheck | undefined;
 try {
   if (verifyMode && outputArgument)
     fileVerificationReceipt = await readExportCopy(path.resolve(outputArgument), sourceArgument ?? '--current');
+  if (fileVerificationReceipt && outputArgument)
+    fileOutputHash = await checkExportOutputHash(outputArgument, fileVerificationReceipt);
   if (!fileVerificationReceipt && (listMode || currentMode || userDataRootArg !== null || (firstIsSource && !firstArgument?.endsWith('.jsonl')))) {
     selectedRoot = await resolveUserDataRoot({
       userDataRoot: userDataRootArg ?? undefined,
@@ -421,17 +425,20 @@ try {
   loaded.copiedSource.kept = !verifyMode && !goldenMode && !snapshotAction && keepSource;
 } catch (error) {
   console.error(errorLabel(error));
-  await writeDiagnosticsForCli({
-    generatedAt: new Date().toISOString(),
-    provider: 'local',
-    sessionId: sourceArgument ?? '--current',
-    command: process.argv.slice(2),
-    report: null,
-    exception: error,
-    exceptionStage: 'load',
-    archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
-    diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
-  }, jsonMode);
+  if (!(error instanceof SessionSelectionError || error instanceof UserDataRootError)) {
+    await writeDiagnosticsForCli({
+      generatedAt: new Date().toISOString(),
+      provider: 'local',
+      sessionId: sourceArgument ?? '--current',
+      command: process.argv.slice(2),
+      report: null,
+      exception: error,
+      exceptionStage: 'load',
+      archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
+      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+      outputHash: fileOutputHash,
+    }, jsonMode);
+  }
   process.exit(1);
 }
 const { location, raw, session } = loaded;
@@ -472,12 +479,21 @@ if (verifyMode) {
   const parserCheck = buildParserCheck(renderedMarkdown ?? built, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
   const imageAccount = verifyLocalImages(session.rawRequests ?? [], raw, renderedMarkdown ?? built,
     renderedMarkdown === null ? overflow.companions : await readLinkedImageCompanions(renderedMarkdown, path.resolve(getWorkspaceRoot(), outputArgument!)));
+  const companionLinks = renderedMarkdown === null
+    ? undefined
+    : await companionLinkStatus(renderedMarkdown, path.resolve(getWorkspaceRoot(), outputArgument!));
   !jsonMode && console.log(`Images: ${imageAccount.unique} unique, ${imageAccount.found} found, ${imageAccount.missing} missing; ${imageAccount.unresolved} unresolved, ${imageAccount.referenceOnly} reference-only, ${imageAccount.excludedNotSubmitted} excluded-not-submitted.`);
+  if (!jsonMode && companionLinks) {
+    const missing = companionLinks.flatMap((status) => status.missing);
+    console.log(`Companion links: ${companionLinks.reduce((sum, status) => sum + status.linked, 0)} linked, ${missing.length} missing.`);
+    for (const target of missing)
+      console.log(`- Missing: ${target}`);
+  }
   !jsonMode && console.log(formatParserCheck(parserCheck, renderedMarkdown === null ? 'in-memory build' : 'the given file').join('\n'));
   const json = buildLocalVerifyJson({
     strict: strictMode, report, census: session.census, crossCheck, render: renderReport, renderSkipReason,
     fenceRepairs, loss: lossAccount, lossTarget: renderedMarkdown === null ? 'in-memory' : 'file', parser: parserCheck,
-    images: imageAccount,
+    images: imageAccount, companionLinks,
   });
   if (jsonMode)
     process.stdout.write(`${JSON.stringify(json)}\n`);
@@ -546,6 +562,7 @@ if (verifyMode) {
     ],
     lossItems: lossAccount.unaccounted,
     sequenceEvidence: lossAccount.sequenceEvidence,
+    outputHash: fileOutputHash,
     imageLocators: localImageLocators(session.rawRequests ?? []),
     verificationDetails: { layerB: report, layerA: crossCheck, layerC: renderReport },
   }, jsonMode);
@@ -585,6 +602,7 @@ if (verifyMode) {
         ...localDiagnosticSchemaRecords(session.rawRequests ?? [], session.census),
         ...questionDiagnosticSchemaRecords(session, 'local'),
       ],
+      outputHash: fileOutputHash,
     }, jsonMode);
     if (diagnosticStatus === 'written' && loaded.copiedSource.captureDirectory)
       await finishCapture(loaded.copiedSource.captureDirectory, true);

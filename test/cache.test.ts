@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { readExportCopy, saveExportCopy } from '../src/session/source-snapshot.ts';
+import { checkExportOutputHash, readExportCopy, saveExportCopy } from '../src/session/source-snapshot.ts';
 import { cleanSourceCache, createSourceCacheDirectory, finishCapture, leaseCapture, listSourceCache, registerCapture } from '../src/session/source-cache.ts';
 
 test('cleanup lists and ages cache failure logs but leaves export-side logs and unknown files alone', async () => {
@@ -43,6 +43,14 @@ test('cleanup does not delete cached logs changed after preview and refuses link
   await fs.symlink(target, link, 'junction');
   await assert.rejects(cleanSourceCache({ yes: true }), /link/u);
   await fs.unlink(link);
+});
+
+test('output receipt comparison is best effort and treats legacy missing hashes as unavailable', async () => {
+  const output = path.join(process.env.CCE_CACHE_DIR!, 'hash-check.md');
+  await fs.writeFile(output, 'saved bytes');
+  assert.equal((await checkExportOutputHash(output, {}))?.state, 'no-export-hash');
+  assert.equal((await checkExportOutputHash(`${output}.missing`, {})), undefined);
+  assert.equal((await checkExportOutputHash(output, { outputSha256: 'f'.repeat(64) }))?.state, 'differs-from-export');
 });
 
 test('re-export replaces its capture; cleanup removes kept captures and receipts together', async () => {

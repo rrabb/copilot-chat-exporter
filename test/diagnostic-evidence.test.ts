@@ -204,7 +204,7 @@ test('diagnostic findings group repeated locators under one stable signature', (
     { ...common, locators: ['line 18'] },
     { ...common, stage: 'verify', locators: ['line 18'] },
   ], schema, content);
-  assert.equal(model.version, 1);
+  assert.equal(model.version, 2);
   assert.equal(model.findings.length, 2);
   const repeated = model.findings.find((finding) => finding.stage === 'normalize');
   assert.equal(repeated?.count, 2);

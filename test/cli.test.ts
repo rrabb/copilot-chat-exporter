@@ -146,6 +146,11 @@ test('an Agent Host chat is exported by prefix, with companions, left-out counts
   const edited = invoke('--verify', '--strict', '--json', 'aaaaaaaa', activeOutput, '--user-data-root', root);
   assert.equal(edited.status, 2, 'SDK verification checks the saved Markdown, not a new rendering');
   assert.ok(JSON.parse(edited.stdout).failureReasons.includes('layer-d'));
+  const diagnosticFiles = (await fs.readdir(home)).filter((name) => name.startsWith('active-sdk.diagnostics-') && name.endsWith('.json'));
+  const diagnostics = await Promise.all(diagnosticFiles.map(async (name) =>
+    JSON.parse(await fs.readFile(path.join(home, name), 'utf8'))));
+  const editedManifest = diagnostics.find((manifest) => manifest.archive?.path === activeOutput);
+  assert.equal(editedManifest?.archive.outputHash.state, 'differs-from-export');
   await fs.writeFile(activeOutput, savedMarkdown);
   const activeAssets = (await fs.readdir(home)).find((name) => name.startsWith('active-sdk_assets_'))!;
   const promptPath = path.join(home, activeAssets, (await fs.readdir(path.join(home, activeAssets)))[0]!);
@@ -222,9 +227,21 @@ test('Fusion long companions verify in memory and saved archives with order, red
   assert.equal(corrupt.status, 2);
   assert.ok(corrupt.report.failureReasons.includes('layer-d'));
   await fs.writeFile(fullPath, phase.bytes);
+  const decoyName = `${path.dirname(phase.relativePath)}/decoy.txt`;
+  const decoyPath = path.join(home, decoyName);
+  await fs.writeFile(decoyPath, phase.bytes);
+  const phaseLinkStart = markdown.lastIndexOf('[', markdown.indexOf(phase.relativePath));
+  const phaseLinkEnd = markdown.indexOf(')', phaseLinkStart) + 1;
+  const withDecoy = `${markdown.slice(0, phaseLinkStart)}[decoy body](${decoyName})\n\n${markdown.slice(phaseLinkStart, phaseLinkEnd)}${markdown.slice(phaseLinkEnd)}`;
+  await fs.writeFile(output, withDecoy);
+  assert.equal(verify().status, 0, 'the linked duplicate must not change the verification result');
   await fs.rename(fullPath, `${fullPath}.unlinked`);
-  assert.equal(verify().status, 2);
+  const maskedMissing = verify();
+  assert.equal(maskedMissing.status, 2, 'a missing linked companion must fail even when another companion contains its lines');
+  assert.ok(maskedMissing.report.failureReasons.includes('companion-loss'), JSON.stringify(maskedMissing.report));
   await fs.rename(`${fullPath}.unlinked`, fullPath);
+  await fs.rm(decoyPath);
+  await fs.writeFile(output, markdown);
   const link = markdown.match(/\[[^\]\n]+\]\([^)]*\.txt\)/u)![0];
   await fs.writeFile(output, markdown.replace(link, '[full body link removed]'));
   assert.equal(verify().status, 2, 'unused files do not replace a removed live link');
@@ -355,7 +372,7 @@ test('--verify --json writes one JSON document with counts and the same exit cod
   const lines = result.stdout.trim().split('\n');
   assert.equal(lines.length, 1, 'JSON mode prints nothing but the document');
   const report = JSON.parse(lines[0]!);
-  assert.equal(report.version, 4);
+  assert.equal(report.version, 5);
   assert.equal(report.path, 'local');
   assert.equal(report.parser.failed, false);
   assert.equal(report.parser.skipped, null, 'the dev parser is installed, so the check runs');
@@ -369,6 +386,39 @@ test('--verify --json writes one JSON document with counts and the same exit cod
   const unreadable = invoke('--verify', '--json', UUID, 'missing.md');
   assert.equal(unreadable.status, 1);
   assert.match(unreadable.stderr, /saved export snapshot is unavailable/u);
+});
+
+test('a Local selector typo is a user error and writes no diagnostic bundle', async (context) => {
+  const { home, root, env, invoke } = await fixture(context);
+  const result = invoke('ffffffff', path.join(home, 'missing.md'), '--user-data-root', root);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout + result.stderr, /No Local chat session matching/u);
+  await assert.rejects(fs.stat(path.join(env.CCE_CACHE_DIR, 'diagnostics')), { code: 'ENOENT' });
+  assert.equal((await fs.readdir(home)).some((name) => name.startsWith('missing.diagnostics-')), false);
+});
+
+test('a diagnostic writer failure keeps the original verification failure visible', async (context) => {
+  const { home, sessionPath, root, env, invoke } = await fixture(context);
+  const output = path.join(home, 'writer-failure.md');
+  const exported = invoke(sessionPath, output, '--strict', '--keep-source', '--user-data-root', root);
+  assert.equal(exported.status, 0, exported.stdout + exported.stderr);
+  const markdown = await fs.readFile(output, 'utf8');
+  await fs.writeFile(output, markdown.replaceAll('Answer', 'Removed recorded answer'));
+  const preload = path.join(home, 'diagnostic-writer-failure.mjs');
+  await fs.writeFile(preload, `
+import { promises as fs } from 'node:fs';
+const original = fs.writeFile;
+fs.writeFile = async function (file, ...args) {
+  if (String(file).includes('.diagnostics-'))
+    throw new Error('Synthetic diagnostic writer failure');
+  return original.call(this, file, ...args);
+};
+`);
+  env.NODE_OPTIONS = `${env.NODE_OPTIONS} --import=${pathToFileURL(preload).href}`;
+  const result = invoke('--verify', '--strict', sessionPath, output, '--user-data-root', root);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /Failed checks: layer-d/u);
+  assert.match(result.stderr, /Diagnostic bundle could not be written: Synthetic diagnostic writer failure/u);
 });
 
 test('a running Local chat exports complete records and verifies the original copy after live growth', async (context) => {
@@ -574,6 +624,11 @@ fs.readFile = async function (file, ...args) {
       const failed = path.join(home, 'failed.verify-failed.md');
       const failedMarkdown = await fs.readFile(failed, 'utf8');
       const explanation = await fs.readFile(path.join(home, 'failed.verify-failed.verification.md'), 'utf8');
+      const diagnosticNames = (await fs.readdir(home)).filter((name) =>
+        name.startsWith('failed.verify-failed.diagnostics-') && name.endsWith('.json'));
+      assert.equal(diagnosticNames.length, 1, 'failed verification writes a Local or SDK diagnostic bundle through the CLI');
+      const diagnostic = JSON.parse(await fs.readFile(path.join(home, diagnosticNames[0]!), 'utf8'));
+      assert.equal(diagnostic.provider, sdk ? 'sdk' : 'local');
       assert.match(explanation, /# Verification report/u);
       assert.match(explanation, /## Failed checks/u);
       assert.match(explanation, /failure log/u);

@@ -174,7 +174,7 @@ async function deleteCompanion (source, prefix) {
 {
   const source = await sandbox('09-not-found', { provider: 'sdk', id: ID, events: baseEvents() });
   await record('09-not-found', source, cli(source, ['ffffffff', source.archive]),
-    { purpose: 'A selector typo is a user error and should not write a bundle.', knownGap: 'G22', match: { exit: 1, bundle: true } }, 'Selector ffffffff matches no chat.');
+    { purpose: 'A selector typo is a user error and does not write a bundle.', match: { exit: 1, bundle: false } }, 'Selector ffffffff matches no chat.');
 }
 
 {

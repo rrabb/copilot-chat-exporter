@@ -271,6 +271,7 @@ function failureReasonLines (report: VerificationJson, failure: ExportFailure | 
     'turn-count': 'The source request count differs from the parsed turn count.',
     'layer-c': 'The saved Markdown structure differs from the parsed turns.',
     'layer-d': 'Recorded text is partial, absent, out of order or missing a repeated occurrence.',
+    'companion-loss': 'A live archive link points to a companion file that is missing.',
     'image-loss': 'A required recorded image is missing or could not be verified.',
     'parser-check': 'The Markdown parser check failed or was unavailable in strict mode.',
     'unreadable-output': 'The saved archive could not be read.',

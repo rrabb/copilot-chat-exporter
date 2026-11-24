@@ -256,15 +256,22 @@ test('raw-field loss expectations include reason before error and every equal in
     ['instruction-update', 'Repeated instruction body.'], ['fusion-phase-failure-reason', 'First failure reason.'],
     ['fusion-phase-error', 'First failure error.'], ['instruction-update', 'Repeated instruction body.'], ['prompt', 'A later prompt'],
   ]);
+  assert.ok(sdkLossPieces(events).every(piece => piece.sourceLine !== undefined));
   assert.ok(sdkLossPieces(events).every(piece => piece.orderGroup === 'main' && piece.checkMultiplicity));
   const out = exportEvents(events);
   assert.equal(buildSdkLossAccount(events, out.markdown, out.companions).failed, false);
   const blocks = noteBlocks(out.markdown);
   assert.equal(blocks.length, 4);
-  assert.equal(buildSdkLossAccount(events, out.markdown.replace(blocks[0]!, ''), out.companions).multiplicity.missing, 1);
-  assert.equal(buildSdkLossAccount(events, out.markdown.replace('First failure error.', 'Corrupted error.'), out.companions).failed, true);
+  const missingRepeat = buildSdkLossAccount(events, out.markdown.replace(blocks[0]!, ''), out.companions, 'request', { captureFailedText: true });
+  assert.equal(missingRepeat.multiplicity.missing, 1);
+  assert.ok(missingRepeat.sequenceEvidence?.multiplicity.every((item) => item.sourceLine !== undefined));
+  const corrupted = buildSdkLossAccount(events, out.markdown.replace('First failure error.', 'Corrupted error.'), out.companions);
+  assert.equal(corrupted.failed, true);
+  assert.equal(corrupted.unaccounted.find((item) => item.category === 'fusion-phase-error')?.sourceLine, events[2]!.line);
   assert.equal(buildSdkLossAccount(events, out.markdown.replace('First failure reason.', ''), out.companions).failed, true);
-  assert.equal(buildSdkLossAccount(events, swap(out.markdown, blocks[0]!, blocks[2]!), out.companions).order.outOfOrder > 0, true);
+  const reordered = buildSdkLossAccount(events, swap(out.markdown, blocks[0]!, blocks[2]!), out.companions, 'request', { captureFailedText: true });
+  assert.equal(reordered.order.outOfOrder > 0, true);
+  assert.ok(reordered.sequenceEvidence?.order.every((item) => item.sourceLine !== undefined));
 });
 
 test('all repeated notes remain separate without a prompt or adjacency deduplication', () => {

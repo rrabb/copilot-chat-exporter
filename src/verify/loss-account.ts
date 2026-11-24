@@ -27,6 +27,8 @@ export interface LossItem {
   /** 1-based position among the recorded requests, not the surviving turn number. */
   request: number;
   category: string;
+  /** One-based line in the SDK event log, when the source provides one. */
+  sourceLine?: number;
   status: LossStatus;
   chars: number;
   /** First characters of the normalized text, for locating it. */
@@ -51,6 +53,7 @@ export interface LossMultiplicity { checked: number; missing: number }
 export interface LossSequenceEvidence {
   order: Array<{
     request: number;
+    sourceLine?: number;
     category: string;
     recordedText: string;
     comparedText: string;
@@ -58,6 +61,7 @@ export interface LossSequenceEvidence {
   }>;
   multiplicity: Array<{
     request: number;
+    sourceLine?: number;
     category: string;
     recordedText: string;
     comparedText: string;
@@ -382,6 +386,7 @@ export interface LossPiece {
   request: number;
   category: string;
   text: string;
+  sourceLine?: number;
   /** Pieces in one independently rendered sequence share a group. */
   orderGroup?: string;
   /** Only source-distinct emitted units contribute to exact-text multiplicity. */
@@ -409,7 +414,7 @@ export function scoreLossPieces (
   const contains = (needle: string) => firstMatch(needle) >= 0;
   const totals: Record<string, LossCategoryTotals> = {};
   const unaccounted: LossItem[] = [];
-  interface SequencedPiece { request: number; category: string; recordedText: string; comparedText: string }
+  interface SequencedPiece { request: number; sourceLine?: number; category: string; recordedText: string; comparedText: string }
   const orderedByGroup = new Map<string, SequencedPiece[]>();
   const multiplicityPieces: SequencedPiece[] = [];
   let checked = 0;
@@ -449,11 +454,16 @@ export function scoreLossPieces (
     if (status === 'present' && (piece.orderGroup || piece.checkMultiplicity) && contains(orderedText)) {
       if (piece.orderGroup) {
         const group = orderedByGroup.get(piece.orderGroup) ?? [];
-        group.push({ request: piece.request, category: piece.category, recordedText: piece.text, comparedText: orderedText });
+        group.push({
+          request: piece.request,
+          ...(piece.sourceLine !== undefined ? { sourceLine: piece.sourceLine } : {}),
+          category: piece.category, recordedText: piece.text, comparedText: orderedText,
+        });
         orderedByGroup.set(piece.orderGroup, group);
       }
       piece.checkMultiplicity && multiplicityPieces.push({
         request: piece.request,
+        ...(piece.sourceLine !== undefined ? { sourceLine: piece.sourceLine } : {}),
         category: piece.category,
         recordedText: piece.text,
         comparedText: orderedText,
@@ -462,6 +472,7 @@ export function scoreLossPieces (
     if (status !== 'present') {
       unaccounted.push({
         request: piece.request, category: piece.category, status, chars, sample,
+        ...(piece.sourceLine !== undefined ? { sourceLine: piece.sourceLine } : {}),
         ...(lines ? { lines } : {}),
         ...(options.captureFailedText ? {
           evidence: {
