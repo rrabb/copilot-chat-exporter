@@ -13,7 +13,7 @@ import { printLossAccount } from './verify/loss-report.ts';
 import { buildSdkVerifyJson } from './verify/json-report.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { errorLabel } from './text.ts';
-import { readLinkedArchiveCompanions, verifySdkImages } from './verify/images.ts';
+import { readLinkedArchiveCompanions, sdkImageLocators, verifySdkImages } from './verify/images.ts';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { existingUserDataSnapshot, keepFailedExportCopy, readExportCopy, saveExportCopy, verifySourceCopy } from './session/source-snapshot.ts';
@@ -27,6 +27,10 @@ import { splitSdkSchemaDrift } from './session/sdk-schema.ts';
 import { renderVerificationExplanation, writeVerificationExplanation } from './verify/explanation.ts';
 import type { SdkVerificationJson } from './verify/json-report.ts';
 import type { VerificationExplanationInput } from './verify/explanation.ts';
+import { shouldWriteDiagnosticBundle, writeDiagnosticBundle } from './verify/diagnostic-bundle.ts';
+import type { DiagnosticBundleInput } from './verify/diagnostic-bundle.ts';
+import { questionDiagnosticSchemaRecords, sdkDiagnosticSchemaRecords } from './verify/diagnostic-source.ts';
+import type { SchemaDiagnosticRecord } from './verify/diagnostic-evidence.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -53,12 +57,44 @@ async function writeExplanationForCli (input: VerificationExplanationInput, quie
   }
 }
 
+type DiagnosticWriteStatus = 'failed' | 'not-needed' | 'written';
+
+async function writeDiagnosticsForCli (input: DiagnosticBundleInput, quiet = false): Promise<DiagnosticWriteStatus> {
+  if (!shouldWriteDiagnosticBundle(input))
+    return 'not-needed';
+  try {
+    const result = await writeDiagnosticBundle(input);
+    if (!result)
+      return 'not-needed';
+    const print = quiet ? console.error : console.log;
+    print(`Diagnostic task: ${workspacePath(result.taskPath)}`);
+    print(`Diagnostic manifest: ${workspacePath(result.manifestPath)}`);
+    result.evidenceDirectory && print(`Diagnostic evidence: ${workspacePath(result.evidenceDirectory)}`);
+    print(`Diagnostic privacy scan: ${result.commonPatternsFound} common pattern(s) found. Review before sharing; a zero is not a clean bill of health.`);
+    return 'written';
+  } catch (error) {
+    console.error(`Diagnostic bundle could not be written: ${errorLabel(error)}`);
+    return 'failed';
+  }
+}
+
 /** Returns an exit code, or null when the selector is not an Agent Host or Copilot CLI chat. */
 export async function runSdkCommand (options: SdkCommandOptions): Promise<number | null> {
   try {
     return await runSdkCommandFromCopy(options);
   } catch (error) {
     console.error(errorLabel(error));
+    await writeDiagnosticsForCli({
+      generatedAt: new Date().toISOString(),
+      provider: 'sdk',
+      sessionId: options.selector,
+      command: process.argv.slice(2),
+      report: null,
+      exception: error,
+      exceptionStage: 'load',
+      archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
+      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+    }, options.json === true);
     return 1;
   }
 }
@@ -111,6 +147,11 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     vscodeVersion: 'not recorded', copilotVersion: 'not recorded',
   };
   let writtenOutput: string | undefined;
+  let diagnosticReport: SdkVerificationJson | null = null;
+  let diagnosticLossItems: ReturnType<typeof buildSdkLossAccount>['unaccounted'] = [];
+  let diagnosticSequenceEvidence: ReturnType<typeof buildSdkLossAccount>['sequenceEvidence'];
+  let diagnosticSchemaRecords: SchemaDiagnosticRecord[] = [];
+  let diagnosticsWritten = false;
   const keepVerificationFailure = async (failure: ExportFailure) => {
     keepSnapshot?.();
     await finishCapture(capture.directory, true);
@@ -149,10 +190,17 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       const exitCode = await verifyReport(preview, options.strict, options.json === true, Boolean(options.outputArgument),
         (report, account) => {
           verification = report;
+          diagnosticReport = report;
+          diagnosticLossItems = account.unaccounted;
+          diagnosticSequenceEvidence = account.sequenceEvidence;
           failure = exportFailureFromReport(report, account.unaccounted);
         });
       const failureLog = failure ? await keepVerificationFailure(failure) : null;
       if (verification) {
+        diagnosticSchemaRecords = [
+          ...sdkDiagnosticSchemaRecords(events, preview.session.census),
+          ...questionDiagnosticSchemaRecords(preview.session, 'sdk'),
+        ];
         const explanation = {
           report: verification,
           failure,
@@ -185,6 +233,33 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           console.log('');
           console.log(renderVerificationExplanation(explanation));
         }
+        const diagnosticStatus = await writeDiagnosticsForCli({
+          generatedAt: new Date().toISOString(),
+          provider: 'sdk',
+          sessionId: source.sessionId,
+          command: process.argv.slice(2),
+          report: verification,
+          failure,
+          archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
+          diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+          assetsPath: explanation.assetsPath,
+          failureLog,
+          sourceHash: sourceCopy.sha256,
+          capturePath: capture.directory,
+          sourceWarnings: preview.session.errors,
+          versions,
+          schemaRecords: diagnosticSchemaRecords,
+          lossItems: diagnosticLossItems,
+          sequenceEvidence: diagnosticSequenceEvidence,
+          imageLocators: sdkImageLocators(events),
+        }, options.json === true);
+        diagnosticsWritten = diagnosticStatus === 'written';
+        if (diagnosticsWritten) {
+          keepSnapshot?.();
+          await finishCapture(capture.directory, true);
+        }
+        if (diagnosticStatus === 'failed' && exitCode === 0)
+          return 1;
       }
       return exitCode;
     }
@@ -218,6 +293,9 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           let failure: ExportFailure | null = null;
           await verifyReport(last, options.strict, false, true, (report, account) => {
             exportVerification = report;
+            diagnosticReport = report;
+            diagnosticLossItems = account.unaccounted;
+            diagnosticSequenceEvidence = account.sequenceEvidence;
             failure = exportFailureFromReport(report, account.unaccounted);
           });
           return failure;
@@ -232,17 +310,49 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     const result = last as SdkExport | null;
     if (!result)
       throw new Error('The export plan was not produced.');
-    const exitCode = written.verificationFailure ? 2 : 0;
+    let exitCode = written.verificationFailure ? 2 : 0;
+    diagnosticSchemaRecords = [
+      ...sdkDiagnosticSchemaRecords(events, result.session.census),
+      ...questionDiagnosticSchemaRecords(result.session, 'sdk'),
+    ];
+    const diagnosticStatus = await writeDiagnosticsForCli({
+      generatedAt,
+      provider: 'sdk',
+      sessionId: source.sessionId,
+      command: process.argv.slice(2),
+      report: exportVerification,
+      failure: written.verificationFailure,
+      archivePath: written.outputPath,
+      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+      assetsPath: written.assetsPath,
+      failureLog: written.failureLog,
+      sourceHash: sourceCopy.sha256,
+      capturePath: capture.directory,
+      sourceWarnings: result.session.errors,
+      versions,
+      schemaRecords: diagnosticSchemaRecords,
+      lossItems: diagnosticLossItems,
+      sequenceEvidence: diagnosticSequenceEvidence,
+      imageLocators: sdkImageLocators(events),
+    }, options.json === true);
+    diagnosticsWritten = diagnosticStatus === 'written';
+    if (diagnosticsWritten) {
+      keepSnapshot?.();
+      await finishCapture(capture.directory, true);
+    }
+    if (diagnosticStatus === 'failed' && exitCode === 0)
+      exitCode = 1;
     if (written.verificationFailure) {
       console.error(failureDetails(written.verificationFailure));
       console.error(`Failure log: ${written.failureLog}`);
       await keepFailure(written.outputPath, JSON.stringify(written.verificationFailure));
     }
     else {
-      await saveExportCopy(outputPath, options.keepSource
+      const keepCopy = options.keepSource === true || diagnosticsWritten;
+      await saveExportCopy(outputPath, keepCopy
         ? { selector: options.selector, status: 'kept', sdk: capture, captureDirectory: capture.directory, copy: sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' }
         : { selector: options.selector, status: 'not-kept', toolGroupOrder: options.toolGroupOrder ?? 'request' });
-      options.keepSource && keepSnapshot?.();
+      keepCopy && keepSnapshot?.();
     }
     let explanationFailed = false;
     if (options.explain && (exportVerification || written.verificationFailure)) {
@@ -298,12 +408,35 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     return explanationFailed && exitCode === 0 ? 1 : exitCode;
   } catch (error) {
     console.error(errorLabel(error));
-    if (options.verify) {
-      const failure = verificationException(error);
-      const failureLog = await keepVerificationFailure(failure);
+    const exceptionFailure = options.verify ? verificationException(error) : null;
+    const diagnosticStatus = await writeDiagnosticsForCli({
+      generatedAt: new Date().toISOString(),
+      provider: 'sdk',
+      sessionId: source.sessionId,
+      command: process.argv.slice(2),
+      report: diagnosticReport,
+      failure: exceptionFailure,
+      exception: error,
+      exceptionStage: options.verify ? 'verify' : 'export',
+      archivePath: writtenOutput ? path.resolve(writtenOutput) : null,
+      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+      failureLog: null,
+      sourceHash: sourceCopy.sha256,
+      capturePath: capture.directory,
+      versions,
+      schemaRecords: diagnosticSchemaRecords,
+      lossItems: diagnosticLossItems,
+      sequenceEvidence: diagnosticSequenceEvidence,
+    }, options.json === true);
+    if (diagnosticStatus === 'written') {
+      keepSnapshot?.();
+      await finishCapture(capture.directory, true);
+    }
+    if (exceptionFailure) {
+      const failureLog = await keepVerificationFailure(exceptionFailure);
       const explanation = {
         report: null,
-        failure,
+        failure: exceptionFailure,
         generatedAt: new Date().toISOString(),
         archivePath: options.outputArgument ? path.resolve(options.outputArgument) : null,
         failureLog,
@@ -325,7 +458,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
 
 async function verifyReport (preview: SdkExport, strict: boolean, json: boolean, savedArchive: boolean,
   onReport?: (report: ReturnType<typeof buildSdkVerifyJson>, account: ReturnType<typeof buildSdkLossAccount>) => void): Promise<number> {
-  const account = buildSdkLossAccount(preview.events, preview.markdown, preview.companions, preview.toolGroupOrder);
+  const account = buildSdkLossAccount(preview.events, preview.markdown, preview.companions, preview.toolGroupOrder, { captureFailedText: true });
   const parser = buildParserCheck(preview.markdown, await loadMarkdownParser(), { turns: preview.session.turns.length, strict });
   const images = verifySdkImages(preview.events, preview.markdown, preview.companions);
   const drift = preview.session.census.unhandled;

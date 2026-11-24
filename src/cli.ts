@@ -31,7 +31,7 @@ import {
 import { buildJournalCrossCheck, buildRenderReport, buildVerificationReport } from './verify/layers.ts';
 import { buildLossAccount } from './verify/loss-account.ts';
 import { buildLocalVerifyJson } from './verify/json-report.ts';
-import { readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
+import { localImageLocators, readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { runSdkCommand } from './sdk-cli.ts';
@@ -51,6 +51,9 @@ import {
 } from './verify/golden.ts';
 import { clip, errorLabel, thousands } from './text.ts';
 import type { VerificationExplanationInput } from './verify/explanation.ts';
+import { shouldWriteDiagnosticBundle, writeDiagnosticBundle } from './verify/diagnostic-bundle.ts';
+import type { DiagnosticBundleInput } from './verify/diagnostic-bundle.ts';
+import { localDiagnosticSchemaRecords, questionDiagnosticSchemaRecords } from './verify/diagnostic-source.ts';
 
 // Command line front end. Turns a VS Code Copilot chat session into one human-readable Markdown
 // archive, or checks an existing one. Full contract, layout, and visual-design rules live in
@@ -79,6 +82,27 @@ async function writeExplanationForCli (input: VerificationExplanationInput, quie
   } catch (error) {
     console.error(`Verification report could not be written: ${errorLabel(error)}`);
     return false;
+  }
+}
+
+type DiagnosticWriteStatus = 'failed' | 'not-needed' | 'written';
+
+async function writeDiagnosticsForCli (input: DiagnosticBundleInput, quiet = false): Promise<DiagnosticWriteStatus> {
+  if (!shouldWriteDiagnosticBundle(input))
+    return 'not-needed';
+  try {
+    const result = await writeDiagnosticBundle(input);
+    if (!result)
+      return 'not-needed';
+    const print = quiet ? console.error : console.log;
+    print(`Diagnostic task: ${workspacePath(result.taskPath)}`);
+    print(`Diagnostic manifest: ${workspacePath(result.manifestPath)}`);
+    result.evidenceDirectory && print(`Diagnostic evidence: ${workspacePath(result.evidenceDirectory)}`);
+    print(`Diagnostic privacy scan: ${result.commonPatternsFound} common pattern(s) found. Review before sharing; a zero is not a clean bill of health.`);
+    return 'written';
+  } catch (error) {
+    console.error(`Diagnostic bundle could not be written: ${errorLabel(error)}`);
+    return 'failed';
   }
 }
 
@@ -397,11 +421,23 @@ try {
   loaded.copiedSource.kept = !verifyMode && !goldenMode && !snapshotAction && keepSource;
 } catch (error) {
   console.error(errorLabel(error));
+  await writeDiagnosticsForCli({
+    generatedAt: new Date().toISOString(),
+    provider: 'local',
+    sessionId: sourceArgument ?? '--current',
+    command: process.argv.slice(2),
+    report: null,
+    exception: error,
+    exceptionStage: 'load',
+    archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
+    diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+  }, jsonMode);
   process.exit(1);
 }
 const { location, raw, session } = loaded;
 
 if (verifyMode) {
+  try {
   const report = buildVerificationReport(session, session.rawRequests || []);
   !jsonMode && printVerificationReport(report);
   !jsonMode && printCensusReport(session.census);
@@ -431,7 +467,7 @@ if (verifyMode) {
   !jsonMode && printFenceRepairs(fenceRepairs);
   const lossAccount = buildLossAccount(session.rawRequests || [], `${renderedMarkdown ?? built}\n${renderedMarkdown === null
     ? overflow.companions.map((item) => Buffer.from(item.bytes).toString('utf8')).join('\n')
-    : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!), renderedMarkdown)}`);
+    : await siblingCompanionText(path.resolve(getWorkspaceRoot(), outputArgument!), renderedMarkdown)}`, { captureFailedText: true });
   !jsonMode && printLossAccount(lossAccount, renderedMarkdown === null ? 'the Markdown this build would write' : 'the given file');
   const parserCheck = buildParserCheck(renderedMarkdown ?? built, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
   const imageAccount = verifyLocalImages(session.rawRequests ?? [], raw, renderedMarkdown ?? built,
@@ -489,6 +525,35 @@ if (verifyMode) {
       : null,
     capturePath: verificationFailure ? loaded.copiedSource.captureDirectory : null,
   };
+  const diagnosticStatus = await writeDiagnosticsForCli({
+    generatedAt: new Date().toISOString(),
+    provider: 'local',
+    sessionId: location.sessionId,
+    command: process.argv.slice(2),
+    report: json,
+    failure: verificationFailure,
+    archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
+    diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+    assetsPath: explanation.assetsPath,
+    failureLog,
+    sourceHash: loaded.copiedSource.sha256,
+    capturePath: loaded.copiedSource.captureDirectory,
+    sourceWarnings: session.errors,
+    versions: loaded.versions,
+    schemaRecords: [
+      ...localDiagnosticSchemaRecords(session.rawRequests ?? [], session.census),
+      ...questionDiagnosticSchemaRecords(session, 'local'),
+    ],
+    lossItems: lossAccount.unaccounted,
+    sequenceEvidence: lossAccount.sequenceEvidence,
+    imageLocators: localImageLocators(session.rawRequests ?? []),
+    verificationDetails: { layerB: report, layerA: crossCheck, layerC: renderReport },
+  }, jsonMode);
+  if (diagnosticStatus === 'failed' && !process.exitCode)
+    process.exitCode = 1;
+  const diagnosticsWritten = diagnosticStatus === 'written';
+  if (diagnosticsWritten && loaded.copiedSource.captureDirectory)
+    await finishCapture(loaded.copiedSource.captureDirectory, true);
   if (outputArgument) {
     if (!await writeExplanationForCli(explanation, jsonMode) && !process.exitCode)
       process.exitCode = 1;
@@ -497,9 +562,34 @@ if (verifyMode) {
     console.log(renderVerificationExplanation(explanation));
   }
   await releaseSavedCopy?.();
-  if (!json.exitCode && !outputArgument && loaded.copiedSource.captureDirectory)
+  if (!json.exitCode && !outputArgument && loaded.copiedSource.captureDirectory && !diagnosticsWritten)
     await discardCapture(loaded.copiedSource.captureDirectory);
   process.exit();
+  } catch (error) {
+    console.error(`Verification could not finish: ${errorLabel(error)}`);
+    const diagnosticStatus = await writeDiagnosticsForCli({
+      generatedAt: new Date().toISOString(),
+      provider: 'local',
+      sessionId: location.sessionId,
+      command: process.argv.slice(2),
+      report: null,
+      exception: error,
+      exceptionStage: 'verify',
+      archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
+      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+      sourceHash: loaded.copiedSource.sha256,
+      capturePath: loaded.copiedSource.captureDirectory,
+      sourceWarnings: session.errors,
+      versions: loaded.versions,
+      schemaRecords: [
+        ...localDiagnosticSchemaRecords(session.rawRequests ?? [], session.census),
+        ...questionDiagnosticSchemaRecords(session, 'local'),
+      ],
+    }, jsonMode);
+    if (diagnosticStatus === 'written' && loaded.copiedSource.captureDirectory)
+      await finishCapture(loaded.copiedSource.captureDirectory, true);
+    process.exit(1);
+  }
 }
 
 // Renders in memory rather than writing an export: the digest is the artifact, and nothing in it
@@ -549,6 +639,10 @@ let companionCount = 0;
 let assetsPath: string | null = null;
 let exportFailure: ExportFailure | null = null;
 let exportVerification: LocalVerificationJson | null = null;
+let exportLossItems: ReturnType<typeof buildLossAccount>['unaccounted'] = [];
+let exportSequenceEvidence: ReturnType<typeof buildLossAccount>['sequenceEvidence'];
+let exportVerificationDetails: unknown = null;
+let diagnosticsWritten = false;
 const exportGeneratedAt = new Date().toISOString();
 try {
   const written = await writeArchive({
@@ -562,9 +656,10 @@ try {
       check: async (stagePath: string): Promise<ExportFailure | null> => {
         const savedMarkdown = await fs.readFile(stagePath, 'utf8');
         const savedText = `${savedMarkdown}\n${await siblingCompanionText(outputPath, savedMarkdown)}`;
-        const account = buildLossAccount(session.rawRequests ?? [], savedText);
+        const account = buildLossAccount(session.rawRequests ?? [], savedText, { captureFailedText: true });
         const crossCheck = buildJournalCrossCheck(session, raw);
         const report = buildVerificationReport(session, session.rawRequests ?? []);
+        const render = buildRenderReport(session, savedMarkdown);
         const images = verifyLocalImages(session.rawRequests ?? [], raw, savedMarkdown,
           await readLinkedImageCompanions(savedMarkdown, outputPath));
         const parser = buildParserCheck(savedMarkdown, await loadMarkdownParser(), { turns: session.turns.length, strict: strictMode });
@@ -573,9 +668,12 @@ try {
         console.log(`Images: ${images.unique} unique, ${images.found} found, ${images.missing} missing; ${images.unresolved} unresolved.`);
         const result = buildLocalVerifyJson({
           strict: strictMode, report, census: session.census, crossCheck,
-          render: buildRenderReport(session, savedMarkdown), renderSkipReason: null,
+          render, renderSkipReason: null,
           fenceRepairs: exportFenceRepairs, loss: account, lossTarget: 'file', parser, images,
         });
+        exportLossItems = account.unaccounted;
+        exportSequenceEvidence = account.sequenceEvidence;
+        exportVerificationDetails = { layerB: report, layerA: crossCheck, layerC: render, parser };
         exportVerification = result;
         return exportFailureFromReport(result, account.unaccounted);
       },
@@ -636,10 +734,66 @@ try {
     }) && !process.exitCode)
       process.exitCode = 1;
   }
+  if (!goldenMode) {
+    const diagnosticStatus = await writeDiagnosticsForCli({
+      generatedAt: exportGeneratedAt,
+      provider: 'local',
+      sessionId: location.sessionId,
+      command: process.argv.slice(2),
+      report: exportVerification,
+      failure: written.verificationFailure,
+      archivePath: written.outputPath,
+      diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+      assetsPath: written.assetsPath,
+      failureLog: written.failureLog,
+      sourceHash: loaded.copiedSource.sha256,
+      capturePath: loaded.copiedSource.captureDirectory,
+      sourceWarnings: session.errors,
+      versions: loaded.versions,
+      schemaRecords: [
+        ...localDiagnosticSchemaRecords(session.rawRequests ?? [], session.census),
+        ...questionDiagnosticSchemaRecords(session, 'local'),
+      ],
+      lossItems: exportLossItems,
+      sequenceEvidence: exportSequenceEvidence,
+      imageLocators: localImageLocators(session.rawRequests ?? []),
+      verificationDetails: exportVerificationDetails,
+    }, jsonMode);
+    if (diagnosticStatus === 'failed' && !process.exitCode)
+      process.exitCode = 1;
+    diagnosticsWritten = diagnosticStatus === 'written';
+    if (diagnosticsWritten && loaded.copiedSource.captureDirectory)
+      await finishCapture(loaded.copiedSource.captureDirectory, true);
+  }
 } catch (error) {
   if (goldenMode)
     throw error;
   console.error(error instanceof Error ? error.message : String(error));
+  const diagnosticStatus = await writeDiagnosticsForCli({
+    generatedAt: exportGeneratedAt,
+    provider: 'local',
+    sessionId: location.sessionId,
+    command: process.argv.slice(2),
+    report: exportVerification,
+    exception: error,
+    exceptionStage: 'export',
+    archivePath: outputPath,
+    diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
+    assetsPath,
+    sourceHash: loaded.copiedSource.sha256,
+    capturePath: loaded.copiedSource.captureDirectory,
+    sourceWarnings: session.errors,
+    versions: loaded.versions,
+    schemaRecords: [
+      ...localDiagnosticSchemaRecords(session.rawRequests ?? [], session.census),
+      ...questionDiagnosticSchemaRecords(session, 'local'),
+    ],
+    lossItems: exportLossItems,
+    sequenceEvidence: exportSequenceEvidence,
+    verificationDetails: exportVerificationDetails,
+  }, jsonMode);
+  if (diagnosticStatus === 'written' && loaded.copiedSource.captureDirectory)
+    await finishCapture(loaded.copiedSource.captureDirectory, true);
   process.exit(1);
 }
 for (const line of formatExportSummary({
@@ -689,11 +843,12 @@ if (!goldenMode) {
       copy: loaded.copiedSource, captureDirectory: loaded.copiedSource.captureDirectory,
     }, JSON.stringify(exportFailure));
   } else {
-    await saveExportCopy(outputPath, keepSource
+    const keepCopy = keepSource || diagnosticsWritten;
+    await saveExportCopy(outputPath, keepCopy
       ? { selector: sourceArgument ?? '--current', status: 'kept', source: location.sessionPath,
         copy: loaded.copiedSource, captureDirectory: loaded.copiedSource.captureDirectory }
       : { selector: sourceArgument ?? '--current', status: 'not-kept' });
-    if (!keepSource && loaded.copiedSource.captureDirectory)
+    if (!keepCopy && loaded.copiedSource.captureDirectory)
       await discardCapture(loaded.copiedSource.captureDirectory);
   }
 }

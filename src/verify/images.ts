@@ -149,6 +149,112 @@ export function verifySdkImages (events: readonly { type: string; data: Record<s
   return account(inventory(kept.map((event) => event.data), assets), markdown, companions, 0);
 }
 
+/** Where a recorded image lives in the source, so a diagnostic can point at the record behind a missing hash. */
+export interface ImageLocator {
+  hash: string | null;
+  line: number;
+  locator: string;
+  mimeType?: string;
+  assetId?: string;
+  bytes?: number;
+}
+
+function locateImages (value: unknown, line: number, base: string, assets: ReadonlyMap<string, { hash: string; bytes: number }>, result: ImageLocator[]) {
+  const visit = (item: unknown, at: string) => {
+    if (Array.isArray(item)) {
+      item.forEach((child, index) => visit(child, `${at}[${index}]`));
+      return;
+    }
+    if (!object(item))
+      return;
+    const mime = typeof item.mimeType === 'string' ? item.mimeType : item.contentType;
+    const image = (typeof mime === 'string' && /^image\//iu.test(mime)) || item.kind === 'image' || item.type === 'image';
+    if (!image) {
+      for (const [key, child] of Object.entries(item))
+        visit(child, `${at}.${key}`);
+      return;
+    }
+    const assetId = typeof item.assetId === 'string' ? item.assetId : undefined;
+    const bytes = recordedBytes(item.data ?? item.value ?? item.base64 ?? item.$base64);
+    const asset = assetId ? assets.get(assetId) : undefined;
+    result.push({
+      hash: bytes ? hash(bytes) : asset?.hash ?? null,
+      line,
+      locator: at,
+      ...(typeof mime === 'string' ? { mimeType: mime } : {}),
+      ...(assetId ? { assetId } : {}),
+      ...(bytes ? { bytes: bytes.length } : asset ? { bytes: asset.bytes } : {}),
+    });
+  };
+  visit(value, base);
+}
+
+export function sdkImageLocators (events: readonly { type: string; line: number; data: Record<string, unknown> }[]): ImageLocator[] {
+  const assets = new Map<string, { hash: string; bytes: number }>();
+  for (const event of events) {
+    const bytes = event.type === 'session.binary_asset' ? recordedBytes(event.data.data) : null;
+    if (bytes && typeof event.data.assetId === 'string')
+      assets.set(event.data.assetId, { hash: hash(bytes), bytes: bytes.length });
+  }
+  const result: ImageLocator[] = [];
+  for (const event of events)
+    if (event.type === 'user.message' || event.type === 'tool.execution_complete')
+      locateImages(event.data, event.line, `line ${event.line} ${event.type} data`, assets, result);
+  return result;
+}
+
+export function localImageLocators (requests: readonly unknown[]): ImageLocator[] {
+  const result: ImageLocator[] = [];
+  requests.forEach((request, index) => locateImages(request, index + 1, `requests[${index}]`, new Map(), result));
+  return result;
+}
+
+export interface CompanionLinkStatus {
+  assetsFolder: string;
+  linked: number;
+  present: Array<{ target: string; bytes: number; sha256: string }>;
+  missing: string[];
+  /** Files in the assets folder that no live archive link names. */
+  unlinked: string[];
+}
+
+/** Lists every live link into this archive's sibling asset folders and whether its file exists. */
+export async function companionLinkStatus (markdown: string, outputPath: string): Promise<CompanionLinkStatus[]> {
+  const directory = path.dirname(path.resolve(outputPath));
+  const prefix = `${path.basename(outputPath, path.extname(outputPath)).replace(/\.verify-failed(?:-\d+)?$/u, '')}_assets_`;
+  const byFolder = new Map<string, CompanionLinkStatus>();
+  const folder = (name: string) => {
+    let status = byFolder.get(name);
+    if (!status) {
+      status = { assetsFolder: name, linked: 0, present: [], missing: [], unlinked: [] };
+      byFolder.set(name, status);
+    }
+    return status;
+  };
+  const linked = new Set<string>();
+  for (const target of archiveTargets(markdown, false)) {
+    const parts = target.split('/');
+    if (parts.length !== 2 || !parts[0]!.startsWith(prefix) || parts.some((part) => !part || part === '..' || part.includes('\\')))
+      continue;
+    const status = folder(parts[0]!);
+    status.linked += 1;
+    linked.add(target);
+    try {
+      const bytes = await fs.readFile(path.join(directory, ...parts));
+      status.present.push({ target, bytes: bytes.length, sha256: hash(bytes) });
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'EISDIR')))
+        throw error;
+      status.missing.push(target);
+    }
+  }
+  for (const entry of await fs.readdir(directory, { withFileTypes: true }).catch(() => []))
+    if (entry.isDirectory() && entry.name.startsWith(prefix))
+      for (const file of await fs.readdir(path.join(directory, entry.name)))
+        !linked.has(`${entry.name}/${file}`) && folder(entry.name).unlinked.push(file);
+  return [...byFolder.values()].sort((left, right) => left.assetsFolder.localeCompare(right.assetsFolder));
+}
+
 /** Reads only linked companions next to this export, never recorded image paths. */
 export async function readLinkedImageCompanions (markdown: string, outputPath: string): Promise<CompanionArtifact[]> {
   return readLinkedArchiveCompanions(markdown, outputPath, true);

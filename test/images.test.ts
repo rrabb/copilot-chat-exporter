@@ -7,7 +7,7 @@ import test from 'node:test';
 import { collectRecordedImages, saveImageCompanion } from '../src/images.ts';
 import { buildDocument } from '../src/markdown.ts';
 import { parseChatSession } from '../src/session/journal.ts';
-import { readLinkedImageCompanions, verifyLocalImages, verifySdkImages } from '../src/verify/images.ts';
+import { readLinkedImageCompanions, sdkImageLocators, verifyLocalImages, verifySdkImages } from '../src/verify/images.ts';
 import type { CompanionArtifact } from '../src/export-policy.ts';
 import { buildParserCheck, loadMarkdownParser } from '../src/verify/parser-check.ts';
 import { testSession, testTool, testTurn } from './helpers.ts';
@@ -163,6 +163,19 @@ test('SDK image hash verification resolves asset descriptors without counting th
   const account = verifySdkImages(events, '![image](assets/image.png)', companions);
   assert.equal(account.found, 1);
   assert.equal(account.unresolved, 0);
+});
+
+test('SDK image locators resolve asset hashes to the event line and JSON path that referenced them', () => {
+  const locators = sdkImageLocators([
+    { type: 'session.binary_asset', line: 3, data: { assetId: 'asset-one', type: 'image', mimeType: 'image/png', data: encoded } },
+    { type: 'tool.execution_complete', line: 8, data: { result: { binaryResultsForLlm: [{ type: 'image', assetId: 'asset-one', mimeType: 'image/png' }] } } },
+    { type: 'user.message', line: 9, data: { attachments: [{ type: 'image', mimeType: 'image/png' }] } },
+  ]);
+  assert.deepEqual(locators, [
+    { hash: createHash('sha256').update(bytes).digest('hex'), line: 8, locator: 'line 8 tool.execution_complete data.result.binaryResultsForLlm[0]',
+      mimeType: 'image/png', assetId: 'asset-one', bytes: bytes.length },
+    { hash: null, line: 9, locator: 'line 9 user.message data.attachments[0]', mimeType: 'image/png' },
+  ]);
 });
 
 test('existing-export image verification reads linked archive bytes and detects deletion or corruption', async () => {

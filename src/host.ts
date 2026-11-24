@@ -60,6 +60,18 @@ export function gitStatus (cwd: string): string {
   }
 }
 
+/** HEAD commit and uncommitted file count, so a diagnostic bundle names the checkout that produced it. */
+export function gitCheckout (cwd: string): { commit: string; dirtyFiles: number | null } {
+  const options = { cwd, encoding: 'utf8', windowsHide: true, timeout: 5000, maxBuffer: 16 * 1024 * 1024 } as const;
+  try {
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], options).trim();
+    const status = execFileSync('git', ['status', '--porcelain'], options);
+    return { commit, dirtyFiles: status.split('\n').filter((line) => line.trim()).length };
+  } catch {
+    return { commit: 'unavailable', dirtyFiles: null };
+  }
+}
+
 // --- which folder the session belonged to ---
 
 async function readJsonFile (filePath: string) {

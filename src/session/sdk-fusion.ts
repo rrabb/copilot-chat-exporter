@@ -2,7 +2,7 @@ import type { NoteNode } from '../types.ts';
 import { isRecord } from './sdk-events.ts';
 import { EventFields } from './sdk-event-fields.ts';
 
-type FusionEventType =
+export type FusionEventType =
   | 'session.fusion_resolved'
   | 'assistant.fusion_phase_completed'
   | 'assistant.fusion_phase_failed'

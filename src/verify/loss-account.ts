@@ -17,6 +17,7 @@
 // Images have a separate independent byte/hash check in images.ts. This text check cannot
 // verify opaque data. Treat "absent" as proof of loss and "present" as necessary, not sufficient.
 
+import { createHash } from 'node:crypto';
 import { redactText } from '../redaction.ts';
 import { stripAnsi } from '../text.ts';
 
@@ -32,6 +33,13 @@ export interface LossItem {
   sample: string;
   /** Multi-line categories only: recorded lines found in the Markdown out of those recorded. */
   lines?: { found: number; total: number };
+  /** Exact failed text, collected only when a diagnostic bundle requested it. */
+  evidence?: {
+    recordedText: string;
+    comparedText: string;
+    matchedText: string | null;
+    textHash: string;
+  };
 }
 
 export interface LossCategoryTotals { present: number; partial: number; absent: number }
@@ -39,6 +47,25 @@ export interface LossCategoryTotals { present: number; partial: number; absent: 
 export interface LossOrder { checked: number; outOfOrder: number }
 
 export interface LossMultiplicity { checked: number; missing: number }
+
+export interface LossSequenceEvidence {
+  order: Array<{
+    request: number;
+    category: string;
+    recordedText: string;
+    comparedText: string;
+    textHash: string;
+  }>;
+  multiplicity: Array<{
+    request: number;
+    category: string;
+    recordedText: string;
+    comparedText: string;
+    textHash: string;
+    expected: number;
+    found: number;
+  }>;
+}
 
 export interface LossAccount {
   /** Content pieces checked. Pieces too short, or with no letters or digits (an empty code fence), are not counted. */
@@ -50,6 +77,8 @@ export interface LossAccount {
   multiplicity: LossMultiplicity;
   /** True for unaccounted text, order errors or missing repeated pieces. No partial-cause exceptions are currently approved. */
   failed: boolean;
+  /** Exact source pieces for sequence failures, present only for a diagnostic run. */
+  sequenceEvidence?: LossSequenceEvidence;
 }
 
 const MINIMUM_CHARS = 4;
@@ -276,14 +305,16 @@ export function normalizeForLoss (value: string): string {
     .trim();
 }
 
-function statusOf (contains: (needle: string) => boolean, needle: string): LossStatus {
+function statusOf (contains: (needle: string) => boolean, needle: string): { status: LossStatus; matchedText: string | null } {
   if (contains(needle))
-    return 'present';
+    return { status: 'present', matchedText: needle };
   const head = needle.slice(0, EDGE_CHARS);
   const tail = needle.slice(-EDGE_CHARS);
-  if (needle.length > EDGE_CHARS && (contains(head) || (needle.length >= LONG_TEXT && contains(tail))))
-    return 'partial';
-  return 'absent';
+  if (needle.length > EDGE_CHARS && contains(head))
+    return { status: 'partial', matchedText: head };
+  if (needle.length > EDGE_CHARS && needle.length >= LONG_TEXT && contains(tail))
+    return { status: 'partial', matchedText: tail };
+  return { status: 'absent', matchedText: null };
 }
 
 function meaningful (line: string): boolean {
@@ -291,12 +322,13 @@ function meaningful (line: string): boolean {
 }
 
 /** Per-line coverage: a command echo trimmed or a middle clipped shows as missing lines, not as all-or-nothing. */
-function lineStatus (contains: (needle: string) => boolean, lineSet: ReadonlySet<string>, raw: string): { status: LossStatus; found: number; total: number; text: string } {
+function lineStatus (contains: (needle: string) => boolean, lineSet: ReadonlySet<string>, raw: string): { status: LossStatus; found: number; total: number; text: string; matchedText: string | null } {
   const lines = raw.split(/\r?\n/u).map((line) => normalizeForLoss(redactText(line).text)).filter(meaningful);
   // Most recorded lines appear as whole lines of the Markdown; only the rest need a scan of the whole text.
-  const found = lines.filter((line) => lineSet.has(line) || contains(line)).length;
+  const matchedLines = lines.filter((line) => lineSet.has(line) || contains(line));
+  const found = matchedLines.length;
   const status = found === lines.length ? 'present' : found === 0 ? 'absent' : 'partial';
-  return { status, found, total: lines.length, text: lines.join(' ') };
+  return { status, found, total: lines.length, text: lines.join(' '), matchedText: matchedLines.length ? matchedLines.join('\n') : null };
 }
 
 function countOccurrences (haystack: string, needle: string, first: number): number {
@@ -324,7 +356,11 @@ function overlapsMatchedRange (ranges: readonly { start: number; end: number }[]
   return low < ranges.length && ranges[low]!.start < end;
 }
 
-export function buildLossAccount (rawRequests: readonly unknown[], markdown: string): LossAccount {
+export interface LossEvidenceOptions {
+  captureFailedText?: boolean;
+}
+
+export function buildLossAccount (rawRequests: readonly unknown[], markdown: string, options: LossEvidenceOptions = {}): LossAccount {
   const priorOutputs = new Map<string, string>();
   return scoreLossPieces(rawRequests.flatMap((request, index) => {
     const updates = new Map<string, string>();
@@ -338,7 +374,7 @@ export function buildLossAccount (rawRequests: readonly unknown[], markdown: str
     for (const [id, value] of updates)
       priorOutputs.set(id, value);
     return recorded.map((piece) => ({ ...piece, request: index + 1 }));
-  }), markdown);
+  }), markdown, LINE_CATEGORIES, options);
 }
 
 /** A recorded piece of content to look for, optionally eligible for source-safe sequence checks. */
@@ -353,7 +389,12 @@ export interface LossPiece {
 }
 
 /** Score pieces against the text the export wrote. Shared by the Local and SDK extractors. */
-export function scoreLossPieces (all: readonly LossPiece[], markdown: string, lineCategories: ReadonlySet<string> = LINE_CATEGORIES): LossAccount {
+export function scoreLossPieces (
+  all: readonly LossPiece[],
+  markdown: string,
+  lineCategories: ReadonlySet<string> = LINE_CATEGORIES,
+  options: LossEvidenceOptions = {},
+): LossAccount {
   const haystack = normalizeForLoss(markdown);
   const lineSet = new Set(markdown.split(/\r?\n/u).map((line) => normalizeForLoss(line)));
   const firstMatches = new Map<string, number>();
@@ -368,8 +409,9 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
   const contains = (needle: string) => firstMatch(needle) >= 0;
   const totals: Record<string, LossCategoryTotals> = {};
   const unaccounted: LossItem[] = [];
-  const orderedByGroup = new Map<string, string[]>();
-  const multiplicityTexts: string[] = [];
+  interface SequencedPiece { request: number; category: string; recordedText: string; comparedText: string }
+  const orderedByGroup = new Map<string, SequencedPiece[]>();
+  const multiplicityPieces: SequencedPiece[] = [];
   let checked = 0;
   for (const piece of all) {
     let status: LossStatus;
@@ -377,23 +419,29 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
     let sample: string;
     let lines: LossItem['lines'];
     let orderedText: string;
+    let comparedText: string;
+    let matchedText: string | null;
     if (lineCategories.has(piece.category)) {
       const result = lineStatus(contains, lineSet, piece.text);
       if (!result.total)
         continue;
-      ({ status } = result);
+      ({ status, matchedText } = result);
       chars = result.text.length;
       sample = result.text.slice(0, 60);
       lines = { found: result.found, total: result.total };
       orderedText = result.text;
+      comparedText = result.text;
     } else {
       const needle = normalizeForLoss(redactText(piece.text).text);
       if (!meaningful(needle))
         continue;
-      status = statusOf(contains, needle);
+      const scored = statusOf(contains, needle);
+      status = scored.status;
+      matchedText = scored.matchedText;
       chars = needle.length;
       sample = needle.slice(0, 60);
       orderedText = needle;
+      comparedText = needle;
     }
     checked += 1;
     const row = totals[piece.category] ??= { present: 0, partial: 0, absent: 0 };
@@ -401,34 +449,65 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
     if (status === 'present' && (piece.orderGroup || piece.checkMultiplicity) && contains(orderedText)) {
       if (piece.orderGroup) {
         const group = orderedByGroup.get(piece.orderGroup) ?? [];
-        group.push(orderedText);
+        group.push({ request: piece.request, category: piece.category, recordedText: piece.text, comparedText: orderedText });
         orderedByGroup.set(piece.orderGroup, group);
       }
-      piece.checkMultiplicity && multiplicityTexts.push(orderedText);
+      piece.checkMultiplicity && multiplicityPieces.push({
+        request: piece.request,
+        category: piece.category,
+        recordedText: piece.text,
+        comparedText: orderedText,
+      });
     }
-    status !== 'present' && unaccounted.push({
-      request: piece.request, category: piece.category, status, chars, sample, ...(lines ? { lines } : {}),
-    });
+    if (status !== 'present') {
+      unaccounted.push({
+        request: piece.request, category: piece.category, status, chars, sample,
+        ...(lines ? { lines } : {}),
+        ...(options.captureFailedText ? {
+          evidence: {
+            recordedText: piece.text,
+            comparedText,
+            matchedText,
+            textHash: createHash('sha256').update(piece.text).digest('hex'),
+          },
+        } : {}),
+      });
+    }
   }
 
   const sourceCounts = new Map<string, number>();
-  for (const text of multiplicityTexts)
-    sourceCounts.set(text, (sourceCounts.get(text) ?? 0) + 1);
+  const sourcePieces = new Map<string, SequencedPiece>();
+  for (const piece of multiplicityPieces) {
+    sourceCounts.set(piece.comparedText, (sourceCounts.get(piece.comparedText) ?? 0) + 1);
+    sourcePieces.has(piece.comparedText) || sourcePieces.set(piece.comparedText, piece);
+  }
   const repeatedCounts = new Map<string, number>();
   let missingRepeats = 0;
+  const multiplicityEvidence: LossSequenceEvidence['multiplicity'] = [];
   for (const [text, expected] of sourceCounts) {
     if (expected < 2)
       continue;
     const found = countOccurrences(haystack, text, firstMatch(text));
     repeatedCounts.set(text, found);
     missingRepeats += Math.max(0, expected - found);
+    if (options.captureFailedText && found < expected) {
+      const piece = sourcePieces.get(text)!;
+      multiplicityEvidence.push({
+        ...piece,
+        textHash: createHash('sha256').update(piece.recordedText).digest('hex'),
+        expected,
+        found,
+      });
+    }
   }
 
   const order: LossOrder = { checked: 0, outOfOrder: 0 };
-  for (const orderedTexts of orderedByGroup.values()) {
+  const orderEvidence: LossSequenceEvidence['order'] = [];
+  for (const orderedPieces of orderedByGroup.values()) {
     let cursor = 0;
     const matchedRanges: { start: number; end: number }[] = [];
-    for (const text of orderedTexts) {
+    for (const piece of orderedPieces) {
+      const text = piece.comparedText;
       const expected = sourceCounts.get(text);
       const foundCount = repeatedCounts.get(text);
       if (expected !== undefined && expected > 1 && foundCount !== undefined && foundCount < expected)
@@ -445,6 +524,10 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
         continue;
       order.checked += 1;
       order.outOfOrder += 1;
+      options.captureFailedText && orderEvidence.push({
+        ...piece,
+        textHash: createHash('sha256').update(piece.recordedText).digest('hex'),
+      });
     }
   }
 
@@ -453,5 +536,8 @@ export function scoreLossPieces (all: readonly LossPiece[], markdown: string, li
     missing: missingRepeats,
   };
   const failed = unaccounted.length > 0 || order.outOfOrder > 0 || multiplicity.missing > 0;
-  return { checked, totals, unaccounted, order, multiplicity, failed };
+  return {
+    checked, totals, unaccounted, order, multiplicity, failed,
+    ...(options.captureFailedText ? { sequenceEvidence: { order: orderEvidence, multiplicity: multiplicityEvidence } } : {}),
+  };
 }

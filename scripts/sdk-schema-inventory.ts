@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { diagnosticFieldOccurrences } from '../src/verify/diagnostic-evidence.ts';
 
 interface FieldCount {
   presentLines: Set<number>;
@@ -36,26 +37,6 @@ export interface SdkSchemaInventory {
   }>;
 }
 
-const typeOf = (value: unknown) => value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
-
-function walk (value: unknown, prefix: string, visit: (field: string, value: unknown) => void): void {
-  const pending = [{ value, path: prefix }];
-  while (pending.length) {
-    const current = pending.pop()!;
-    visit(current.path, current.value);
-    if (Array.isArray(current.value)) {
-      for (let index = current.value.length - 1; index >= 0; index -= 1)
-        pending.push({ value: current.value[index], path: `${current.path}[]` });
-    } else if (current.value !== null && typeof current.value === 'object') {
-      const entries = Object.entries(current.value);
-      for (let index = entries.length - 1; index >= 0; index -= 1) {
-        const [key, item] = entries[index]!;
-        pending.push({ value: item, path: `${current.path}.${key}` });
-      }
-    }
-  }
-}
-
 export function inventorySdkSchema (bytes: Uint8Array, eventTypes?: ReadonlySet<string>): SdkSchemaInventory {
   const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   const groups = new Map<string, EventCount>();
@@ -85,17 +66,16 @@ export function inventorySdkSchema (bytes: Uint8Array, eventTypes?: ReadonlySet<
     }
     group.events += 1;
     group.lines.push(index + 1);
-    walk(record.data, 'data', (field, value) => {
-      let count = group.fields.get(field);
+    for (const occurrence of diagnosticFieldOccurrences(record.data, 'data')) {
+      let count = group.fields.get(occurrence.path);
       if (!count) {
         count = { presentLines: new Set(), occurrences: 0, types: new Map() };
-        group.fields.set(field, count);
+        group.fields.set(occurrence.path, count);
       }
       count.presentLines.add(index + 1);
       count.occurrences += 1;
-      const kind = typeOf(value);
-      count.types.set(kind, (count.types.get(kind) ?? 0) + 1);
-    });
+      count.types.set(occurrence.type, (count.types.get(occurrence.type) ?? 0) + 1);
+    }
   }
   const normalized = [...groups].map(([type, group]) => ({
     type,

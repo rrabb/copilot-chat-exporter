@@ -4,6 +4,7 @@
 
 import { scoreLossPieces } from './loss-account.ts';
 import type { LossAccount, LossPiece } from './loss-account.ts';
+import type { LossEvidenceOptions } from './loss-account.ts';
 import { childScopes, isRecord } from '../session/sdk-events.ts';
 import type { SdkEvent } from '../session/sdk-events.ts';
 import type { CompanionArtifact } from '../export-policy.ts';
@@ -262,7 +263,8 @@ export function buildSdkLossAccount (
   markdown: string,
   companions: string | readonly CompanionArtifact[] = [],
   toolGroupOrder: ToolGroupOrder = 'request',
+  options: LossEvidenceOptions = {},
 ): LossAccount {
   const evidence = typeof companions === 'string' ? `${markdown}\n${companions}` : withLinkedCompanions(markdown, companions);
-  return scoreLossPieces(sdkLossPieces(events, toolGroupOrder), evidence, LINES);
+  return scoreLossPieces(sdkLossPieces(events, toolGroupOrder), evidence, LINES, options);
 }

@@ -240,7 +240,7 @@ test('Fusion long companions verify in memory and saved archives with order, red
 });
 
 test('an unknown agent event type is schema drift that --verify --strict reports', async (context) => {
-  const { home, root, workspace, invoke } = await fixture(context);
+  const { home, root, workspace, env, invoke } = await fixture(context);
   const chat = 'bbbbbbbb-1111-4111-8111-111111111111';
   const database = new DatabaseSync(path.join(workspace, 'state.vscdb'));
   try {
@@ -271,8 +271,21 @@ test('an unknown agent event type is schema drift that --verify --strict reports
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.match(result.stdout, /UNHANDLED event types: brand\.new\.kind=1/u);
   assert.match(result.stdout, /Unsupported payload variants: instruction\.update=1/u);
+  assert.match(result.stdout, /Diagnostic task:/u);
+  const diagnosticDirectory = path.join(env.CCE_CACHE_DIR, 'diagnostics');
+  const firstDiagnostics = (await fs.readdir(diagnosticDirectory)).filter((name) => name.endsWith('.json'));
+  assert.equal(firstDiagnostics.length, 1);
+  const firstManifest = JSON.parse(await fs.readFile(path.join(diagnosticDirectory, firstDiagnostics[0]!), 'utf8'));
+  assert.ok(firstManifest.samples.schema.groups.some((group: { type: string }) => group.type === 'brand.new.kind'));
+  assert.doesNotMatch(JSON.stringify(firstManifest.samples.schema), /Recorded update\./u);
+  const output = path.join(home, 'drift.md');
+  const exported = invoke('bbbbbbbb', output, '--user-data-root', root);
+  assert.equal(exported.status, 0, exported.stdout + exported.stderr);
+  assert.match(exported.stdout, /Diagnostic task:/u);
+  assert.ok((await fs.readdir(home)).some((name) => /^drift\.diagnostics-.*\.json$/u.test(name)));
   const json = invoke('--verify', '--strict', '--json', 'bbbbbbbb', '--user-data-root', root);
   assert.equal(json.status, 2, json.stdout + json.stderr);
+  assert.match(json.stderr, /Diagnostic task:/u);
   const report = JSON.parse(json.stdout);
   assert.equal(report.path, 'sdk');
   assert.deepEqual(report.failureReasons, ['unhandled-kind']);
@@ -325,13 +338,14 @@ test('ambiguous child content is omitted with an archive warning while --strict 
 });
 
 test('--verify prints the independent content check, explanation and --strict fails only when content is missing', async (context) => {
-  const { invoke } = await fixture(context);
+  const { env, invoke } = await fixture(context);
   const clean = invoke('--verify', UUID);
   assert.equal(clean.status, 0, clean.stdout + clean.stderr);
   assert.match(clean.stdout, /Layer D - recorded content vs the Markdown this build would write/u);
   assert.match(clean.stdout, /Every checked piece of recorded content appears in the export\./u);
   assert.match(clean.stdout, /# Verification report/u);
   assert.equal(invoke('--verify', '--strict', UUID).status, 0);
+  assert.ok(!(await fs.readdir(env.CCE_CACHE_DIR)).includes('diagnostics'));
 });
 
 test('--verify --json writes one JSON document with counts and the same exit code', async (context) => {
