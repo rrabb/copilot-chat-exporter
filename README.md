@@ -314,12 +314,44 @@ Normal tests also check the portable synthetic SDK/Fusion goldens. Run `pnpm tes
 | `pnpm run verify:local` | `verify` then `baseline` | the above plus the machine-local baseline |
 | `pnpm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
 | `pnpm run demo:failure` | `node scripts/failure-demo.mjs` | generate synthetic failed-export review artifacts |
+| `pnpm run demo:diagnostics` | `node scripts/diagnostics-demo.mjs` | run injected-fault scenarios and record each diagnostic bundle |
 
 `pnpm run demo:failure` runs five synthetic Local and SDK verification failures using only the
 committed fixtures. It writes the failed Markdown, warning header, console output, failure log,
 non-deleting cleanup preview and a summary under
 `temp-tool-output/failure-demo-<local timestamp>/`. It is for manual review and is not part of
 `pnpm run verify`.
+
+`pnpm run demo:diagnostics` shows what a diagnostic bundle gives you for each kind of fault. It runs 11 scenarios on synthetic chats through the real CLI:
+
+- clean
+- schema drift, as a warning and under `--strict`
+- deleted paragraph
+- unclosed fence
+- deleted text or image companion
+- unrecorded image
+- truncated source line
+- selector typo
+- Local content loss
+
+Each scenario states its expected exit code and bundle. A known gap expects today's behavior and is labelled with its gap number. The script exits 1 when any scenario differs, so a fixed gap shows up as a mismatch. Output goes to `temp-tool-output/diagnostics-demo-<local timestamp>/`, with one folder per scenario and a `scenario-summary.json`. It isn't part of `pnpm run verify`.
+
+<a name="cli-sandbox"></a>**Run the CLI on a copied chat.** Both demos use [`scripts/lib/cli-sandbox.mjs`](scripts/lib/cli-sandbox.mjs). Reuse it for a new demo or probe rather than building a sandbox by hand. To set one up manually:
+
+1. Point `HOME`, `USERPROFILE`, `APPDATA`, `XDG_CONFIG_HOME`, `COPILOT_HOME` and `CCE_CACHE_DIR` at folders inside the sandbox. Then nothing reads or writes your real chats or cache.
+2. Put an agent chat's `events.jsonl` under `<COPILOT_HOME>/session-state/<id>/`.
+3. Create `<user-data>/User/workspaceStorage/<any>/state.vscdb` with a `chat.ChatSessionStore.index` entry for the chat.
+4. Pass `--user-data-root <user-data>` on every command. Without it, the CLI may search other VS Code roots on the machine.
+5. Export with `--keep-source` if you'll run a saved-file `--verify` later. Without it, `--verify` exits 1 with "source copy was not kept".
+
+The index key decides what else is required:
+
+| Index key | Also needs |
+| --- | --- |
+| `copilotcli:/<id>` | Nothing else |
+| `agent-host-copilotcli:/<id>` | `<user-data>/agentSessionData/<id>/session.db` |
+
+⚠️ A missing or wrong index entry fails with "No Local chat session matching", even for an agent chat.
 
 For commits in this repository, enable [the commit-message hook](.githooks/commit-msg) with `git config core.hooksPath .githooks`. It removes Copilot co-author trailers, keeps other authors and body text, and requires Node.js on `PATH`. The hook is tested through a real commit in a temporary repository.
 

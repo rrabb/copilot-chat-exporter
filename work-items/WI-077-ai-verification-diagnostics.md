@@ -571,7 +571,7 @@ Every scenario runs `node src/cli.ts` against a sandbox `COPILOT_HOME` built fro
 | G21 | SDK content findings locate only by request. An SDK chat often has one request, so an agent must grep for the text. No event line and no expected archive position | `04-content-loss` manifest `samples.content.groups[0]` |
 | G22 | Every load error writes a bundle, including "No ... session matching" user errors. This predates the fixes | `09-not-found`, `src/cli.ts` load catch |
 | G23 | Saved-file verify needs `--keep-source` at export time. A copied archive gives "snapshot unavailable" with exit 1 and no bundle. This is correct, but it's easy to miss when building fixtures | demo run log |
-| G24 | 🐛 Verify doesn't notice a deleted, linked companion. Layer D still counted all 82 tool outputs as present. It may match the inline 10-line preview, but that's inferred and unchecked. This is a verifier gap outside the bundle | `06-companion-loss.console.txt` |
+| G24 | 🐛 Verify didn't notice a deleted `detailed-result-0ef30c20.txt` companion from this real chat. Layer D still counted all 82 tool outputs as present. **Narrowed later on 261124:** the committed demo deletes a synthetic text companion and an image companion, and both fail as expected. The deleted text doesn't appear anywhere else in the real archive, so a duplicate match doesn't explain it. The cause is unknown | `06-companion-loss.console.txt`, then `pnpm run demo:diagnostics` scenarios 06 and 11 |
 
 **Not done:** G20-G24 aren't approved scope. They're in the Inbox for a decision.
 
@@ -593,6 +593,27 @@ Same 5 fault types as the baseline, from the real-CLI demo. **Stricter than the 
 | --- | --- | --- |
 | G25 | 🐛 The bundle doesn't say whether the archive still matches the export. The receipt already stores `outputSha256` from export time, so the check is one hash compare. Without it, an agent can't tell a hand-edited archive from a renderer bug, and may weaken the verifier | cases 2 and 3, `src/session/source-snapshot.ts:346` |
 | G26 | Raw records cover only schema records. Image and content findings have none, so agents couldn't see the line 20 record or the record behind the absent text | cases 2 and 4 |
+
+### Committed diagnostics demo 261124
+
+The demo2 driver used a frozen slice of a real chat, so it couldn't be committed. `pnpm run demo:diagnostics` reruns its scenarios on synthetic events built inside the script. Anyone can run it on a fresh clone.
+
+- **Shared sandbox:** `scripts/lib/cli-sandbox.mjs` holds the sandbox setup that `failure-demo.mjs` had inline. Both demos use it. `pnpm run demo:failure` gave the same summary fields for all 5 cases before and after the move.
+- **Index keys:** a `copilotcli:/<id>` index key needs no `session.db`. Only `agent-host-copilotcli:/<id>` does. This comes from `src/session/provider-sources.ts`. An earlier note here said `session.db` was always needed.
+- **Scenarios:** demo2's 9 scenarios plus 2 more:
+
+  | Added scenario | Why |
+  | --- | --- |
+  | Local content loss | The first Local bundle run through the real CLI |
+  | Image companion deletion | Splits G24 by companion type |
+
+- **Results:** all 11 match their expectations. G22 (typo writes a bundle) is still marked as a known gap.
+- **Limits:**
+  - The demo isn't a test and doesn't run in `pnpm run verify`.
+  - It checks exit codes, categories and counts, not the quality of the task text.
+  - Synthetic chats are small, so the demo can't reproduce real-chat effects such as the G24 pass.
+
+How to run it is in the [README](../README.md#cli-sandbox).
 
 ## Work tree
 
@@ -666,13 +687,13 @@ Each run keeps a timestamped, collision-safe pair. It doesn't replace older evid
 
 ## Resume point 261124
 
-The approved fixes are implemented. `pnpm run verify` passes. The real-CLI demo and blind eval 2 are recorded above. The item waits for dev acceptance.
+The approved fixes are implemented. `pnpm run verify` passes. The real-CLI demo and blind eval 2 are recorded above. A committed version of the demo now runs on synthetic chats with `pnpm run demo:diagnostics`. The item waits for dev acceptance.
 
 Next:
 
-1. Decide on G20-G26 (Inbox). G25 (archive changed since export) is the cheapest and fixes the harmful case 2 answer.
+1. Decide on G20-G26 (Inbox). G25 (archive changed since export) is the cheapest and fixes the harmful case 2 answer. G24 needs a cause first, because synthetic companion deletions fail as expected.
 2. Accept the fixes or request changes.
-3. Start [WI-079](../work-log.md#wi-079) when approved.
+3. Start [WI-079](../work-log.md#wi-079) when approved. Use `scripts/lib/cli-sandbox.mjs` for its end-to-end tests.
 
 ## Resume point 261123
 

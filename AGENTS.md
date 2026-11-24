@@ -98,6 +98,7 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 | `pnpm run list --user-data-root <dir> --html-output <file>` | Session listing. Don't add `--`: pnpm passes it on and the CLI rejects it. |
 | `node src/cli.ts <id or 8-char prefix>` | Export one chat |
 | `node src/cli.ts --verify <id> <absolute-file>` | Layer D content check. The output path must be absolute. |
+| `pnpm run demo:diagnostics` | Injected-fault scenarios through the real CLI. For your own sandbox runs, see [Run the CLI on a copied chat](README.md#cli-sandbox). |
 
 - Run the narrowest relevant test right after the first real edit, then `pnpm run verify`.
 - Write inline probes as `temp-tool-output\*.mts` that import `../src/...`.

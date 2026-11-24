@@ -52,6 +52,7 @@
     "verify:local": "pnpm run verify && pnpm run baseline",
     "build": "node scripts/build.mjs",
     "demo:failure": "node scripts/failure-demo.mjs",
+    "demo:diagnostics": "node scripts/diagnostics-demo.mjs",
     "generate:brotli": "node scripts/generate-brotli.mjs",
     "prepare": "pnpm run build"
   },
