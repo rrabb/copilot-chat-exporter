@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { scanFences } from '../text.ts';
 import type { CompanionArtifact } from '../export-policy.ts';
+import { markdownInlineCodeAt, markdownLinks } from './markdown-links.ts';
 
 export interface ImageAccount {
   unique: number;
@@ -92,10 +93,31 @@ function inventory (value: unknown, assets = new Map<string, string>()): Recorde
 /** Links inside fenced code do not prove an artifact was kept. */
 function archiveTargets (markdown: string, imagesOnly: boolean): Set<string> {
   const lines = markdown.split(/\r?\n/u);
+  const document = lines.join('\n');
   const { inside } = scanFences(lines);
-  const live = lines.filter((_line, index) => !inside[index]).join('\n');
-  const pattern = imagesOnly ? /!\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu : /!?\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu;
-  const targets = [...live.matchAll(pattern)].map((match) => match[1]!);
+  const starts: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1;
+  }
+  const lineAt = (position: number) => {
+    let low = 0;
+    let high = starts.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if (starts[middle]! <= position)
+        low = middle + 1;
+      else
+        high = middle;
+    }
+    return low - 1;
+  };
+  const targets = markdownLinks(document)
+    .filter((link) => (!imagesOnly || link.image)
+      && !inside[lineAt(link.index)]
+      && !markdownInlineCodeAt(document, link.index))
+    .map((link) => link.target);
   return new Set(targets.map((target) => {
     try {
       return decodeURIComponent(target);

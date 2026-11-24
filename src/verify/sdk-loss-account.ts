@@ -9,6 +9,7 @@ import { childScopes, isRecord } from '../session/sdk-events.ts';
 import type { SdkEvent } from '../session/sdk-events.ts';
 import type { CompanionArtifact } from '../export-policy.ts';
 import { scanFences } from '../text.ts';
+import { markdownInlineCodeAt, markdownLinks } from './markdown-links.ts';
 import type { ToolGroupOrder } from '../types.ts';
 
 const LINES = new Set(['tool-input', 'tool-output', 'tool-detail']);
@@ -216,45 +217,40 @@ function withLinkedCompanions (markdown: string, companions: readonly CompanionA
     }
     return low - 1;
   };
-  // Check inline code only within the link's Markdown paragraph. Global matching can pair
-  // unrelated backticks across tables and then hide thousands of lines of live companion links.
-  const inInlineCode = (line: number, column: number) => {
-    let start = line;
-    while (start > 0 && lines[start - 1]!.trim())
-      start -= 1;
-    let open = 0;
-    for (let current = start; current <= line; current += 1) {
-      const text = lines[current]!;
-      for (const match of text.matchAll(/`+/gu)) {
-        if (current === line && match.index >= column)
-          break;
-        const backslashes = /\\+$/u.exec(text.slice(0, match.index))?.[0].length ?? 0;
-        if (backslashes % 2 !== 0)
-          continue;
-        open = open === 0 ? match[0].length : open === match[0].length ? 0 : open;
-      }
-    }
-    return open !== 0;
-  };
-  return document.replace(/!?\[(?:\\.|[^\]\\])*\]\(([^)\s]+)\)/gu, (link: string, encoded: string, index: number) => {
+  let output = '';
+  let cursor = 0;
+  for (const match of markdownLinks(document)) {
+    output += document.slice(cursor, match.index);
+    const link = document.slice(match.index, match.index + match.length);
+    const index = match.index;
     const escapes = /\\+$/u.exec(document.slice(0, index))?.[0].length ?? 0;
     const line = lineAt(index);
-    if (link.startsWith('!') || escapes % 2 !== 0 || inside[line] || inInlineCode(line, index - starts[line]!))
-      return link;
+    if (match.image || escapes % 2 !== 0 || inside[line] || markdownInlineCodeAt(document, index)) {
+      output += link;
+      cursor = index + match.length;
+      continue;
+    }
     let target: string;
     try {
-      target = decodeURIComponent(encoded);
+      target = decodeURIComponent(match.target);
     } catch (error) {
       if (!(error instanceof URIError))
         throw error;
-      return link;
+      output += link;
+      cursor = index + match.length;
+      continue;
     }
     const parts = target.split('/');
-    if (parts.length !== 2 || parts.some((part) => !part || part === '.' || part === '..' || /[:\\?#\u0000-\u001f]/u.test(part)))
-      return link;
+    if (parts.length !== 2 || parts.some((part) => !part || part === '.' || part === '..' || /[:\\?#\u0000-\u001f]/u.test(part))) {
+      output += link;
+      cursor = index + match.length;
+      continue;
+    }
     const body = bodies.get(target);
-    return body === undefined ? link : `${link}\n${body}\n`;
-  });
+    output += body === undefined ? link : `${link}\n${body}\n`;
+    cursor = index + match.length;
+  }
+  return output + document.slice(cursor);
 }
 
 /** Artifact objects keep link positions and repeated references. Legacy concatenated text supports presence checks but cannot prove link order. */

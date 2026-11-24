@@ -142,6 +142,7 @@ test('independent image verification fails missing, unlinked and corrupted compa
     ['no link', [companion]],
     ['![image](assets/image.png)', [{ ...companion, bytes: Buffer.from('wrong') }]],
     ['```text\n![image](assets/image.png)\n```', [companion]],
+    ['`![image](assets/image.png)`', [companion]],
   ] as const) {
     const account = verifyLocalImages([request], '', markdown, [...companions]);
     assert.equal(account.missing, 1);
@@ -163,6 +164,21 @@ test('SDK image hash verification resolves asset descriptors without counting th
   const account = verifySdkImages(events, '![image](assets/image.png)', companions);
   assert.equal(account.found, 1);
   assert.equal(account.unresolved, 0);
+});
+
+test('SDK image targets keep fence positions aligned with CRLF Markdown', () => {
+  const event = { type: 'session.binary_asset', data: {
+    assetId: 'asset-one', type: 'image', mimeType: 'image/png', data: encoded,
+  } };
+  const companion: CompanionArtifact = {
+    id: 'image', kind: 'image', relativePath: 'assets/image.png', mediaType: 'image/png',
+    bytes, location: { sourceId: 'fixture', field: 'image' },
+  };
+  const before = Array.from({ length: 80 }, (_, index) => `before ${index}`).join('\r\n');
+  const after = ['```text', ...Array.from({ length: 120 }, (_, index) => `fenced ${index}`), '```'].join('\r\n');
+  const account = verifySdkImages([event], `${before}\r\n![image](assets/image.png)\r\n${after}`, [companion]);
+  assert.equal(account.found, 1);
+  assert.equal(account.missing, 0);
 });
 
 test('SDK image locators resolve asset hashes to the event line and JSON path that referenced them', () => {
