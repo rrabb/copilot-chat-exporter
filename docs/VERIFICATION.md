@@ -23,6 +23,8 @@ Agent Host and Copilot CLI output comes first. Local-chat-only checks follow.
 | `An older .verify-failed.md archive exists... It was not deleted.` | A new successful export didn't remove older failed evidence. | No | Compare or keep the older run if needed |
 | `Verification report could not be written: ...` | The archive result is separate from the sidecar-write problem. | **Yes for that command** | Fix the report path or permissions. Don't confuse this with content loss |
 | `Verification could not finish` | The verifier threw an exception before producing a complete structured result. | **Yes** | Start with the exception and failure log |
+| `Diagnostic task: ...diagnostics-...md` | A private repair bundle was written for this warning, failure or exception. | No by itself | Review the task and manifest locally. Don't upload them automatically |
+| `Diagnostic privacy scan: 0 common pattern(s) found` | The bundled best-effort scan found no common credential pattern. | No | This isn't a clean bill of health. Review the bundle manually |
 
 ## 2. Agent Host and Copilot CLI event census
 
@@ -339,3 +341,42 @@ The report mirrors every major terminal section:
 15. Reproduction facts
 
 The failure-log link should appear near the verdict and again in the final action section.
+
+## 13. AI diagnostic bundle
+
+A verification warning, verification failure or exporter exception writes:
+
+- `<archive>.diagnostics-<timestamp>.md`, or a cache-based task when no archive exists
+- `<archive>.diagnostics-<timestamp>.json`
+- an optional restricted evidence folder for large exact Layer D text
+- an optional `<archive>.diagnostics-<timestamp>.raw-records.jsonl` with the exact recorded records behind each finding
+
+Clean verification writes none. A normal failed shell command doesn't trigger a bundle when verification is clean.
+
+The manifest separates two evidence types:
+
+| Evidence | Content |
+| --- | --- |
+| Schema | Event or payload type, field paths, value types, safe discriminator values, line or turn locators, issue and one-to-three structurally redacted samples |
+| Fidelity | Exact failed source piece, normalized compared text, best rendered match, source hash and request or line locators |
+
+Schema evidence keeps key names and parser-relevant structure. It fingerprints private strings, IDs, paths, tokens and dynamic keys with a bundle-local secret. It keeps no binary image body. Fidelity evidence is exact because redacting the value could remove the verifier defect.
+
+The task file is written for a repair agent. It lists these sections when they apply:
+
+| Section | What it gives the agent |
+| --- | --- |
+| Failure reasons | Each verifier reason mapped to a category (`images`, `parser`, `schema-drift`, `structure` and so on) and its likely source modules |
+| Exception | The stage that threw (`load`, `verify` or `export`), the first project stack frames and the partial report |
+| Failed parser checks | The expected marker, where it landed inside a code fence, the fence opener line and a short excerpt |
+| Missing or unresolved images | The recorded line and JSON path of each image whose bytes didn't reach the archive |
+| Companion links | Linked companion files that are missing, and files in the assets folder that nothing links |
+| Exact content | JSON paths into the manifest for the exact recorded and rendered text |
+| Raw records | Line numbers in the raw records file |
+| Replay | A `node src/cli.ts --verify` command for the saved archive, the exporter commit and, for source runs, the checkout status |
+
+**Raw records.** The raw records file keeps up to three exact recorded records per schema signature. Strings over 2,500 characters keep the first 2,000 and last 500 characters. A marker gives the length and SHA-256. The manifest indexes the file by line but never copies raw values. The privacy scanner covers this file too. ⚠️ It holds unredacted session content, so review it before you share it.
+
+**Known limit.** For Local chats, the record `line` is the request number, not the journal file line.
+
+The task and manifest are private. The exporter never uploads them or sends them to an agent automatically. It prints the scanner's common-pattern count. Zero isn't proof that sharing is safe. `--verify --json` still writes one JSON document to stdout. Diagnostic paths go to stderr.

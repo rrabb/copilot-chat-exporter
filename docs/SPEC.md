@@ -941,6 +941,14 @@ Run these commands from the exporter repository root.
 - `0` = no mismatches detected.
 - `2` = at least one mismatch or request/turn count mismatch.
 
+**AI diagnostic bundles.** Verification warnings, verification failures, and exporter or verifier exceptions produce a collision-safe Markdown task and versioned JSON manifest. A clean run produces neither file. A saved archive gets sibling `<archive>.diagnostics-<timestamp>.md` and `.json` paths. An in-memory or pre-output failure writes under the configured cache's `diagnostics` directory. The task and manifest never upload or invoke a remote service.
+
+Schema evidence keeps field names, paths, value types and safe parser discriminators. It groups repeated records by structural signature and keeps at most three redacted samples. String values, IDs, paths, tokens and binary bodies don't enter a schema sample. Layer D evidence is captured only on an opted-in diagnostic run and keeps the exact failed source piece, compared text and best rendered match. Large samples move to a restricted evidence folder with byte size and SHA-256 in the manifest.
+
+The diagnostic files come from one typed model. The human task explains the verdict and points to likely parser, renderer or verifier modules. The machine manifest includes the ordinary verification report, selected source structures, failure locators, source hash, frozen capture path, runtime versions, sanitized command, scanner counts and artifact hashes. `--verify --json` still writes one JSON document to stdout; diagnostic paths go to stderr.
+
+Manifest schema version 2 adds these repair aids. Each verifier failure reason maps to a category and source modules. A generic reason finding is dropped when a specific finding has the same category, and the report is stored once. Exceptions record the stage (`load`, `verify` or `export`), project stack frames and any partial report. Failed parser checks record where the expected marker landed relative to code fences. Missing images carry the recorded line and JSON path. Companion links list missing targets and unlinked files. A replay command, the exporter commit and, for source runs, the checkout status support reproduction. An optional sibling `.raw-records.jsonl` keeps up to three exact records per schema signature, clipping strings over 2,500 characters to the first 2,000 and last 500 with length and SHA-256. The manifest indexes that file by line without copying raw values, and the privacy scanner covers it.
+
 ### 9.3 Verifier report expectations
 
 `--verify` prints a deterministic summary that must be reviewed before a release:
