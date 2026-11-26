@@ -56,9 +56,11 @@ export function formatSessionListingHtml (
   const root = occurrences[0]?.provenance.userDataRoot ?? 'selected VS Code user-data root';
   const renderRows = (rows: readonly ConversationGroup[], tableId: string) => rows.map((group, index) => {
     const session = group.representative;
-    const isPathRequired = session.provider === 'local' && (localCounts.get(session.sessionId) ?? 0) > 1;
+    const suggestedSelector = ids.get(group.key) ?? session.sessionId;
+    const isPathRequired = session.provider === 'local'
+      && ((localCounts.get(session.sessionId) ?? 0) > 1 || suggestedSelector.endsWith('.jsonl'));
     const selector = options.fullIds || !UUID.test(session.sessionId)
-      ? session.sessionId : ids.get(session.sessionId) ?? session.sessionId;
+      ? session.sessionId : suggestedSelector;
     const sourcePaths = isPathRequired
       ? group.occurrences.flatMap((item) => item.backing.status === 'verified' && item.backing.source.kind === 'local-journal'
         ? [item.backing.source.path] : [])

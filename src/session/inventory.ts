@@ -8,6 +8,7 @@ import { resolveUserDataRoot } from './roots.ts';
 import { resolveProviderOccurrences } from './provider-sources.ts';
 import type { ProviderResolverOptions } from './provider-sources.ts';
 import { occurrenceId } from './occurrence.ts';
+import { listJournalFiles } from './journal-files.ts';
 import type {
   InventoryDiagnostic, SessionOccurrence, SessionProvider,
 } from './sources.ts';
@@ -40,6 +41,17 @@ function providerOf (key: string): SessionProvider {
   if (key.startsWith('copilotcli:/'))
     return 'copilot-cli';
   return key.includes(':/') ? 'external' : 'unknown';
+}
+
+function sqliteBusyOrLocked (error: unknown): boolean {
+  const message = describeError(error);
+  if (/\b(?:database is )?(?:busy|locked)\b/iu.test(message) || /SQLITE_(?:BUSY|LOCKED)/u.test(message))
+    return true;
+  if (!isRecord(error))
+    return false;
+  const code = typeof error.code === 'string' ? error.code : '';
+  return code.includes('SQLITE_BUSY') || code.includes('SQLITE_LOCKED')
+    || error.errcode === 5 || error.errcode === 6;
 }
 
 interface ChatIndex {
@@ -77,7 +89,12 @@ export function readChatIndex (workspaceStoragePath: string): ChatIndex {
       }
     }
   } catch (error) {
-    diagnostics.push({ path: databasePath, category: 'unreadable', description: describeError(error) });
+    diagnostics.push({
+      path: databasePath,
+      category: 'unreadable',
+      description: `${describeError(error)}${sqliteBusyOrLocked(error) ? ' VS Code may be writing. Retry the selection.' : ''}`,
+      affectsCandidateDiscovery: true,
+    });
   } finally {
     try {
       database?.close();
@@ -113,14 +130,30 @@ export async function inventorySessions (userDataRoot: string, options: Provider
     diagnostics.push({
       path: storageRoot, category: missingPath(error) ? 'source-unavailable' : 'unreadable',
       description: describeError(error),
+      ...(missingPath(error) ? {} : { affectsCandidateDiscovery: true }),
     });
   }
   // Windows with no folder open keep their chats in global storage: journals in
   // emptyWindowChatSessions and the same chat index key in the global state database.
   const emptyWindowJournals = path.join(globalStorageRoot, 'emptyWindowChatSessions');
-  const hasGlobalStore = await Promise.all([emptyWindowJournals, path.join(globalStorageRoot, 'state.vscdb')]
-    .map((candidate) => fs.stat(candidate).then(() => true, () => false)));
-  hasGlobalStore.some(Boolean)
+  const globalStoreChecks = await Promise.all([emptyWindowJournals, path.join(globalStorageRoot, 'state.vscdb')]
+    .map(async (candidate) => {
+      try {
+        await fs.stat(candidate);
+        return true;
+      } catch (error) {
+        if (!missingPath(error)) {
+          diagnostics.push({
+            path: candidate,
+            category: 'unreadable',
+            description: describeError(error),
+            affectsCandidateDiscovery: true,
+          });
+        }
+        return !missingPath(error);
+      }
+    }));
+  globalStoreChecks.some(Boolean)
     && stores.push({ storagePath: globalStorageRoot, journalDirectory: emptyWindowJournals, emptyWindow: true });
   for (const store of stores) {
     const { storagePath: workspaceStoragePath, journalDirectory, emptyWindow } = store;
@@ -144,23 +177,30 @@ export async function inventorySessions (userDataRoot: string, options: Provider
         workspaceDiagnostics.push({ path: workspaceMetadataPath, category: 'invalid-data', description: describeError(error) });
     }
     diagnostics.push(...workspaceDiagnostics);
-    // A missing global database is normal for a profile that never used an empty window.
-    const hasDatabase = !emptyWindow || await fs.stat(path.join(workspaceStoragePath, 'state.vscdb')).then(() => true, () => false);
+    // A missing index is normal. Keep journal discovery independent from optional title metadata.
+    const databasePath = path.join(workspaceStoragePath, 'state.vscdb');
+    const hasDatabase = await fs.stat(databasePath).then(() => true, (error: unknown) => {
+      if (!missingPath(error)) {
+        diagnostics.push({
+          path: databasePath,
+          category: 'unreadable',
+          description: describeError(error),
+          affectsCandidateDiscovery: true,
+        });
+      }
+      return false;
+    });
     const index = hasDatabase ? readChatIndex(workspaceStoragePath) : { entries: new Map<string, Record<string, unknown>>(), diagnostics: [] };
     diagnostics.push(...index.diagnostics);
     const journals = new Map<string, string>();
-    try {
-      for (const entry of await fs.readdir(journalDirectory, { withFileTypes: true })) {
-        if (entry.isFile() && entry.name.endsWith('.jsonl') && UUID.test(entry.name.slice(0, -6)))
-          journals.set(entry.name.slice(0, -6), path.join(journalDirectory, entry.name));
-      }
-    } catch (error) {
-      if (!missingPath(error))
-        diagnostics.push({ path: journalDirectory, category: 'unreadable', description: describeError(error) });
-    }
+    const listed = await listJournalFiles(journalDirectory);
+    diagnostics.push(...listed.diagnostics);
+    for (const file of listed.files)
+      journals.set(file.sessionId, file.path);
     const keys = [...new Set([...index.entries.keys(), ...journals.keys()])].sort();
     for (const key of keys) {
       const metadata = index.entries.get(key);
+      const journalPath = journals.get(key);
       const provenance = {
         userDataRoot: root, workspaceStoragePath,
         ...(emptyWindow ? { store: 'empty-window' as const } : {}),
@@ -176,6 +216,7 @@ export async function inventorySessions (userDataRoot: string, options: Provider
         activityTimestamp: indexedDate, activitySource: indexedDate === null ? 'unknown' : 'index',
         createdTimestamp: null, promptCount: null,
         provenance, visibility: { status: 'included' },
+        ...(journalPath === undefined ? {} : { localJournalPath: journalPath }),
         backing: {
           status: provider === 'external' || provider === 'unknown' ? 'unsupported' : 'unresolved',
           reason: provider === 'local' ? 'Local index entry has no journal.'
@@ -183,7 +224,6 @@ export async function inventorySessions (userDataRoot: string, options: Provider
         },
         diagnostics: [...index.diagnostics, ...workspaceDiagnostics],
       };
-      const journalPath = journals.get(key);
       if (journalPath !== undefined && !options.identityOnly) {
         try {
           const before = await fs.stat(journalPath);

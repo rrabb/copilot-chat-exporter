@@ -40,17 +40,30 @@ function groupKey (session: SessionOccurrence): string | null {
 }
 
 export function shortIds (groups: readonly ConversationGroup[]): Map<string, string> {
-  const ids = groups.map((group) => group.representative.sessionId);
-  return new Map(ids.map((id) => {
+  const aliases = groups.flatMap((group) =>
+    group.occurrences.flatMap((occurrence) => {
+      const values = [occurrence.sessionId];
+      const backing = occurrence.backing;
+      if (backing.status === 'verified' && backing.source.kind === 'sdk-events')
+        values.push(backing.source.chatIdentity, backing.source.sessionId);
+      return values.flatMap((value) => {
+        const candidate = value.replace(/^.*?:\//u, '').split('#')[0]!;
+        return UUID.test(candidate) ? [candidate.replaceAll('-', '').toLowerCase()] : [];
+      }).map((id) => ({ group, id }));
+    }));
+  return new Map(groups.map((group, index) => {
+    const id = group.representative.sessionId;
     if (!UUID.test(id))
-      return [id, id] as const;
+      return [group.key, id] as const;
     const compactId = id.replaceAll('-', '');
-    const compactIds = ids.map((candidate) => candidate.replaceAll('-', '').toLowerCase());
     let prefixLength = 8;
-    while (prefixLength < compactId.length && compactIds.some((candidate) =>
-      candidate !== compactId.toLowerCase() && candidate.startsWith(compactId.slice(0, prefixLength).toLowerCase())))
+    while (prefixLength < compactId.length && aliases.some((candidate) =>
+      candidate.group !== groups[index] && candidate.id.startsWith(compactId.slice(0, prefixLength).toLowerCase())))
       prefixLength += 1;
-    return [id, compactId.slice(0, prefixLength)] as const;
+    const collidesAtFullId = aliases.some((candidate) =>
+      candidate.group !== groups[index] && candidate.id === compactId.toLowerCase());
+    const localPath = groups[index]!.representative.localJournalPath;
+    return [group.key, collidesAtFullId && localPath ? localPath : compactId.slice(0, prefixLength)] as const;
   }));
 }
 

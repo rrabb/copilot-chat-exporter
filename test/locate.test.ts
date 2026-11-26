@@ -285,3 +285,46 @@ test('a missing Local ID explains how to find and select its journal', async (co
     return true;
   });
 });
+
+test('Local discovery ignores extensionless UUID files instead of treating them as journals', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-extension-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const workspace = path.join(root, 'User', 'workspaceStorage', 'hash');
+  await fs.mkdir(path.join(workspace, 'chatSessions'), { recursive: true });
+  await fs.writeFile(path.join(workspace, 'chatSessions', UUID), JSON.stringify({
+    kind: 0, v: { version: 3, sessionId: UUID, requests: [] },
+  }));
+
+  assert.deepEqual(await listSessions({ userDataRoot: root }), []);
+  await assert.rejects(resolveSession(UUID, { userDataRoot: root }), /No Local chat session/u);
+});
+
+test('an unreadable journal file blocks only selectors for the hidden UUID and lists found paths', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'cce-file-diagnostic-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const otherDirectory = path.join(root, 'User', 'workspaceStorage', 'other', 'chatSessions');
+  const hiddenDirectory = path.join(root, 'User', 'workspaceStorage', 'hidden', 'chatSessions');
+  const visibleDirectory = path.join(root, 'User', 'workspaceStorage', 'visible', 'chatSessions');
+  await Promise.all([otherDirectory, hiddenDirectory, visibleDirectory].map((directory) => fs.mkdir(directory, { recursive: true })));
+  const otherPath = path.join(otherDirectory, `${UUID}.jsonl`);
+  const hiddenPath = path.join(hiddenDirectory, `${RENAMED_UUID}.jsonl`);
+  const visiblePath = path.join(visibleDirectory, `${RENAMED_UUID}.jsonl`);
+  for (const [filePath, sessionId] of [[otherPath, UUID], [hiddenPath, RENAMED_UUID], [visiblePath, RENAMED_UUID]] as const) {
+    await fs.writeFile(filePath, JSON.stringify({ kind: 0, v: { version: 3, sessionId, requests: [] } }));
+  }
+  const originalStat = fs.stat;
+  context.mock.method(fs, 'stat', async (candidate: string) => {
+    if (candidate === hiddenPath)
+      throw Object.assign(new Error('synthetic access denied'), { code: 'EACCES' });
+    return originalStat(candidate);
+  });
+
+  const unrelated = await resolveSession(UUID, { userDataRoot: root });
+  assert.equal(unrelated.sessionPath, otherPath);
+  await assert.rejects(resolveSession(RENAMED_UUID, { userDataRoot: root }), (error: Error) => {
+    assert.match(error.message, /candidate discovery is incomplete/u);
+    assert.ok(error.message.includes(hiddenPath));
+    assert.ok(error.message.includes(`Local journal: ${visiblePath}`));
+    return true;
+  });
+});

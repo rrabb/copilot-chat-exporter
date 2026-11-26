@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { Script } from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { formatSessionListing, formatSessionListingHtml } from '../src/session/listing.ts';
-import { dateCell } from '../src/session/listing-model.ts';
+import { dateCell, groupOccurrences, shortIds } from '../src/session/listing-model.ts';
 import type { SessionOccurrence } from '../src/session/sources.ts';
 
 function localOccurrence (
@@ -23,6 +23,7 @@ function localOccurrence (
     createdTimestamp: Date.UTC(2026, 9, 1),
     promptCount: 4,
     provenance,
+    localJournalPath: `${provenance.workspaceStoragePath}\\chatSessions\\${id}.jsonl`,
     backing: {
       status: 'verified',
       source: {
@@ -35,6 +36,68 @@ function localOccurrence (
     ...overrides,
   };
 }
+
+test('Local listing selectors use an exact path when an SDK alias shares the full ID', () => {
+  const id = '11111111-2222-4333-8444-555555555555';
+  const local = localOccurrence(id);
+  const sdk: SessionOccurrence = {
+    ...local,
+    occurrenceId: 'sdk',
+    provider: 'agent-host',
+    sessionId: `agent-host-copilotcli:/${id}`,
+    localJournalPath: undefined,
+    backing: {
+      status: 'verified',
+      source: {
+        kind: 'sdk-events',
+        provider: 'agent-host',
+        sessionId: id,
+        path: 'C:\\copilot\\session-state\\id\\events.jsonl',
+        schemaVersion: 1,
+        producer: 'test',
+        scope: { kind: 'main' },
+        chatIdentity: `agent-host-copilotcli:/${id}`,
+        provenance: local.provenance,
+        identityEvidence: [],
+        identityWarnings: [],
+        scopeWarnings: [],
+        sha256: 'sdk',
+      },
+    },
+  };
+  const groups = groupOccurrences([local, sdk]);
+  const ids = shortIds(groups);
+  const localGroup = groups.find((group) => group.representative.provider === 'local')!;
+  const sdkGroup = groups.find((group) => group.representative.provider === 'agent-host')!;
+  assert.equal(ids.get(localGroup.key), local.localJournalPath);
+  assert.equal(ids.get(sdkGroup.key), sdk.sessionId);
+});
+
+test('duplicate Local IDs show the exact path for each conversation group', () => {
+  const id = '22222222-2222-4333-8444-555555555555';
+  const first = localOccurrence(id, { occurrenceId: 'first' });
+  const second = localOccurrence(id, {
+    occurrenceId: 'second',
+    localJournalPath: 'C:\\Code\\User\\workspaceStorage\\other\\chatSessions\\22222222-2222-4333-8444-555555555555.jsonl',
+    backing: {
+      status: 'verified',
+      source: {
+        kind: 'local-journal',
+        sessionId: id,
+        path: 'C:\\Code\\User\\workspaceStorage\\other\\chatSessions\\22222222-2222-4333-8444-555555555555.jsonl',
+        schemaVersion: 3,
+        sha256: 'different',
+        provenance: { userDataRoot: 'C:\\Code', workspaceStoragePath: 'C:\\Code\\User\\workspaceStorage\\other' },
+      },
+    },
+  });
+  const groups = groupOccurrences([first, second]);
+  const ids = shortIds(groups);
+  assert.equal(ids.size, 2);
+  assert.deepEqual(new Set(groups.map((group) => ids.get(group.key))), new Set([
+    first.localJournalPath, second.localJournalPath,
+  ]));
+});
 
 test('listing filters ignored entries, groups exact duplicate journals, and summarizes counts', () => {
   const first = localOccurrence('duplicate', {

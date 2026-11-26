@@ -18,7 +18,7 @@ export function formatSessionListing (
     const sessionId = group.representative.sessionId;
     if (!options.fullIds && !UUID.test(sessionId))
       return 10;
-    return Array.from(cleanCell(options.fullIds ? sessionId : ids.get(sessionId) ?? sessionId)).length;
+    return Array.from(cleanCell(options.fullIds ? sessionId : ids.get(group.key) ?? sessionId)).length;
   }));
   const rows = shown.map((group) => ({
     group, created: dateCell(group.createdTimestamp, options.referenceYear),
@@ -42,20 +42,22 @@ export function formatSessionListing (
   ];
   for (const { group, created, updated } of rows) {
     const session = group.representative;
+    const suggestedSelector = ids.get(group.key) ?? session.sessionId;
     const status = group.visibility.status === 'hidden' && group.visibility.reason === 'ambiguous'
       ? '🟠 ❓ ambiguous' : group.visibility.status === 'hidden'
         ? group.visibility.reason === 'new-chat-unknown' ? 'ignored:new-chat?' : `ignored:${group.visibility.reason}`
         : session.backing.status;
     const statusWithChildren = group.childWarnings > 0
       ? `🟠 ❓ +${group.childWarnings}` : status;
-    const selectorStatus = session.provider === 'local' && (idAmbiguity.get(session.sessionId) ?? 0) > 1
+    const selectorStatus = session.provider === 'local'
+      && ((idAmbiguity.get(session.sessionId) ?? 0) > 1 || suggestedSelector.endsWith('.jsonl'))
       ? 'path required' : statusWithChildren;
     lines.push(renderLine([
       created,
       updated,
       group.promptCount === null ? 'unknown' : String(group.promptCount),
       sessionType(session),
-      options.fullIds ? session.sessionId : ids.get(session.sessionId) ?? session.sessionId,
+      options.fullIds ? session.sessionId : suggestedSelector,
       session.title || '(untitled)',
       selectorStatus,
     ]));

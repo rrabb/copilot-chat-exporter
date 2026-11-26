@@ -6,11 +6,13 @@
 // parsed into an empty export.
 
 import { createReadStream, promises as fs } from 'node:fs';
-import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { DatabaseSync } from 'node:sqlite';
 import type { SessionLocation } from '../types.ts';
+import type { InventoryDiagnostic } from './sources.ts';
+import { diagnosticAffectsSelector } from './sources.ts';
+import { listJournalFiles } from './journal-files.ts';
 import { parseJson } from '../text.ts';
 import { resolveUserDataRoot } from './roots.ts';
 import { assertLocalJournalSnapshot } from './journal-validation.ts';
@@ -132,13 +134,37 @@ export async function listSessions ({ withTitles = false, userDataRoot }: {
   withTitles?: boolean;
   userDataRoot?: string;
 } = {}) {
+  return (await discoverSessions({ withTitles, userDataRoot })).sessions;
+}
+
+function missingPath (error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+function describeError (error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function discoverSessions ({ withTitles = false, userDataRoot }: {
+  withTitles?: boolean;
+  userDataRoot?: string;
+} = {}) {
   const root = await resolveUserDataRoot({ userDataRoot });
   const sessions = [];
+  const diagnostics: InventoryDiagnostic[] = [];
   for (const storageRoot of [path.join(root, 'User', 'workspaceStorage')]) {
     let hashes = [];
     try {
       hashes = await fs.readdir(storageRoot, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      if (!missingPath(error)) {
+        diagnostics.push({
+          path: storageRoot,
+          category: 'unreadable',
+          description: describeError(error),
+          affectsCandidateDiscovery: true,
+        });
+      }
       continue;
     }
     for (const hash of hashes) {
@@ -146,19 +172,10 @@ export async function listSessions ({ withTitles = false, userDataRoot }: {
         continue;
       const hashRoot = path.join(storageRoot, hash.name);
       const indexedTitles = readIndexedTitles(hashRoot);
-      const chatSessionsDir = path.join(hashRoot, 'chatSessions');
-      let files = [];
-      try {
-        files = await fs.readdir(chatSessionsDir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const file of files) {
-        const sessionId = path.basename(file.name, '.jsonl');
-        if (!file.isFile() || !SESSION_ID_PATTERN.test(sessionId))
-          continue;
-        const sessionPath = path.join(chatSessionsDir, file.name);
-        const stat = await fs.stat(sessionPath);
+      const listed = await listJournalFiles(path.join(hashRoot, 'chatSessions'));
+      diagnostics.push(...listed.diagnostics);
+      for (const file of listed.files) {
+        const { sessionId, path: sessionPath, mtimeMs } = file;
         const indexedTitle = indexedTitles.get(sessionId) ?? '';
         let title = indexedTitle;
         if (withTitles && !title) {
@@ -168,25 +185,17 @@ export async function listSessions ({ withTitles = false, userDataRoot }: {
             // Title is best-effort.
           }
         }
-        sessions.push({ sessionId, hashRoot, sessionPath, mtimeMs: stat.mtimeMs, title, indexedTitle });
+        sessions.push({ sessionId, hashRoot, sessionPath, mtimeMs, title, indexedTitle });
       }
     }
   }
   const globalStorageRoot = path.join(root, 'User', 'globalStorage');
   const emptyWindowDir = path.join(globalStorageRoot, 'emptyWindowChatSessions');
   const indexedTitles = readIndexedTitles(globalStorageRoot);
-  let emptyWindowFiles: Dirent[] = [];
-  try {
-    emptyWindowFiles = await fs.readdir(emptyWindowDir, { withFileTypes: true });
-  } catch {
-    // Empty-window storage is optional.
-  }
-  for (const file of emptyWindowFiles) {
-    const sessionId = path.basename(file.name, '.jsonl');
-    if (!file.isFile() || !SESSION_ID_PATTERN.test(sessionId))
-      continue;
-    const sessionPath = path.join(emptyWindowDir, file.name);
-    const stat = await fs.stat(sessionPath);
+  const listed = await listJournalFiles(emptyWindowDir);
+  diagnostics.push(...listed.diagnostics);
+  for (const file of listed.files) {
+    const { sessionId, path: sessionPath, mtimeMs } = file;
     const indexedTitle = indexedTitles.get(sessionId) ?? '';
     let title = indexedTitle;
     if (withTitles && !title) {
@@ -196,9 +205,9 @@ export async function listSessions ({ withTitles = false, userDataRoot }: {
         // Title is best-effort.
       }
     }
-    sessions.push({ sessionId, hashRoot: globalStorageRoot, sessionPath, mtimeMs: stat.mtimeMs, title, indexedTitle });
+    sessions.push({ sessionId, hashRoot: globalStorageRoot, sessionPath, mtimeMs, title, indexedTitle });
   }
-  return sessions.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  return { sessions: sessions.sort((left, right) => right.mtimeMs - left.mtimeMs), diagnostics };
 }
 
 export interface SessionSelectionOptions {
@@ -244,7 +253,8 @@ export async function resolveSession (sourceArgument?: string, options: SessionS
   }
   const root = await resolveUserDataRoot({ userDataRoot: options.userDataRoot });
   if (sourceArgument) {
-    const sessions = await listSessions({ userDataRoot: root });
+    const discovery = await discoverSessions({ userDataRoot: root });
+    const sessions = discovery.sessions;
     const isPrefix = SESSION_ID_PREFIX_PATTERN.test(sourceArgument);
     const candidates = sessions.filter((session) => isPrefix
       ? session.sessionId.replaceAll('-', '').toLowerCase().startsWith(sourceArgument.toLowerCase())
@@ -256,6 +266,16 @@ export async function resolveSession (sourceArgument?: string, options: SessionS
       distinctByPath.set(key, candidate);
     }
     const matches = [...distinctByPath.values()];
+    const blockingDiagnostics = discovery.diagnostics
+      .filter((diagnostic) => diagnosticAffectsSelector(diagnostic, sourceArgument));
+    if (blockingDiagnostics.length) {
+      const failures = blockingDiagnostics.map((diagnostic) => `  ${diagnostic.path}: ${diagnostic.description}`);
+      const alternatives = matches.map((match) => `  Local journal: ${match.sessionPath}`);
+      const advice = alternatives.length
+        ? `Use one precise source:\n${alternatives.join('\n')}`
+        : 'Pass an exact .jsonl path to select a verified journal.';
+      throw new SessionSelectionError(`Local candidate discovery is incomplete for ${sourceArgument}:\n${failures.join('\n')}\n${advice}`);
+    }
     const matchingIds = [...new Set(matches.map((match) => match.sessionId))];
     if (isPrefix && matchingIds.length > 1)
       throw new SessionSelectionError(`Session ID prefix ${sourceArgument} is ambiguous. Matching Local IDs:\n${matchingIds.map((id) => `  ${id}`).join('\n')}\nPass a longer unique prefix or an exact .jsonl path.`);

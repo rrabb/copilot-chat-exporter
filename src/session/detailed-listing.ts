@@ -323,7 +323,7 @@ export function formatDetailedSessionListingHtml (
     const exact = (workspaceCounts.get(row.sessionId) ?? 0) > 1;
     const sdkMain = row.backing.status === 'verified' && row.backing.source.kind === 'sdk-events' && row.backing.source.scope.kind === 'main';
     const selector = local && exact && row.backing.status === 'verified' ? row.backing.source.path
-      : sdkMain && row.backing.status === 'verified' ? row.backing.source.sessionId : ids.get(row.sessionId) ?? row.sessionId;
+      : sdkMain ? row.sessionId : ids.get(group.key) ?? row.sessionId;
     const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
     const command = `copilot-chat-export ${quote(selector)} --user-data-root ${quote(row.provenance.userDataRoot)}`;
     const readiness = sdkMain ? data?.state === 'changed' ? 'Source changed; refresh before export' : 'Agent MD export supported (main conversation)'

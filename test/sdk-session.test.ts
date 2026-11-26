@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { argumentsText, buildSdkSession } from '../src/session/sdk-session.ts';
-import { renderSdkExport, selectSdkSession } from '../src/session/sdk-export.ts';
+import { inspectSdkSelection, renderSdkExport, selectSdkSession } from '../src/session/sdk-export.ts';
 import { buildSdkLossAccount } from '../src/verify/sdk-loss-account.ts';
 import { detailedOccurrence } from './detailed-listing-fixture.ts';
 import type { SdkEvent } from '../src/session/sdk-events.ts';
@@ -287,6 +287,54 @@ test('an agent chat is selected by key, chat UUID prefix or backing ID; ambiguit
   assert.equal(selectSdkSession(rows, '77777777'), null);
   assert.equal(selectSdkSession(rows, '1111'), null, 'prefixes shorter than 8 characters never match');
   assert.ok(Array.isArray(selectSdkSession(rows, 'aaaaaaaa')), 'the same backing ID under two different backing files is ambiguous');
+});
+
+test('selection checks Local collisions, unverified SDK mappings and incomplete candidate discovery together', () => {
+  const localId = '11111111-2222-4333-8444-555555555555';
+  const local = detailedOccurrence(localId, {
+    localJournalPath: `C:\\Code\\User\\workspaceStorage\\local\\chatSessions\\${localId}.jsonl`,
+  });
+  const sdk = sdkRow('sdk', `agent-host-copilotcli:/${localId}`, source());
+  const unresolved = detailedOccurrence('unresolved', {
+    provider: 'copilot-cli',
+    sessionId: 'copilotcli:/77777777-2222-4333-8444-555555555555',
+    backing: { status: 'unresolved', reason: 'SDK folder cannot be read.' },
+  });
+  const blocked = {
+    path: 'C:\\Code\\User\\workspaceStorage',
+    category: 'unreadable' as const,
+    description: 'access denied',
+    affectsCandidateDiscovery: true,
+  };
+
+  const otherJournalFailure = {
+    path: 'C:/Code/User/workspaceStorage/other/chatSessions/22222222-2222-4222-8222-222222222222.jsonl',
+    category: 'unreadable' as const,
+    description: 'access denied',
+    affectsCandidateDiscovery: true,
+    hidesSessionId: '22222222-2222-4222-8222-222222222222',
+  };
+  const matchingJournalFailure = { ...otherJournalFailure, hidesSessionId: localId };
+
+  const collision = inspectSdkSelection([local, sdk], [], '11111111');
+  assert.equal(collision.local.length, 1);
+  assert.ok(collision.sdk && !Array.isArray(collision.sdk));
+
+  const unrelatedFileFailure = inspectSdkSelection([local], [otherJournalFailure], localId);
+  assert.equal(unrelatedFileFailure.blockingDiagnostics.length, 0, 'a per-file failure does not block another UUID');
+
+  const matchingFileFailure = inspectSdkSelection([local], [matchingJournalFailure], '11111111');
+  assert.deepEqual(matchingFileFailure.blockingDiagnostics, [matchingJournalFailure], 'a matching prefix blocks the hidden UUID');
+  const matchingExactFailure = inspectSdkSelection([local], [matchingJournalFailure], localId);
+  assert.deepEqual(matchingExactFailure.blockingDiagnostics, [matchingJournalFailure], 'an exact ID blocks the hidden UUID');
+
+  const incomplete = inspectSdkSelection([local], [blocked], localId);
+  assert.equal(incomplete.blockingDiagnostics.length, 1);
+
+  const qualified = inspectSdkSelection([unresolved], [blocked], unresolved.sessionId);
+  assert.equal(qualified.qualified, true);
+  assert.equal(qualified.unresolvedSdk.length, 1);
+  assert.equal(qualified.blockingDiagnostics.length, 0, 'a qualified key does not rescan unrelated selectors');
 });
 
 test('a delegated agent is nested at its call, labelled, and its conversation is complete', () => {

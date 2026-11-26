@@ -9,9 +9,11 @@ Canonical entry: [WI-015](../work-log.md#wi-015). Code links use commit `cba16b3
 - No-argument CLI runs list chats. Local exports need an ID, prefix, journal path or verified `--current`; SDK main chats also accept qualified keys.
 - Inventory includes workspace and empty-window journals, indexes and provider references. Other profiles and remote stores aren't established as covered.
 - Rejected: defaulting to the newest chat or first root, grouping by title or UUID alone, and discovering nested backups or transferred copies as separate chats.
-- A synthetic check found that an SDK chat can win over a colliding Local selector. [WI-044](../work-log.md#wi-044) tracks that risk.
-- Another check found that unreadable stores can hide duplicates or disappear from inventory diagnostics. [WI-045](../work-log.md#wi-045) tracks that risk.
-- Work tree: 0 of 2 children done. Exact Local journal paths worked as a workaround in the collision probe.
+- A synthetic check found that an SDK chat can win over a colliding Local selector. WI-044 refuses ambiguous selectors. Accepted 261126.
+- Another check found that unreadable stores can hide duplicates or disappear from inventory diagnostics. WI-045 blocks bare selection when discovery is incomplete. Accepted 261126.
+- WI-080 aligns Local lookup with inventory by requiring the `.jsonl` suffix. Accepted 261126.
+- WI-085 blocks only the chat a failed file can hide, adds a retry hint for a locked index and lists exact paths in Local errors. Accepted 261126.
+- Work tree: WI-086 (terminal listing usability) is open. Exact paths and verified qualified keys remain usable.
 - [WI-003](WI-003-remaining-manual-acceptance.md) records later chooser acceptance. [WI-007](../work-log.md#wi-007) keeps separate inventory evidence questions.
 
 ## Original goal
@@ -30,12 +32,15 @@ These are the original criteria for the accepted work. The later findings below 
 
 ## Work tree
 
-Progress as of 261104: 0 of 2 children done.
+Progress as of 261126: 3 of 3 implemented, awaiting developer acceptance.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
 | 1 | [WI-044 Cross-provider selector collisions](../work-log.md#wi-044) | [build] | M | - |
-| 2 | [WI-045 Unreadable discovery sources](../work-log.md#wi-045) | [build] | M | - |
+| 2 | [WI-080 Local lookup accepts extensionless files](../work-log.md#wi-080) | [build] | S | - |
+| 3 | [WI-045 Unreadable discovery sources](../work-log.md#wi-045) | [build] | M | - |
+| 4 | [WI-085 Selector-safety refinements](../work-log.md#wi-085) | [build] | S | WI-044, WI-045 |
+| 5 | [WI-086 Terminal listing usability](../work-log.md#wi-086) | [build] | M | - |
 
 ## Current understanding
 
@@ -69,13 +74,28 @@ Progress as of 261104: 0 of 2 children done.
 
 **Inferred from source:** [short ID generation](https://github.com/rrabb/copilot-chat-exporter/blob/cba16b37b7e31de73530b355e9200edefa82b04c/src/session/listing-model.ts#L42) compares the Local ID with the qualified provider key, not the SDK's selectable native or backing ID. The [CLI](https://github.com/rrabb/copilot-chat-exporter/blob/cba16b37b7e31de73530b355e9200edefa82b04c/src/cli.ts#L340) tries [SDK selection](https://github.com/rrabb/copilot-chat-exporter/blob/cba16b37b7e31de73530b355e9200edefa82b04c/src/sdk-cli.ts#L62) before Local lookup. SDK selection doesn't compare its match with Local journals. This can export a different chat than the Local selector suggests. [WI-044](../work-log.md#wi-044) covers the collision and listing-selector checks.
 
-**Owner question:** When a selector matches both a Local and an SDK chat, should the CLI error, prefer one, or require a qualified key? The dev decides before any build.
+**Decision 261126:** bare selectors error on a cross-provider collision. The error lists exact Local paths and verified qualified SDK keys. The prototype doesn't add a provider preference or force flag.
 
 ### Unreadable discovery sources
 
 **Observed here:** two synthetic workspaces contained the same Local ID. Normal lookup reported both paths. After an injected `EACCES` on one workspace's journal directory, lookup returned the other path as unique. Inventory reported that unreadable workspace directory. A separate injected `EACCES` on both global-store existence checks caused an existing empty-window journal to disappear without a global-store diagnostic.
 
 **Inferred from source:** [Local enumeration](https://github.com/rrabb/copilot-chat-exporter/blob/cba16b37b7e31de73530b355e9200edefa82b04c/src/session/locate.ts#L137) skips directory-read errors before [resolving IDs](https://github.com/rrabb/copilot-chat-exporter/blob/cba16b37b7e31de73530b355e9200edefa82b04c/src/session/locate.ts#L240). [Global-store detection](https://github.com/rrabb/copilot-chat-exporter/blob/cba16b37b7e31de73530b355e9200edefa82b04c/src/session/inventory.ts#L120) treats any `stat` error as absence. [WI-045](../work-log.md#wi-045) covers incomplete discovery and safe selection. The checks injected errors; they didn't change filesystem permissions or establish how often this happens.
+
+### Selector safety slice 261126
+
+**Implemented, awaiting acceptance:**
+
+- Bare IDs and prefixes compare discovered Local journal paths with verified SDK native and backing aliases before a capture starts.
+- Known collisions and read failures that hide candidates throw `SessionSelectionError`. These failures don't write an archive, capture or diagnostic bundle.
+- Errors list exact Local paths and verified qualified SDK keys when the inventory has that evidence.
+- Missing optional stores and title metadata remain non-blocking. A corrupt index, unreadable journal directory or failed candidate path check can block broad selection.
+- Qualified SDK keys still need a verified recorded mapping. A qualified key doesn't use unrelated discovery failures as a reason to guess.
+- Saved-file verification reads its valid kept receipt and frozen capture before live selection.
+- Local listing and lookup now require `.jsonl`, matching inventory.
+- Console and detailed listing selectors avoid a bare Local/SDK alias collision.
+
+**Accepted behavior check:** verify one collision or unreadable-store case in a synthetic sandbox. Confirm the error gives a usable exact command and creates no output or cache entry. Check a successful saved-file verification against its kept receipt.
 
 ### Historical corrections
 
@@ -84,6 +104,7 @@ Progress as of 261104: 0 of 2 children done.
 ## Validation and limits
 
 - **Observed here:** `node --test temp-tool-output\wi-015-selection-261104-1315.mts` ran six isolated probes. They reproduced both selector collisions, the two unreadable-store cases, the filename mismatch filed in the Inbox, and the `bkup2` exclusion with exact-path lookup. Passing probes describe current behavior, including bugs; they aren't approval of that behavior.
+- **Observed here, 261126:** focused selector, inventory and listing regressions pass. Both typechecks and the full `pnpm run verify` gate pass. The golden render matches the committed baseline. A read-only code review found the duplicate Local selector issue, which was fixed and rechecked.
 - Focused synthetic tests covered roots, Local lookup, inventory, provider lookup and CLI dispatch. All 27 selected tests passed. The first attempt failed before tests ran because Node rejected a Windows path as an import specifier; the retry used a file URL. The [rerun script](../temp-tool-output/wi-015-261104-1315/run-focused.ps1) records the selected tests and isolates the test cache.
 - The [probe](../temp-tool-output/wi-015-selection-261104-1315.mts) and [logs](../temp-tool-output/wi-015-261104-1315/) are Git-ignored local evidence and may be absent from another checkout. Fixtures were generated for the checks and cleaned up by the tests. No real session data was read for these checks.
 - Full verification and a build weren't run, as requested. The graph reported changed file metadata, so claims above use direct source reads. The cited source matched the clean code at the named commit.

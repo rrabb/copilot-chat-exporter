@@ -4,7 +4,8 @@ import type { CompanionArtifact } from '../export-policy.ts';
 import type { ParsedSession, ToolGroupOrder } from '../types.ts';
 import { eventsInScope, readSdkEvents } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
-import type { SdkEventSource, SessionOccurrence } from './sources.ts';
+import type { InventoryDiagnostic, SdkEventSource, SessionOccurrence } from './sources.ts';
+import { diagnosticAffectsSelector } from './sources.ts';
 import { buildSdkSession } from './sdk-session.ts';
 import { attachRunningTotals, attachUsage, copilotHomeOf, readUsageLedger, selectUsage, usageForScope } from './sdk-usage.ts';
 import type { UsageCall } from './sdk-usage.ts';
@@ -99,6 +100,60 @@ export async function exportSdkScope (source: SdkEventSource, options: SdkExport
 }
 
 export interface SdkSelection { occurrence: SessionOccurrence; source: SdkEventSource }
+
+const SDK_SESSION_KEY_PATTERN = /^(?:agent-host-copilotcli|copilotcli):\/[a-z0-9._~-]+(?:[/#][a-z0-9._~-]+)*$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface SdkSelectionCheck {
+  qualified: boolean;
+  sdk: SdkSelection | SdkSelection[] | null;
+  local: SessionOccurrence[];
+  unresolvedSdk: SessionOccurrence[];
+  blockingDiagnostics: InventoryDiagnostic[];
+}
+
+function bareIdMatch (candidate: string, selector: string, qualified: boolean): boolean {
+  if (qualified)
+    return false;
+  const wanted = selector.toLowerCase().replaceAll('-', '');
+  const prefix = wanted.length >= 8 && /^[0-9a-f]+$/u.test(wanted);
+  if (!prefix)
+    return false;
+  return candidate.replaceAll('-', '').toLowerCase().startsWith(wanted);
+}
+
+/** Checks all providers before the SDK command creates a capture or any export artifact. */
+export function inspectSdkSelection (
+  occurrences: readonly SessionOccurrence[],
+  diagnostics: readonly InventoryDiagnostic[],
+  selector: string,
+): SdkSelectionCheck {
+  const qualified = SDK_SESSION_KEY_PATTERN.test(selector);
+  const local = occurrences.filter((occurrence) =>
+    occurrence.provider === 'local' && UUID.test(occurrence.sessionId)
+    && occurrence.localJournalPath !== undefined
+    && bareIdMatch(occurrence.sessionId, selector, qualified));
+  const unresolvedSdk = occurrences.filter((occurrence) => {
+    if (occurrence.provider !== 'agent-host' && occurrence.provider !== 'copilot-cli')
+      return false;
+    if (occurrence.backing.status === 'verified' && occurrence.backing.source.kind === 'sdk-events')
+      return false;
+    if (qualified)
+      return occurrence.sessionId.toLowerCase() === selector.toLowerCase();
+    const native = occurrence.sessionId.replace(/^.*?:\//u, '').split('#')[0]!;
+    return bareIdMatch(native, selector, false);
+  });
+  const blockingDiagnostics = qualified
+    ? []
+    : diagnostics.filter((diagnostic) => diagnosticAffectsSelector(diagnostic, selector));
+  return {
+    qualified,
+    sdk: selectSdkSession(occurrences, selector),
+    local,
+    unresolvedSdk,
+    blockingDiagnostics,
+  };
+}
 
 /**
  * A verified main-scope Agent Host or Copilot CLI chat selected by its exact qualified chat key,

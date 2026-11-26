@@ -6,8 +6,8 @@ import { createHostContext, resolveOutputPath, setWorkspaceRoot, workspacePath }
 import { buildExportSummary, formatExportSummary } from './export-summary.ts';
 import { inventorySessions } from './session/inventory.ts';
 import { questionWarningLines } from './session/questions.ts';
-import { readSdkScope, readUsageForSource, renderSdkExport, selectSdkSession } from './session/sdk-export.ts';
-import type { SdkExport } from './session/sdk-export.ts';
+import { inspectSdkSelection, readSdkScope, readUsageForSource, renderSdkExport } from './session/sdk-export.ts';
+import type { SdkExport, SdkSelection, SdkSelectionCheck } from './session/sdk-export.ts';
 import { buildSdkLossAccount } from './verify/sdk-loss-account.ts';
 import { printLossAccount } from './verify/loss-report.ts';
 import { buildSdkVerifyJson } from './verify/json-report.ts';
@@ -35,6 +35,7 @@ import { questionDiagnosticSchemaRecords, sdkDiagnosticSchemaRecords } from './v
 import type { SchemaDiagnosticRecord } from './verify/diagnostic-evidence.ts';
 import { SessionSelectionError } from './session/locate.ts';
 import { UserDataRootError } from './session/roots.ts';
+import type { SessionOccurrence } from './session/sources.ts';
 
 export interface SdkCommandOptions {
   root: string;
@@ -94,6 +95,31 @@ export async function removeFrozenSource (directory: string): Promise<void> {
   }
 }
 
+function localJournalPath (occurrence: SessionOccurrence): string {
+  if (occurrence.localJournalPath)
+    return occurrence.localJournalPath;
+  const directory = occurrence.provenance.store === 'empty-window' ? 'emptyWindowChatSessions' : 'chatSessions';
+  return path.join(occurrence.provenance.workspaceStoragePath, directory, `${occurrence.sessionId}.jsonl`);
+}
+
+function alternativeLines (check: SdkSelectionCheck): string[] {
+  const localPaths = [...new Set(check.local.map(localJournalPath))];
+  const sdkSelections = check.sdk === null ? [] : Array.isArray(check.sdk) ? check.sdk : [check.sdk];
+  const sdkKeys = [...new Set(sdkSelections.map((selection: SdkSelection) => selection.occurrence.sessionId))];
+  return [
+    ...localPaths.map((candidate) => `  Local journal: ${candidate}`),
+    ...sdkKeys.map((candidate) => `  SDK chat key: ${candidate}`),
+  ];
+}
+
+function selectionError (selector: string, reason: string, check: SdkSelectionCheck): SessionSelectionError {
+  const alternatives = alternativeLines(check);
+  const advice = alternatives.length
+    ? `Use one precise source:\n${alternatives.join('\n')}`
+    : 'Run --list to inspect available sources. Use an exact Local .jsonl path or a verified qualified SDK key.';
+  return new SessionSelectionError(`${selector}: ${reason}\n${advice}`);
+}
+
 /** Returns an exit code, or null when the selector is not an Agent Host or Copilot CLI chat. */
 export async function runSdkCommand (options: SdkCommandOptions): Promise<number | null> {
   try {
@@ -141,15 +167,41 @@ async function runSdkCommandFromCopy (options: SdkCommandOptions): Promise<numbe
   const root = receipt?.root ?? options.root;
   const existing = await existingUserDataSnapshot(root);
   const inventory = await inventorySessions(root, { copilotHome: existing?.copilotHome, identityOnly: true });
-  const selection = selectSdkSession(inventory.occurrences, options.selector);
-  if (selection === null)
-    return null;
-  if (Array.isArray(selection)) {
-    console.error(`"${options.selector}" matches ${selection.length} Agent Host or Copilot CLI chats. Use an exact chat key from this list:`);
-    for (const item of selection)
-      console.error(`  ${item.occurrence.sessionId}  (backing ${item.source.sessionId})  ${item.occurrence.title || '(untitled)'}`);
-    return 1;
+  const checked = inspectSdkSelection(inventory.occurrences, inventory.diagnostics, options.selector);
+  const { sdk: selection } = checked;
+  if (checked.qualified) {
+    if (checked.unresolvedSdk.length)
+      throw selectionError(options.selector, 'the qualified SDK key has a recorded mapping that could not be verified', checked);
+    if (selection === null)
+      throw selectionError(options.selector, 'no verified SDK chat has this qualified key', checked);
+  } else {
+    if (Array.isArray(selection) || (selection && checked.local.length)) {
+      throw selectionError(
+        options.selector,
+        'the selector matches more than one Local or SDK chat',
+        checked,
+      );
+    }
+    if (checked.unresolvedSdk.length) {
+      throw selectionError(
+        options.selector,
+        'an SDK mapping matching this selector could not be verified',
+        checked,
+      );
+    }
+    if (checked.blockingDiagnostics.length) {
+      const failedPaths = checked.blockingDiagnostics.map((diagnostic) => `  ${diagnostic.path}: ${diagnostic.description}`);
+      throw selectionError(
+        options.selector,
+        `candidate discovery is incomplete:\n${failedPaths.join('\n')}`,
+        checked,
+      );
+    }
+    if (selection === null)
+      return null;
   }
+  if (Array.isArray(selection))
+    throw selectionError(options.selector, 'the qualified SDK key resolves to multiple verified chats', checked);
   const capture = await snapshotSdkSelection(selection);
   let kept = false;
   let problem = false;

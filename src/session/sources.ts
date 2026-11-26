@@ -50,6 +50,20 @@ export interface InventoryDiagnostic {
   path: string;
   category: 'unreadable' | 'invalid-data' | 'unsupported' | 'ambiguous' | 'source-unavailable';
   description: string;
+  /** A failure in this check can hide selectable chat identities. */
+  affectsCandidateDiscovery?: boolean;
+  /** Set when one unreadable journal file can hide only this session. */
+  hidesSessionId?: string;
+}
+
+export function diagnosticAffectsSelector (diagnostic: InventoryDiagnostic, selector: string): boolean {
+  if (!diagnostic.affectsCandidateDiscovery)
+    return false;
+  if (!diagnostic.hidesSessionId)
+    return true;
+  const wanted = selector.toLowerCase().replaceAll('-', '');
+  const prefix = wanted.length >= 8 && /^[0-9a-f]+$/u.test(wanted);
+  return prefix && diagnostic.hidesSessionId.replaceAll('-', '').toLowerCase().startsWith(wanted);
 }
 
 export interface SessionOccurrence {
@@ -63,6 +77,8 @@ export interface SessionOccurrence {
   createdTimestamp?: number | null;
   promptCount?: number | null;
   provenance: SourceProvenance;
+  /** A Local journal found by filename, even when the backing has not been parsed yet. */
+  localJournalPath?: string;
   backing:
     | { status: 'verified'; source: VerifiedSessionSource }
     | { status: 'unresolved' | 'unsupported'; reason: string };
