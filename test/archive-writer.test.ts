@@ -104,6 +104,28 @@ test('verification failure publishes warning and companions without replacing ea
   assert.match(await fs.readFile(result.failureLog!, 'utf8'), /"sourceHash"/u);
 });
 
+test('failure log write error still publishes the failed archive and reports the error', async (context) => {
+  const { outputPath } = await fixture(context);
+  const original = fs.writeFile;
+  context.mock.method(fs, 'writeFile', async (file: Parameters<typeof fs.writeFile>[0], ...rest: unknown[]) => {
+    if (String(file).includes('.failure-log-'))
+      throw Object.assign(new Error('Synthetic log denial'), { code: 'EACCES' });
+    return (original as (...args: unknown[]) => Promise<void>).call(fs, file, ...rest);
+  });
+  const result = await writeArchive({
+    outputPath, generatedAt, plan,
+    verification: {
+      capture: null, sessionId: 'synthetic', sourceHash: 'a'.repeat(64), keep: async () => {},
+      check: async () => ({ failureReasons: ['layer-d'], categories: {}, details: {} }),
+    },
+  });
+  assert.equal(result.failureLog, null);
+  assert.match(result.failureLogError!, /Synthetic log denial/u);
+  const markdown = await fs.readFile(result.outputPath, 'utf8');
+  assert.match(markdown, /Frozen source removed/u);
+  assert.doesNotMatch(markdown, /Kept private source copy/u);
+});
+
 test('existing destinations refuse by default; overwrite keeps prior companion folder', async (context) => {
   const { outputPath } = await fixture(context);
   const first = await writeArchive({ outputPath, generatedAt, plan });

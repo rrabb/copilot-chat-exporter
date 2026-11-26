@@ -562,8 +562,8 @@ test('CLI cleanup previews and age-deletes cache failure logs without touching l
 
 for (const sdk of [false, true]) {
   for (const failure of sdk ? ['missing-content', 'read-error', 'missing-companion'] : ['missing-content', 'read-error']) {
-    for (const keepSource of [false, true]) {
-    test(`failed ${sdk ? 'SDK' : 'Local'} ${keepSource ? 'kept' : 'default'} export keeps its capture after ${failure}`, async (context) => {
+    for (const keepFlag of [null, '--keep-source', '--keep-source-on-problem']) {
+    test(`failed ${sdk ? 'SDK' : 'Local'} ${keepFlag ?? 'default'} export ${keepFlag ? 'keeps' : 'removes'} its capture after ${failure}`, async (context) => {
       const { home, root, sessionPath, env, invoke } = await fixture(context);
       let selector = sessionPath;
       if (sdk) {
@@ -612,14 +612,19 @@ fs.readFile = async function (file, ...args) {
       const previousNodeOptions = env.NODE_OPTIONS;
       env.NODE_OPTIONS = `${previousNodeOptions} --import=${pathToFileURL(preload).href}`;
       await fs.writeFile(output, 'Existing successful archive');
-      const result = invoke(selector, output, '--overwrite', '--explain', ...(keepSource ? ['--keep-source'] : []), '--user-data-root', root);
+      const result = invoke(selector, output, '--overwrite', '--explain', ...(keepFlag ? [keepFlag] : []), '--user-data-root', root);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
       assert.equal(createHash('sha256').update(await fs.readFile(sourceFile)).digest('hex'), sourceHash);
       const captures = (await fs.readdir(env.CCE_CACHE_DIR)).filter((name) => name.startsWith('cce-'));
-      assert.equal(captures.length, 1, result.stdout + result.stderr);
-      const capture = path.join(env.CCE_CACHE_DIR, captures[0]!);
-      assert.ok(result.stderr.includes(capture), 'failure diagnostic includes the kept capture path');
-      assert.match(result.stderr, /verification failed.*source copy.*kept/iu);
+      assert.equal(captures.length, keepFlag ? 1 : 0, result.stdout + result.stderr);
+      const capture = keepFlag ? path.join(env.CCE_CACHE_DIR, captures[0]!) : null;
+      if (capture) {
+        assert.ok(result.stderr.includes(capture), 'failure diagnostic includes the kept capture path');
+        assert.match(result.stderr, /verification failed.*source copy.*kept/iu);
+      } else {
+        assert.match(result.stderr, /Frozen source removed \(\d+\.\d MiB\).*--keep-source-on-problem/u);
+        assert.doesNotMatch(result.stderr, /source copy kept/u);
+      }
       assert.equal(await fs.readFile(output, 'utf8'), 'Existing successful archive');
       const failed = path.join(home, 'failed.verify-failed.md');
       const failedMarkdown = await fs.readFile(failed, 'utf8');
@@ -634,9 +639,9 @@ fs.readFile = async function (file, ...args) {
       assert.match(explanation, /failure log/u);
       assert.match(explanation, /frozen source/u);
       assert.match(failedMarkdown, /^>.*Verification failed/iu);
-      assert.ok(failedMarkdown.includes(capture));
+      assert.ok(capture ? failedMarkdown.includes(capture) : failedMarkdown.includes('Frozen source removed'));
       assert.match(failedMarkdown, /### Chat Export Artifact\s+- `[^`]*failed\.verify-failed\.md`/u);
-      assert.equal((result.stderr.match(/Export verification failed; private source copy kept at:/gu) ?? []).length, 1);
+      assert.equal((result.stderr.match(/Export verification failed; private source copy kept at:/gu) ?? []).length, capture ? 1 : 0);
       assert.doesNotMatch(result.stderr, /"failureReasons"|"stack"|"layerD"/u);
       assert.doesNotMatch(result.stdout, /Exported session/u);
       assert.match(result.stdout, /Export failed verification; written as .*failed\.verify-failed\.md/u);
@@ -670,8 +675,15 @@ fs.readFile = async function (file, ...args) {
         assert.equal(logData.details.layerD.target, 'file');
         assert.ok(failedMarkdown.includes(failure === 'missing-companion' ? 'system-prompt' : 'request 1 prompt'));
       }
-      assert.equal(JSON.parse(await fs.readFile(path.join(capture, '.cce-capture.json'), 'utf8')).kept, true);
       env.NODE_OPTIONS = previousNodeOptions;
+      if (!capture) {
+        assert.equal(logData.capture, null);
+        const verify = invoke('--verify', '--strict', selector, failed, '--user-data-root', root);
+        assert.notEqual(verify.status, 0);
+        assert.match(verify.stderr, /source copy was not kept.*--keep-source-on-problem/u);
+        return;
+      }
+      assert.equal(JSON.parse(await fs.readFile(path.join(capture, '.cce-capture.json'), 'utf8')).kept, true);
       const cleanupPreview = invoke('--clean');
       assert.equal(cleanupPreview.status, 0, cleanupPreview.stdout + cleanupPreview.stderr);
       assert.match(cleanupPreview.stdout, /Nothing deleted/u);

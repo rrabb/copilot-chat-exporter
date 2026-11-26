@@ -47,6 +47,7 @@ export interface SdkCommandOptions {
   strict: boolean;
   json?: boolean;
   keepSource?: boolean;
+  keepSourceOnProblem?: boolean;
   toolGroupOrder?: ToolGroupOrder;
   outputHash?: ExportOutputHashCheck;
 }
@@ -80,6 +81,16 @@ async function writeDiagnosticsForCli (input: DiagnosticBundleInput, quiet = fal
   } catch (error) {
     console.error(`Diagnostic bundle could not be written: ${errorLabel(error)}`);
     return 'failed';
+  }
+}
+
+/** Deletes a frozen source after a problem run and tells the user how to keep it next time. */
+export async function removeFrozenSource (directory: string): Promise<void> {
+  try {
+    const bytes = await discardCapture(directory);
+    console.error(`Frozen source removed (${(bytes / 1_048_576).toFixed(1)} MiB). This run can't be replayed from its exact source later. Rerun with --keep-source-on-problem to keep it.`);
+  } catch (error) {
+    console.error(`Frozen source could not be removed: ${errorLabel(error)}. Run --cache --clean to remove it.`);
   }
 }
 
@@ -141,20 +152,33 @@ async function runSdkCommandFromCopy (options: SdkCommandOptions): Promise<numbe
   }
   const capture = await snapshotSdkSelection(selection);
   let kept = false;
+  let problem = false;
   try {
-    return await runSdkSnapshotCommand(resolvedOptions, capture, () => { kept = true; });
+    return await runSdkSnapshotCommand(resolvedOptions, capture, () => { kept = true; }, () => { problem = true; });
   } finally {
     if (!kept)
-      await discardCapture(capture.directory);
+      problem ? await removeFrozenSource(capture.directory) : await discardCapture(capture.directory);
   }
 }
 
-async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCapture, keepSnapshot?: () => void): Promise<number> {
+async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCapture, keepSnapshot?: () => void,
+  onProblem?: () => void): Promise<number> {
   const { occurrence, source } = capture.selection;
   const sourceCopy = capture.copy;
   for (const file of capture.files)
     await verifySourceCopy(file);
   sourceCopy.kept = options.keepSource === true || !keepSnapshot;
+  // A saved-file check leases an already kept capture, so it is never removed here.
+  const retain = !keepSnapshot || options.keepSource === true || options.keepSourceOnProblem === true;
+  const keptPath = retain ? capture.directory : null;
+  const keepOnProblem = async () => {
+    if (!retain) {
+      onProblem?.();
+      return;
+    }
+    keepSnapshot?.();
+    await finishCapture(capture.directory, true);
+  };
   const displaySource = { ...source, path: sourceCopy.source };
   const title = occurrence.title || '(untitled)';
   const versions = {
@@ -167,18 +191,24 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
   let diagnosticSchemaRecords: SchemaDiagnosticRecord[] = [];
   let diagnosticsWritten = false;
   const keepVerificationFailure = async (failure: ExportFailure) => {
-    keepSnapshot?.();
-    await finishCapture(capture.directory, true);
+    await keepOnProblem();
     const diagnostics = path.join(sourceCacheRoot(), 'failures');
     await fs.mkdir(diagnostics, { recursive: true });
     const log = await writeFailureLog(path.join(diagnostics, 'verification.md'), source.sessionId,
-      failure, capture.directory, new Date().toISOString(), sourceCopy.sha256, versions);
-    console.error(`Export verification failed; private source copy kept at: ${capture.directory}`);
+      failure, keptPath, new Date().toISOString(), sourceCopy.sha256, versions);
+    console.error(keptPath ? `Export verification failed; private source copy kept at: ${keptPath}` : 'Export verification failed.');
     console.error(failureDetails(failure));
     console.error(`Failure log: ${log}`);
     return log;
   };
   const keepFailure = async (outputPath: string, failure: string) => {
+    if (!retain) {
+      onProblem?.();
+      console.error('Export verification failed.');
+      await saveExportCopy(outputPath, { selector: options.selector, status: 'not-kept', verificationFailure: failure,
+        toolGroupOrder: options.toolGroupOrder ?? 'request' });
+      return;
+    }
     keepSnapshot?.();
     console.error(`Export verification failed; private source copy kept at: ${capture.directory}`);
     await keepFailedExportCopy(outputPath, {
@@ -239,7 +269,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           assetsPath: options.outputArgument && preview.companions.length
             ? path.join(path.dirname(path.resolve(options.outputArgument)), preview.companions[0]!.relativePath.split('/')[0]!)
             : null,
-          capturePath: failure ? capture.directory : null,
+          capturePath: failure ? keptPath : null,
         };
         if (options.outputArgument) {
           const written = await writeExplanationForCli(explanation, options.json === true);
@@ -261,7 +291,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           assetsPath: explanation.assetsPath,
           failureLog,
           sourceHash: sourceCopy.sha256,
-          capturePath: capture.directory,
+          capturePath: keptPath,
           sourceWarnings: preview.session.errors,
           versions,
           schemaRecords: diagnosticSchemaRecords,
@@ -271,10 +301,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           outputHash: options.outputHash,
         }, options.json === true);
         diagnosticsWritten = diagnosticStatus === 'written';
-        if (diagnosticsWritten) {
-          keepSnapshot?.();
-          await finishCapture(capture.directory, true);
-        }
+        diagnosticsWritten && await keepOnProblem();
         if (diagnosticStatus === 'failed' && exitCode === 0)
           return 1;
       }
@@ -296,9 +323,13 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
     const written = await writeArchive({
       outputPath, generatedAt, overwrite: options.overwrite,
       verification: {
-        capture: capture.directory, sessionId: source.sessionId, sourceHash: sourceCopy.sha256,
+        capture: keptPath, sessionId: source.sessionId, sourceHash: sourceCopy.sha256,
         versions,
         keep: async () => {
+          if (!retain) {
+            onProblem?.();
+            return;
+          }
           keepSnapshot?.();
           await keepCaptureDuringFailure(capture.directory);
         },
@@ -344,7 +375,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       assetsPath: written.assetsPath,
       failureLog: written.failureLog,
       sourceHash: sourceCopy.sha256,
-      capturePath: capture.directory,
+      capturePath: keptPath,
       sourceWarnings: result.session.errors,
       versions,
       schemaRecords: diagnosticSchemaRecords,
@@ -354,19 +385,16 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       outputHash: options.outputHash,
     }, options.json === true);
     diagnosticsWritten = diagnosticStatus === 'written';
-    if (diagnosticsWritten) {
-      keepSnapshot?.();
-      await finishCapture(capture.directory, true);
-    }
+    diagnosticsWritten && await keepOnProblem();
     if (diagnosticStatus === 'failed' && exitCode === 0)
       exitCode = 1;
     if (written.verificationFailure) {
       console.error(failureDetails(written.verificationFailure));
-      console.error(`Failure log: ${written.failureLog}`);
+      console.error(written.failureLog ? `Failure log: ${written.failureLog}` : `Failure log could not be written: ${written.failureLogError}`);
       await keepFailure(written.outputPath, JSON.stringify(written.verificationFailure));
     }
     else {
-      const keepCopy = options.keepSource === true || diagnosticsWritten;
+      const keepCopy = options.keepSource === true || (diagnosticsWritten && retain);
       await saveExportCopy(outputPath, keepCopy
         ? { selector: options.selector, status: 'kept', sdk: capture, captureDirectory: capture.directory, copy: sourceCopy, toolGroupOrder: options.toolGroupOrder ?? 'request' }
         : { selector: options.selector, status: 'not-kept', toolGroupOrder: options.toolGroupOrder ?? 'request' });
@@ -392,7 +420,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
           verificationFailed: written.verificationFailure !== null,
         }),
         companionCount: written.companionPaths.length,
-        capturePath: written.verificationFailure ? capture.directory : null,
+        capturePath: written.verificationFailure ? keptPath : null,
         olderFailedArchive: written.olderFailedArchive,
       });
     }
@@ -440,17 +468,14 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
       diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
       failureLog: null,
       sourceHash: sourceCopy.sha256,
-      capturePath: capture.directory,
+      capturePath: keptPath,
       versions,
       schemaRecords: diagnosticSchemaRecords,
       lossItems: diagnosticLossItems,
       sequenceEvidence: diagnosticSequenceEvidence,
       outputHash: options.outputHash,
     }, options.json === true);
-    if (diagnosticStatus === 'written') {
-      keepSnapshot?.();
-      await finishCapture(capture.directory, true);
-    }
+    diagnosticStatus === 'written' && await keepOnProblem();
     if (exceptionFailure) {
       const failureLog = await keepVerificationFailure(exceptionFailure);
       const explanation = {
@@ -461,7 +486,7 @@ async function runSdkSnapshotCommand (options: SdkCommandOptions, capture: SdkCa
         failureLog,
         sourceWarnings: [],
         sourceHash: sourceCopy.sha256,
-        capturePath: capture.directory,
+        capturePath: keptPath,
       };
       if (options.outputArgument) {
         await writeExplanationForCli(explanation, options.json === true);

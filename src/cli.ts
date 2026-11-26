@@ -35,7 +35,7 @@ import { buildLocalVerifyJson } from './verify/json-report.ts';
 import { companionLinkStatus, localImageLocators, readLinkedArchiveCompanions, readLinkedImageCompanions, verifyLocalImages } from './verify/images.ts';
 import { buildParserCheck, formatParserCheck, loadMarkdownParser } from './verify/parser-check.ts';
 import { printLossAccount } from './verify/loss-report.ts';
-import { runSdkCommand } from './sdk-cli.ts';
+import { removeFrozenSource, runSdkCommand } from './sdk-cli.ts';
 import { renderVerificationExplanation, writeVerificationExplanation } from './verify/explanation.ts';
 import type { LocalVerificationJson } from './verify/json-report.ts';
 import {
@@ -253,7 +253,7 @@ const {
   workspaceRoot: workspaceRootArg, outDir: outDirArg, positionals: positionalArgs, htmlOutput: htmlOutputArg,
   userDataRoot: userDataRootArg,
   overwrite: overwriteMode,
-  keepSource, toolGroupOrder, cache: cacheMode, clean: cleanMode, dryRun, olderThanDays, yes, includeCorpus,
+  keepSource, keepSourceOnProblem, toolGroupOrder, cache: cacheMode, clean: cleanMode, dryRun, olderThanDays, yes, includeCorpus,
 } = parsed.options;
 
 if (cacheMode) {
@@ -410,7 +410,7 @@ if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefin
   const sdkExit = await runSdkCommand({
     root: selectedRoot ?? '', selector: sourceArgument, outputArgument, outDir: outDirArg ?? null,
     overwrite: overwriteMode, verify: verifyMode, strict: strictMode, json: jsonMode,
-    explain: explainMode, keepSource, toolGroupOrder,
+    explain: explainMode, keepSource, keepSourceOnProblem, toolGroupOrder,
   });
   sdkExit !== null && process.exit(sdkExit);
 }
@@ -448,6 +448,17 @@ try {
   process.exit(1);
 }
 const { location, raw, session } = loaded;
+// A saved-file check leases an already kept capture, so it is never removed here.
+const localRetain = keepSource || keepSourceOnProblem || Boolean(fileVerificationReceipt?.captureDirectory);
+const localKept = localRetain ? loaded.copiedSource.captureDirectory ?? null : null;
+let localProblem = false;
+const keepLocalOnProblem = async () => {
+  if (!localRetain) {
+    localProblem = true;
+    return;
+  }
+  loaded.copiedSource.captureDirectory && await finishCapture(loaded.copiedSource.captureDirectory, true);
+};
 
 if (verifyMode) {
   try {
@@ -507,12 +518,12 @@ if (verifyMode) {
   const verificationFailure = exportFailureFromReport(json, lossAccount.unaccounted);
   let failureLog: string | null = null;
   if (verificationFailure && loaded.copiedSource.captureDirectory) {
-    await finishCapture(loaded.copiedSource.captureDirectory, true);
+    await keepLocalOnProblem();
     const diagnostics = path.join(sourceCacheRoot(), 'failures');
     await fs.mkdir(diagnostics, { recursive: true });
     failureLog = await writeFailureLog(path.join(diagnostics, 'verification.md'), location.sessionId,
-      verificationFailure, loaded.copiedSource.captureDirectory, new Date().toISOString(), loaded.copiedSource.sha256, loaded.versions);
-    console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
+      verificationFailure, localKept, new Date().toISOString(), loaded.copiedSource.sha256, loaded.versions);
+    console.error(localKept ? `Export verification failed; private source copy kept at: ${localKept}` : 'Export verification failed.');
     console.error(failureDetails(verificationFailure));
     console.error(`Failure log: ${failureLog}`);
   }
@@ -545,7 +556,7 @@ if (verifyMode) {
           : null;
       })()
       : null,
-    capturePath: verificationFailure ? loaded.copiedSource.captureDirectory : null,
+    capturePath: verificationFailure ? localKept : null,
   };
   const diagnosticStatus = await writeDiagnosticsForCli({
     generatedAt: new Date().toISOString(),
@@ -559,7 +570,7 @@ if (verifyMode) {
     assetsPath: explanation.assetsPath,
     failureLog,
     sourceHash: loaded.copiedSource.sha256,
-    capturePath: loaded.copiedSource.captureDirectory,
+    capturePath: localKept,
     sourceWarnings: session.errors,
     versions: loaded.versions,
     schemaRecords: [
@@ -575,8 +586,7 @@ if (verifyMode) {
   if (diagnosticStatus === 'failed' && !process.exitCode)
     process.exitCode = 1;
   const diagnosticsWritten = diagnosticStatus === 'written';
-  if (diagnosticsWritten && loaded.copiedSource.captureDirectory)
-    await finishCapture(loaded.copiedSource.captureDirectory, true);
+  diagnosticsWritten && await keepLocalOnProblem();
   if (outputArgument) {
     if (!await writeExplanationForCli(explanation, jsonMode) && !process.exitCode)
       process.exitCode = 1;
@@ -585,7 +595,9 @@ if (verifyMode) {
     console.log(renderVerificationExplanation(explanation));
   }
   await releaseSavedCopy?.();
-  if (!json.exitCode && !outputArgument && loaded.copiedSource.captureDirectory && !diagnosticsWritten)
+  if (localProblem && !outputArgument && loaded.copiedSource.captureDirectory)
+    await removeFrozenSource(loaded.copiedSource.captureDirectory);
+  else if (!json.exitCode && !outputArgument && loaded.copiedSource.captureDirectory && !diagnosticsWritten)
     await discardCapture(loaded.copiedSource.captureDirectory);
   process.exit();
   } catch (error) {
@@ -601,7 +613,7 @@ if (verifyMode) {
       archivePath: outputArgument ? path.resolve(getWorkspaceRoot(), outputArgument) : null,
       diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
       sourceHash: loaded.copiedSource.sha256,
-      capturePath: loaded.copiedSource.captureDirectory,
+      capturePath: localKept,
       sourceWarnings: session.errors,
       versions: loaded.versions,
       schemaRecords: [
@@ -610,8 +622,9 @@ if (verifyMode) {
       ],
       outputHash: fileOutputHash,
     }, jsonMode);
-    if (diagnosticStatus === 'written' && loaded.copiedSource.captureDirectory)
-      await finishCapture(loaded.copiedSource.captureDirectory, true);
+    diagnosticStatus === 'written' && await keepLocalOnProblem();
+    if (localProblem && !outputArgument && loaded.copiedSource.captureDirectory)
+      await removeFrozenSource(loaded.copiedSource.captureDirectory);
     process.exit(1);
   }
 }
@@ -672,9 +685,13 @@ try {
   const written = await writeArchive({
     outputPath, generatedAt: exportGeneratedAt, overwrite: goldenMode || overwriteMode,
     ...(!goldenMode ? { verification: {
-      capture: loaded.copiedSource.captureDirectory!, sessionId: location.sessionId, sourceHash: loaded.copiedSource.sha256,
+      capture: localKept, sessionId: location.sessionId, sourceHash: loaded.copiedSource.sha256,
       versions: loaded.versions,
       keep: async () => {
+        if (!localRetain) {
+          localProblem = true;
+          return;
+        }
         await keepCaptureDuringFailure(loaded.copiedSource.captureDirectory!);
       },
       check: async (stagePath: string): Promise<ExportFailure | null> => {
@@ -729,8 +746,8 @@ try {
   exportFailure = written.verificationFailure;
   if (exportFailure) {
     console.error(failureDetails(exportFailure));
-    console.error(`Failure log: ${written.failureLog}`);
-    console.error(`Export verification failed; private source copy kept at: ${loaded.copiedSource.captureDirectory}`);
+    console.error(written.failureLog ? `Failure log: ${written.failureLog}` : `Failure log could not be written: ${written.failureLogError}`);
+    console.error(localKept ? `Export verification failed; private source copy kept at: ${localKept}` : 'Export verification failed.');
     process.exitCode = 2;
   }
   written.olderFailedArchive && console.log(`An older .verify-failed.md archive exists: ${written.olderFailedArchive}. It was not deleted.`);
@@ -753,7 +770,7 @@ try {
         verificationFailed: written.verificationFailure !== null,
       }),
       companionCount: written.companionPaths.length,
-      capturePath: written.verificationFailure ? loaded.copiedSource.captureDirectory : null,
+      capturePath: written.verificationFailure ? localKept : null,
       olderFailedArchive: written.olderFailedArchive,
     }) && !process.exitCode)
       process.exitCode = 1;
@@ -771,7 +788,7 @@ try {
       assetsPath: written.assetsPath,
       failureLog: written.failureLog,
       sourceHash: loaded.copiedSource.sha256,
-      capturePath: loaded.copiedSource.captureDirectory,
+      capturePath: localKept,
       sourceWarnings: session.errors,
       versions: loaded.versions,
       schemaRecords: [
@@ -786,8 +803,7 @@ try {
     if (diagnosticStatus === 'failed' && !process.exitCode)
       process.exitCode = 1;
     diagnosticsWritten = diagnosticStatus === 'written';
-    if (diagnosticsWritten && loaded.copiedSource.captureDirectory)
-      await finishCapture(loaded.copiedSource.captureDirectory, true);
+    diagnosticsWritten && await keepLocalOnProblem();
   }
 } catch (error) {
   if (goldenMode)
@@ -805,7 +821,7 @@ try {
     diagnosticsDirectory: path.join(sourceCacheRoot(), 'diagnostics'),
     assetsPath,
     sourceHash: loaded.copiedSource.sha256,
-    capturePath: loaded.copiedSource.captureDirectory,
+    capturePath: localKept,
     sourceWarnings: session.errors,
     versions: loaded.versions,
     schemaRecords: [
@@ -816,8 +832,9 @@ try {
     sequenceEvidence: exportSequenceEvidence,
     verificationDetails: exportVerificationDetails,
   }, jsonMode);
-  if (diagnosticStatus === 'written' && loaded.copiedSource.captureDirectory)
-    await finishCapture(loaded.copiedSource.captureDirectory, true);
+  diagnosticStatus === 'written' && await keepLocalOnProblem();
+  if (localProblem && loaded.copiedSource.captureDirectory)
+    await removeFrozenSource(loaded.copiedSource.captureDirectory);
   process.exit(1);
 }
 for (const line of formatExportSummary({
@@ -861,19 +878,22 @@ if (selfFailed.length) {
 }
 
 if (!goldenMode) {
-  if (exportFailure) {
+  if (exportFailure && !localRetain) {
+    await saveExportCopy(outputPath, { selector: sourceArgument ?? '--current', status: 'not-kept', verificationFailure: JSON.stringify(exportFailure) });
+    loaded.copiedSource.captureDirectory && await removeFrozenSource(loaded.copiedSource.captureDirectory);
+  } else if (exportFailure) {
     await keepFailedExportCopy(outputPath, {
       selector: sourceArgument ?? '--current', source: location.sessionPath,
       copy: loaded.copiedSource, captureDirectory: loaded.copiedSource.captureDirectory,
     }, JSON.stringify(exportFailure));
   } else {
-    const keepCopy = keepSource || diagnosticsWritten;
+    const keepCopy = keepSource || (diagnosticsWritten && localRetain);
     await saveExportCopy(outputPath, keepCopy
       ? { selector: sourceArgument ?? '--current', status: 'kept', source: location.sessionPath,
         copy: loaded.copiedSource, captureDirectory: loaded.copiedSource.captureDirectory }
       : { selector: sourceArgument ?? '--current', status: 'not-kept' });
     if (!keepCopy && loaded.copiedSource.captureDirectory)
-      await discardCapture(loaded.copiedSource.captureDirectory);
+      await (localProblem ? removeFrozenSource : discardCapture)(loaded.copiedSource.captureDirectory);
   }
 }
 

@@ -546,6 +546,8 @@ export function renderVerificationExplanation (input: VerificationExplanationInp
       lines.push(`**Failure log:** [${path.basename(input.failureLog)}](./${link(input.failureLog, reportPath)}).`);
     if (input.capturePath)
       lines.push(`The exact frozen source was kept at \`${input.capturePath}\`.`);
+    else if (input.failure)
+      lines.push('The frozen source was removed after this run. Rerun with `--keep-source-on-problem` to keep it for replay.');
     lines.push('', '## Failed checks', '');
     for (const reason of failure?.failureReasons ?? ['verification-error'])
       lines.push(`- ${reason}`);
@@ -590,6 +592,8 @@ export function renderVerificationExplanation (input: VerificationExplanationInp
     lines.push(`**Failure log:** [${path.basename(input.failureLog)}](./${link(input.failureLog, reportPath)}).`);
   if (input.capturePath)
     lines.push(`The exact frozen source was kept at \`${input.capturePath}\`.`);
+  else if (input.failure)
+    lines.push('The frozen source was removed after this run. Rerun with `--keep-source-on-problem` to keep it for replay.');
   lines.push('', ...summarySection(input, reportPath));
   lines.push('## What passed', '', ...visibleChecks(report), '');
   const failed = failureCategories(report);

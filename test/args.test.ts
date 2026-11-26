@@ -74,6 +74,7 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     current: false,
     overwrite: false,
     keepSource: false,
+    keepSourceOnProblem: false,
     toolGroupOrder: 'request',
     cache: false,
     clean: false,
@@ -113,9 +114,12 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     assert.equal(parseArgs(['--yes']).ok, false);
     assert.equal(parseArgs(['--include-corpus']).ok, false);
     assert.equal(ok(['synthetic', '--keep-source']).keepSource, true);
+    assert.equal(ok(['synthetic', '--keep-source-on-problem']).keepSourceOnProblem, true);
+    assert.equal(ok(['--verify', 'synthetic', '--keep-source-on-problem']).keepSourceOnProblem, true);
     for (const argv of [['--older-than', '2'], ['--dry-run'], ['--clean', '--older-than', '-1'],
       ['--clean', '--older-than', 'NaN'], ['--clean', 'synthetic'], ['--cache', '--list'], ['--cache', '--strict'],
-      ['--keep-source'], ['--verify', 'synthetic', '--keep-source']])
+      ['--keep-source'], ['--verify', 'synthetic', '--keep-source'], ['--keep-source-on-problem'],
+      ['--cache', '--keep-source-on-problem'], ['--list', '--keep-source-on-problem']])
       assert.equal(parseArgs(argv).ok, false, argv.join(' '));
   });
 });

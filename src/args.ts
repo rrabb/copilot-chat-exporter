@@ -19,6 +19,8 @@ export interface CliOptions {
   current: boolean;
   overwrite: boolean;
   keepSource: boolean;
+  /** Keep the frozen source only when a warning, failure or exception occurs. */
+  keepSourceOnProblem: boolean;
   toolGroupOrder: ToolGroupOrder;
   cache: boolean;
   clean: boolean;
@@ -48,7 +50,7 @@ export type ParsedArgs =
 const BOOLEAN_FLAGS = new Set([
   '--list', '--current', '--overwrite', '--verify', '--audit', '--explain', '--strict', '--json',
   '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed', '--compressed',
-  '--keep-source', '--cache', '--clean', '--dry-run', '--yes', '--include-corpus',
+  '--keep-source', '--keep-source-on-problem', '--cache', '--clean', '--dry-run', '--yes', '--include-corpus',
 ]);
 
 // Value is the usage line shown when the flag is wrong, so the message lives next to the flag.
@@ -113,12 +115,15 @@ export function parseArgs (argv: string[]): ParsedArgs {
     return { ok: false, error: 'Usage: --older-than <nonnegative days>' };
   if ((booleans.has('--dry-run') || booleans.has('--yes') || booleans.has('--include-corpus') || olderThan !== undefined) && !booleans.has('--clean'))
     return { ok: false, error: '--dry-run, --yes, --include-corpus and --older-than require --clean.' };
-  if ((booleans.has('--cache') || booleans.has('--clean')) && (positionals.length || booleans.has('--current') || booleans.has('--keep-source')))
+  if ((booleans.has('--cache') || booleans.has('--clean')) && (positionals.length || booleans.has('--current') || booleans.has('--keep-source') || booleans.has('--keep-source-on-problem')))
     return { ok: false, error: 'Cache commands do not accept a session, output or --keep-source.' };
   const listRequested = booleans.has('--list')
     || (modes === 0 && positionals.length === 0 && !booleans.has('--current'));
   if (booleans.has('--keep-source') && (listRequested || modes > 0))
     return { ok: false, error: '--keep-source is available only when exporting a chat.' };
+  const verifyMode = booleans.has('--verify') || booleans.has('--audit');
+  if (booleans.has('--keep-source-on-problem') && (listRequested || modes - Number(verifyMode) > 0))
+    return { ok: false, error: '--keep-source-on-problem is available only when exporting or verifying a chat.' };
   if ((booleans.has('--cache') || booleans.has('--clean'))
     && ([...booleans].some((flag) => !['--cache', '--clean', '--dry-run', '--yes', '--include-corpus'].includes(flag))
       || [...values.keys()].some((flag) => flag !== '--older-than')))
@@ -171,6 +176,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       current: booleans.has('--current'),
       overwrite: booleans.has('--overwrite'),
       keepSource: booleans.has('--keep-source'),
+      keepSourceOnProblem: booleans.has('--keep-source-on-problem'),
       toolGroupOrder: (groupOrder ?? 'request') as ToolGroupOrder,
       cache: booleans.has('--cache') || booleans.has('--clean'),
       clean: booleans.has('--clean'),

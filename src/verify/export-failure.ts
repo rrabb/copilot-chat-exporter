@@ -71,7 +71,7 @@ export function failedArchivePath (output: string, suffix = 0): string {
   return `${output.slice(0, output.length - extension.length)}.verify-failed${suffix ? `-${suffix}` : ''}.md`;
 }
 
-export function failureWarning (failure: ExportFailure, capture: string): string {
+export function failureWarning (failure: ExportFailure, capture: string | null): string {
   const categories = Object.entries(failure.categories)
     .filter(([, count]) => count.partial || count.absent)
     .map(([name, count]) => `${name}: ${count.partial} partial, ${count.absent} absent`);
@@ -81,13 +81,15 @@ export function failureWarning (failure: ExportFailure, capture: string): string
     ...Object.entries(failure.counts ?? {}).map(([name, count]) => `> ${name}: ${count} failed check(s) or item(s).`),
     ...categories.map((line) => `> ${line}`),
     ...locationSummary(failure).map((line) => `> ${line}`),
-    `> Kept private source copy: \`${capture.replace(/`/gu, '&#96;').replace(/[\r\n]/gu, ' ')}\``,
+    `> ${capture === null
+      ? 'Frozen source removed. Rerun with `--keep-source-on-problem` to keep it for replay.'
+      : `Kept private source copy: \`${capture.replace(/`/gu, '&#96;').replace(/[\r\n]/gu, ' ')}\``}`,
     '',
     '',
   ].join('\n');
 }
 
-export async function writeFailureLog (output: string, sessionId: string, failure: ExportFailure, capture: string,
+export async function writeFailureLog (output: string, sessionId: string, failure: ExportFailure, capture: string | null,
   generatedAt: string, sourceHash?: string, versions?: FailureVersions): Promise<string> {
   const date = new Date(generatedAt);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString();

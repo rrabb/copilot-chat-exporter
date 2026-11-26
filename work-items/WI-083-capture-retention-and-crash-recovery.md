@@ -10,8 +10,8 @@ Part of [WI-022](WI-022-source-captures-cache-cleanup.md), the source capture an
 - **Cleanup finding:** dead owners, stale registrations and partial registration failures can leave capture data that current cleanup misses or hides.
 - **Diagnostic limit:** diagnostic evidence needs a total size limit before it replaces keeping the full source.
 - **Related:** [WI-043](../work-log.md#wi-043) (errors when writing the failure log) keeps the run receipt, or result record, and console output working.
-- **Next step:** decide the Slice B policy. Slice A (cleanup bug fixes) was accepted 261125.
-- **Scope:** Slice A is accepted. Slice B, which changes retention policy, isn't approved.
+- **Next step:** the developer reviews Slice B (built 261125) and stages or commits it. Slice A was accepted and committed as `604d867`.
+- **Scope:** Slice A is accepted. Slice B is built and waiting for review.
 
 ## Original goal
 
@@ -177,12 +177,31 @@ On 261125 the developer split the work into two slices. They chose Slice A first
 
 Still open for Slice B:
 
-1. Approve the policy that deletes the source by default after warnings and failures.
-2. Approve `--keep-source-on-problem`, or require users to pass `--keep-source`.
-3. Set a byte limit for diagnostic evidence.
-4. Approve the Slice B scope: receipt states, the retention change, the diagnostic limit and folding in WI-043.
+1. ✅ Approved 261125: delete the full source by default after warnings and failures.
+2. ✅ Approved 261125: add `--keep-source-on-problem`.
+3. ✅ Decided 261125: limit diagnostic evidence to 4 MiB per bundle. That's more than twice the largest real bundle, 1.7 MiB. See [Is a diagnostic limit needed?](#is-a-diagnostic-limit-needed).
+4. ✅ Approved 261125: build Slice B with receipt states, the retention change, the 4 MiB diagnostic limit and WI-043 folded in. Slice A was committed as `604d867`.
 
-Until these decisions are made, retention behavior stays unchanged.
+### Is a diagnostic limit needed?
+
+**Observed here 261125:** only 2 diagnostic bundles exist on this machine. Both come from the same failed export, with 1.7 MiB of evidence each.
+
+| Measure | Value |
+| --- | --- |
+| Evidence file | `schema-and-content.json`, 1,707 KiB, all in content evidence |
+| Largest texts | 17 system-prompt texts of 15 to 78 KiB each, all different |
+| Failed archive beside it | 12,242 KiB, which already holds the same text |
+| Earlier chats | No past chat reported a bundle size problem. The WI-077 review said bundles still needed a frozen case to replay some failures. |
+
+**What this means:**
+
+- A 1 MiB limit would have shortened the only real bundle. Removing duplicates wouldn't help, because the texts differ.
+- Evidence adds little new private data. The failed archive beside it already contains the same text.
+- The risk is a rare export with many failed large texts. Today nothing stops that growth.
+
+**Recommendation and decision:** the agent suggested an 8 MiB backstop instead of a tight 1 MiB limit. The developer chose 4 MiB. Either value leaves the real case untouched and stops runaway growth. Each shortened text keeps its head, tail, byte count and SHA-256 hash. The bundle states how many bytes it shortened. **Counterargument:** with only one real sample, 8 MiB is a guess. Skipping the limit is also reasonable, because the failed archive beside the bundles is already 12 MiB.
+
+Decision 4 above approved this. Slice B below records what was built.
 
 ## Slice A: cleanup bug fixes (built 261125)
 
@@ -212,3 +231,35 @@ Files: [`source-cache.ts`](../src/session/source-cache.ts), [`cli.ts`](../src/cl
 1. Run `node src/cli.ts --cache` and confirm it lists everything without an error.
 2. Run `node src/cli.ts --cache --clean --dry-run` and confirm the 9 stale registrations and the 80 MiB kept capture show as `Eligible`.
 3. Run `node src/cli.ts --cache --clean` and answer `y` if you want to free about 80 MiB. This deletes the kept source of the failed WI-071 review export (`wi071-final-review.verify-failed.md`). That archive can't be re-verified afterward.
+
+## Slice B: delete sources after problems by default (built 261125)
+
+**Waiting for the developer's review.** This slice changes what a problem run keeps.
+
+| Change | What it does now | Test |
+| --- | --- | --- |
+| Default after a problem | Warnings, failures and exceptions delete the frozen source after the failed archive, failure log and diagnostic bundle are written. The console prints `Frozen source removed (N MiB)` and names the flag that keeps it. | `failed ... default export removes its capture after ...` (5 cases) |
+| `--keep-source-on-problem` | Keeps the source only after a problem. It works for export and live `--verify`. Cache and listing commands reject it. | `failed ... --keep-source-on-problem export keeps its capture ...` (5 cases), `args.test.ts` |
+| Receipt | A deleted failure source gets a `not-kept` receipt with the failure recorded. A later saved-file `--verify` explains that the copy wasn't kept and names both keep flags. | the default cases above |
+| Failed archive, log and report | The warning, failure log `capture` field, diagnostic bundle and `--explain` report say the source was removed, instead of pointing to a deleted folder. | the default cases above, `archive-writer.test.ts` |
+| Saved-file `--verify` | Never deletes the kept capture it reads. That capture belongs to an earlier export. | existing saved-file tests |
+| WI-043 | A failure-log write error is reported on the console. The failed archive and receipt are still written. | `failure log write error still publishes...` |
+| 4 MiB evidence limit | Past 4 MiB, the longest evidence texts keep their first 2,000 and last 500 characters plus byte count and SHA-256. The manifest's `limits.evidenceShortened` records how many were shortened. | `evidence over the total limit shortens...` |
+
+Files: [`args.ts`](../src/args.ts), [`cli.ts`](../src/cli.ts), [`sdk-cli.ts`](../src/sdk-cli.ts), [`archive-writer.ts`](../src/archive-writer.ts), [`export-failure.ts`](../src/verify/export-failure.ts), [`explanation.ts`](../src/verify/explanation.ts), [`diagnostic-bundle.ts`](../src/verify/diagnostic-bundle.ts), [`source-snapshot.ts`](../src/session/source-snapshot.ts), their tests, README, SPEC and CHANGELOG.
+
+**Not built from the approved scope:**
+
+- No separate `cleanup-failed` receipt state. If deleting the source fails, the console says so and tells you to run `--cache --clean`. Slice A already lists that leftover as `abandoned`. A new receipt state would add a value that only this rare path writes. Ask if you still want it.
+- The diagnostic task Markdown doesn't mention shortening. The notice is inside each shortened text and in the manifest.
+
+**Limits:**
+
+- An exception before the failed archive is written can still leave the capture to the exit hook instead of the explicit delete. The hook removes it silently, without the size message.
+- The 4 MiB limit was tested with synthetic data only. The two real bundles are 1.7 MiB, so they're unchanged.
+
+### How to check Slice B
+
+1. Read the `failed ... default export removes its capture` tests in [`cli.test.ts`](../test/cli.test.ts).
+2. Export a chat you know fails, without flags. Confirm the `Frozen source removed` line and that `node src/cli.ts --cache` shows no new capture.
+3. Repeat with `--keep-source-on-problem`. Confirm the capture is listed as kept.

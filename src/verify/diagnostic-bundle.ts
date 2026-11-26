@@ -27,6 +27,52 @@ import { MARK, scanFences } from '../text.ts';
 import { exporterCommit, exporterVersion } from '../version.ts';
 
 const INLINE_EVIDENCE_LIMIT = 256 * 1024;
+// Backstop for one bundle's evidence file. The real 261125 bundles were 1.7 MiB (WI-083).
+const EVIDENCE_TOTAL_LIMIT = 4 * 1024 * 1024;
+const SHORTENED_HEAD_CHARS = 2000;
+const SHORTENED_TAIL_CHARS = 500;
+
+interface EvidenceShortening {
+  strings: number;
+  bytesRemoved: number;
+}
+
+/** Shortens the longest strings, keeping head, tail, byte count and SHA-256, until the evidence fits the limit. */
+export function capDiagnosticEvidence<T> (value: T, limit = EVIDENCE_TOTAL_LIMIT): { value: T; text: string; shortened: EvidenceShortening } {
+  let text = JSON.stringify(value);
+  const shortened = { strings: 0, bytesRemoved: 0 };
+  let total = Buffer.byteLength(text, 'utf8');
+  if (total <= limit)
+    return { value, text, shortened };
+  const copy = JSON.parse(text) as T;
+  const leaves: Array<{ holder: Record<string, unknown>; key: string; text: string }> = [];
+  const walk = (node: unknown) => {
+    if (node === null || typeof node !== 'object')
+      return;
+    for (const [key, child] of Object.entries(node)) {
+      if (typeof child === 'string' && child.length > SHORTENED_HEAD_CHARS + SHORTENED_TAIL_CHARS + 200)
+        leaves.push({ holder: node as Record<string, unknown>, key, text: child });
+      else
+        walk(child);
+    }
+  };
+  walk(copy);
+  leaves.sort((left, right) => right.text.length - left.text.length);
+  for (const leaf of leaves) {
+    if (total <= limit)
+      break;
+    const bytes = Buffer.byteLength(leaf.text, 'utf8');
+    const hash = createHash('sha256').update(leaf.text).digest('hex');
+    const replacement = `${leaf.text.slice(0, SHORTENED_HEAD_CHARS)}\n[shortened by the exporter: ${bytes} bytes, sha256 ${hash}]\n${leaf.text.slice(-SHORTENED_TAIL_CHARS)}`;
+    leaf.holder[leaf.key] = replacement;
+    const removed = Buffer.byteLength(JSON.stringify(leaf.text), 'utf8') - Buffer.byteLength(JSON.stringify(replacement), 'utf8');
+    total -= removed;
+    shortened.strings += 1;
+    shortened.bytesRemoved += removed;
+  }
+  text = JSON.stringify(copy);
+  return { value: copy, text, shortened };
+}
 const MAX_LISTED_COMPANIONS = 100;
 const MAX_IMAGE_LOCATORS = 20;
 const MAX_PARSER_EXCERPTS = 3;
@@ -102,7 +148,7 @@ interface DiagnosticTaskManifest {
   verification: VerificationJson | null;
   redaction: { commonPatternsFound: number };
   command: string[];
-  source: { hash?: string; capturePath?: string };
+  source: { hash?: string; capturePath?: string | null };
   archive: { path: string | null; failureLog?: string | null; outputHash?: ExportOutputHashCheck };
   runtime: { copilotVersion: string; vscodeVersion: string; exporterVersion: string; exporterCommit: string; sourceCheckout?: { commit: string; dirtyFiles: number | null } };
   exception: { name: string; message: string; stage: string; frames: string[]; partialReport: boolean; sourceLine?: number; excerpt?: string } | null;
@@ -132,7 +178,8 @@ export interface DiagnosticBundleInput {
   assetsPath?: string | null;
   failureLog?: string | null;
   sourceHash?: string;
-  capturePath?: string;
+  /** Null when the frozen source is removed after this run. */
+  capturePath?: string | null;
   sourceWarnings?: readonly string[];
   versions?: FailureVersions;
   schemaRecords?: readonly SchemaDiagnosticRecord[];
@@ -781,7 +828,8 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
   };
   const { directory, stem } = diagnosticPaths(input);
   await fs.mkdir(directory, { recursive: true });
-  const evidenceText = JSON.stringify({ schema, content, sequence });
+  const cappedEvidence = capDiagnosticEvidence({ schema, content, sequence });
+  const evidenceText = cappedEvidence.text;
   const evidenceBytes = Buffer.from(evidenceText, 'utf8');
   const externalEvidence = evidenceBytes.length > INLINE_EVIDENCE_LIMIT;
   const exactRecords = exactDiagnosticRecords(input.schemaRecords ?? []);
@@ -888,7 +936,7 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
         parserEvidence: parserEvidence(input.report, archiveFile?.markdown ?? null),
         images: imageEvidence(input.report, input.imageLocators),
         companions,
-        samples: evidenceArtifact ? undefined : { schema, content, sequence },
+        samples: evidenceArtifact ? undefined : cappedEvidence.value,
         evidence: evidenceArtifact,
         exactEvidence: evidenceArtifact
           ? { file: evidenceArtifact.file, content: exactContentPaths('') }
@@ -897,6 +945,8 @@ export async function writeDiagnosticBundle (input: DiagnosticBundleInput): Prom
         model: modelSummary,
         limits: {
           inlineEvidenceLimit: INLINE_EVIDENCE_LIMIT,
+          evidenceTotalLimit: EVIDENCE_TOTAL_LIMIT,
+          evidenceShortened: cappedEvidence.shortened,
           schemaSamplesPerSignature: 3,
           contentSamplesPerSignature: 1,
           rawRecordsPerSignature: 3,

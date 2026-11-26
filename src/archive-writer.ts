@@ -14,7 +14,8 @@ export interface ArchiveWriteOptions {
   verification?: {
     check: (stagePath: string) => Promise<ExportFailure | null>;
     keep: () => Promise<void>;
-    capture: string;
+    /** Null when the frozen source will be removed after this run. */
+    capture: string | null;
     sessionId: string;
     sourceHash: string;
     versions?: FailureVersions;
@@ -29,6 +30,8 @@ export interface WrittenArchive {
   archive: PlannedArchive;
   verificationFailure: ExportFailure | null;
   failureLog: string | null;
+  /** Message when the failure log couldn't be written. The archive and receipt still are. */
+  failureLogError: string | null;
   olderFailedArchive: string | null;
 }
 
@@ -129,6 +132,7 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
       throw new Error('Markdown verification failed before publication.');
     let failure: ExportFailure | null = null;
     let failureLog: string | null = null;
+    let failureLogError: string | null = null;
     if (options.verification) {
       try {
         failure = await options.verification.check(stage);
@@ -175,16 +179,22 @@ export async function writeArchive (options: ArchiveWriteOptions): Promise<Writt
       await fs.link(stage, outputPath);
     }
     published = true;
-    if (failure && options.verification)
-      failureLog = await writeFailureLog(outputPath, options.verification.sessionId, failure,
-        options.verification.capture, options.generatedAt, options.verification.sourceHash, options.verification.versions);
+    if (failure && options.verification) {
+      // A failure-log write error must not stop the caller from saving its receipt (WI-043).
+      try {
+        failureLog = await writeFailureLog(outputPath, options.verification.sessionId, failure,
+          options.verification.capture, options.generatedAt, options.verification.sourceHash, options.verification.versions);
+      } catch (error) {
+        failureLogError = error instanceof Error ? error.message : String(error);
+      }
+    }
     if (stage !== null) {
       await fs.unlink(stage);
       stage = null;
     }
     return {
       outputPath, assetsPath, companionPaths: [...ownedFiles],
-      markdownBytes: (await fs.stat(outputPath)).size, archive, verificationFailure: failure, failureLog, olderFailedArchive,
+      markdownBytes: (await fs.stat(outputPath)).size, archive, verificationFailure: failure, failureLog, failureLogError, olderFailedArchive,
     };
   } catch (error) {
     const cleanupErrors: unknown[] = [];

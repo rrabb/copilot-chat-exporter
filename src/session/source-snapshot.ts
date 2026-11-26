@@ -393,7 +393,7 @@ export async function readExportCopy (output: string, selector: string): Promise
   if (receipt.selector !== selector)
     throw new Error('The saved export snapshot belongs to a different source selector.');
   if (receipt.status === 'not-kept')
-    throw new Error('The source copy was not kept. Re-export with --keep-source before verifying this saved file; live sources will not be substituted.');
+    throw new Error('The source copy was not kept. Re-export with --keep-source, or --keep-source-on-problem for a failed export, before verifying this saved file; live sources will not be substituted.');
   if (receipt.captureDirectory && !await exists(receipt.captureDirectory))
     throw new Error('The kept source copy is unavailable. Re-export with --keep-source before verifying this saved file.');
   return receipt;

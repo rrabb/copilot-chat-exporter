@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { sanitizeDiagnosticArguments, shouldWriteDiagnosticBundle, writeDiagnosticBundle } from '../src/verify/diagnostic-bundle.ts';
+import { capDiagnosticEvidence, sanitizeDiagnosticArguments, shouldWriteDiagnosticBundle, writeDiagnosticBundle } from '../src/verify/diagnostic-bundle.ts';
 import { buildSdkVerifyJson } from '../src/verify/json-report.ts';
 import type { Census } from '../src/types.ts';
 import type { LossAccount } from '../src/verify/loss-account.ts';
@@ -434,4 +434,18 @@ test('image and companion evidence point at the missing record and the broken li
   assert.match(task, /line 9 tool\.execution_complete data\.result\.contents\[1\]`, image\/png, asset `asset-9`/u);
   assert.match(task, /Missing link target: `chat_assets_1\/gone\.png`/u);
   assert.match(task, /src\/verify\/images\.ts/u);
+});
+
+test('evidence over the total limit shortens the longest strings and records hash and size', () => {
+  const big = 'a'.repeat(6000) + 'MIDDLE' + 'z'.repeat(6000);
+  const small = 'keep me whole';
+  const capped = capDiagnosticEvidence({ groups: [{ text: big }, { text: big + '!' }, { text: small }] }, 9000);
+  assert.ok(Buffer.byteLength(capped.text) <= 9000, String(Buffer.byteLength(capped.text)));
+  assert.equal(capped.shortened.strings, 2);
+  assert.ok(capped.shortened.bytesRemoved > 0);
+  const [first, , third] = capped.value.groups;
+  assert.match(first!.text, /^a{2000}\n\[shortened by the exporter: 12006 bytes, sha256 [a-f\d]{64}\]\nz{500}$/u);
+  assert.equal(third!.text, small);
+  const under = { groups: [{ text: big }] };
+  assert.equal(capDiagnosticEvidence(under).value, under);
 });
