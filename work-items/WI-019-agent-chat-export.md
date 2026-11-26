@@ -19,10 +19,10 @@ Canonical entry: [WI-019](../work-log.md#wi-019). The dashboard owns status and 
 - Nested opaque reasoning can be counted in the parsed child but reported as zero in the footer.
 - A 261102 listing showed 64 ambiguous scopes; a 60-day scan found no conflicting IDs or attachable child messages.
 - One real export had no agent-attributed child messages, so real misattachment remains unconfirmed.
-- [WI-034](../work-log.md#wi-034), [WI-035](../work-log.md#wi-035), [WI-036](../work-log.md#wi-036), [WI-049](../work-log.md#wi-049) and [WI-074](../work-log.md#wi-074) track the follow-ups.
+- [WI-034](../work-log.md#wi-034), [WI-035](../work-log.md#wi-035), [WI-036](../work-log.md#wi-036), [WI-049](../work-log.md#wi-049), [WI-074](../work-log.md#wi-074) and [WI-075](../work-log.md#wi-075) track the follow-ups.
 - Rejected: flattening child turns into the main conversation, treating a summary as a transcript, and using the sister knowledge adapter as a fidelity engine.
 - Rejected: adding cumulative totals, estimating credits from tokens, attributing whole-log totals to children, cross-chat totals, and one flattened verification sequence.
-- Work tree: 2 of 4 children done. Estimates need the dev's confirmation.
+- Work tree: 2 of 6 children done. Estimates need the dev's confirmation.
 
 ## Original goal
 
@@ -44,14 +44,16 @@ These criteria describe the slice recorded as delivered in old #9 and #20. They 
 
 ## Work tree
 
-Progress as of 261119: 2 of 4 children done.
+Progress as of 261119: 2 of 6 children done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
 | 1 | [WI-034 Ambiguous subagent mapping](../work-log.md#wi-034) | [research] | M | - |
 | 2 | [WI-035 Delegation inputs](../work-log.md#wi-035) | [research] | M | - |
 | 3 | [WI-036 Child opaque reasoning count](../work-log.md#wi-036) | [build] | S | - |
-| 4 | [WI-074 SDK schema drift compatibility](../work-log.md#wi-074) | [build] | M | - |
+| 4 | [WI-049 Ambiguous child archive warning](../work-log.md#wi-049) | [build] | M | - |
+| 5 | [WI-074 SDK schema drift compatibility](../work-log.md#wi-074) | [build] | M | - |
+| 6 | [WI-075 SDK event and tool coverage inventory](../work-log.md#wi-075) | [research] | M | - |
 
 The children's who and size are proposed estimates for the dev to confirm. These rows don't approve implementation.
 
