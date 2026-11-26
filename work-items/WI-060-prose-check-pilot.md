@@ -14,8 +14,10 @@
 - **Review boundary 261125:** agents check prose they create or change. They don't run the checker on user-only file changes.
 - **Related:** [WI-061](WI-061-end-of-turn-writing-style-review.md) (turn-end writing-style review) owns later hook behavior.
 - **Goal audit 261125:** you decided Q1-Q4. Under `--ai`, the model now judges word choice, and word-list hits print only when the AI call fails. See [Goal audit 261125](#goal-audit-261125).
+- **Model catalog 261126:** a typed catalog covers 34 documented models. It records token prices, context tiers, promotions and legacy premium multipliers.
+- **Model selection 261126:** `--model` accepts catalog IDs, documented names, words within names, short names and unknown custom IDs. It ignores case and normalizes spaces, `_` characters and hyphens. If several models match, it picks the cheapest documented default-rate sum and reports the choice.
 - **Status 261125:** phases 1-4 and the goal-audit fixes are implemented. Focused tests, a real AI run and full verification pass. The work pauses for developer trials in real chat sessions.
-- **What to try:** use the checker once on changed files and chat replies. Check output tone, file scope, severity, `--fail` and the usage footer.
+- **What to try:** use the checker once on changed files and chat replies. Check tone, file scope, severity, `--fail`, model selection and the usage footer.
 
 ## Original goal
 
@@ -48,6 +50,78 @@ The code has three causes:
 - `README` and `AGENTS` command guidance match the implementation.
 - The developer accepts the first slice.
 
+
+### Quick trial overview:
+
+| Check | Command or action | Accept when |
+| --- | --- | --- |
+| Default model | `node scripts/check-prose.mjs --stdin --ai` | The footer reports `claude-haiku-5.5` |
+| Name lookup | Add `--model "Claude Haiku 5.5"` | It resolves to `claude-haiku-5.5` |
+| Custom ID | Use the exported lookup function in Node | Unknown IDs pass through unchanged |
+| Dirty-file scope | Run on changed Markdown | Only changed lines appear |
+| Whole-file scope | Add `--all` | The whole file appears |
+| Exit policy | Try a known finding with `--fail --ai` | Findings affect exit 1. Operational failures use exit 2 |
+| Multi-file AI | Review a few Markdown files together | One request runs, or large input gets bounded batches |
+| Repeated runs | Stop after the first useful AI run | The advisory notice prevents a review loop |
+
+Run these checks once, in this order.
+
+### Quick trial steps:
+
+#### 1. One default AI run
+
+Pipe a short agent-authored draft into:
+
+`node scripts/check-prose.mjs --stdin --ai`
+
+Check the advisory notice, the single batch and the usage footer. Confirm the footer names `claude-haiku-5.5` and reports usage fields.
+
+#### 2. Model-name lookup
+
+Run:
+
+`node scripts/check-prose.mjs --stdin --ai --model "Claude Haiku 5.5"`
+
+Confirm the usage footer still names `claude-haiku-5.5`. This test avoids guesswork about display names.
+
+#### 3. Custom ID lookup
+
+Run:
+
+`node -e "import('./scripts/check-prose.mjs').then(({ resolveCopilotModelId }) => console.log(resolveCopilotModelId('my-company/model')))"`
+
+Confirm it prints `my-company/model`. A real enterprise or bring-your-own-key ID should pass through even if it is absent from the catalog.
+
+#### 4. File scope
+
+Run the checker on a dirty Markdown file. Confirm it reports only changed lines.
+
+Run `node scripts/check-prose.mjs --all <file-or-folder...>` once. Confirm it reports whole-file findings instead.
+
+#### 5. Exit behavior
+
+Run a known finding with `--fail --ai`.
+
+Confirm AI blockers, plus deterministic findings, return exit code 1. Recommendations and considerations should stay advisory. Operational failures should return exit code 2.
+
+#### 6. Usage and one-pass behavior
+
+Run one multi-file AI review. Confirm one request handles small files or bounded batches handle large input. Stop after the first useful review instead of editing and rerunning.
+
+### Accept WI-060 when
+
+- The advisory line prevents a review loop.
+- The default and display-name model resolve as expected.
+- Custom IDs pass through.
+- Dirty-file scope and `--all` behave as described.
+- `--fail --ai` separates findings from operational failures.
+- The usage footer names reported fields and handles unavailable usage.
+
+
+
+
+
+
 ## Approved decisions 261125
 
 | Topic | Decision | Reason |
@@ -66,6 +140,8 @@ The code has three causes:
 | Repeat control | Soft guard only | Print a one-pass notice and enforce it in agent instructions |
 | Persistent state | Defer | A local hash store or receipt adds cleanup and false-block risks |
 | Hook guard | Defer to WI-061 | Turn-level state belongs in the hook layer |
+| Model catalog | Keep public facts in a typed snapshot | It gives editor completions without blocking enterprise or bring-your-own-key IDs |
+| Model catalog validation | Resolve known display names and keep unknown IDs | Copilot decides final account availability |
 
 ## Proposed output contract
 
@@ -336,8 +412,8 @@ The implementation added a declaration file for the script's testable API and fo
 
 | Check | Result | Limit |
 | --- | --- | --- |
-| Focused checker tests | ✅ 11 of 11 pass | Tests use invented AI and usage responses |
-| Full `pnpm run verify` | ✅ 877 tests pass, plus typechecks and both goldens | Full suite still doesn't call the paid model |
+| Focused checker tests | ✅ 19 of 19 pass | Tests use invented AI and usage responses |
+| Full `pnpm run verify` | ✅ 895 tests pass, plus both typechecks and both goldens | Full suite still doesn't call the paid model |
 | Real AI integration | ✅ One CLI batch returned structured findings and parsed usage | One local sample, not model-wide behavior |
 | Usage result | 0.8614 AI credits, 1 premium request, 43,658 input tokens, 6,313 output tokens, 5,524 reasoning tokens | One run with `claude-haiku-5.5` |
 | Usage timing | 32.7 seconds, 33.3 KiB prompt, 2.1 KiB response | Wall time varies by machine and service |
@@ -349,6 +425,18 @@ The usage file reported successfully. The script removed its temporary directory
 The 261125 follow-up added one contract test. It checks a replacement row, a grouped word and technical exceptions.
 
 The core file groups the strict vocabulary by repair type. The reference explains those groups with examples and doesn't repeat the complete list.
+
+The 261126 catalog update adds types and runtime metadata to the checker:
+
+- 34 supported chat models from the GitHub docs model table
+- provider, category and release status
+- default and long-context token prices
+- dates of pricing promotions and known future rates
+- legacy premium request multipliers for annual plans
+- lookup by model ID, display name or alias
+- pass-through for enterprise and bring-your-own-key IDs
+
+The catalog is a snapshot of public docs taken on a known date. It doesn't prove that a model is available to the current account or product. Copilot CLI still decides access and reports actual usage.
 
 ## Goal audit 261125
 
@@ -418,6 +506,11 @@ Acceptance checks:
 - One multi-file AI run produces one Copilot request or a bounded number of size batches.
 - AI blockers affect `--fail --ai`; recommendations and suggestions don't.
 - The usage footer names the fields it knows and says `usage unavailable` when needed.
+- `--model` accepts a documented display name and resolves it to the catalog ID.
+- `--model` accepts words within model names, short names, case differences and space or hyphen variants.
+- `--model luna` reports that two models matched and selects `gpt-6-luna`.
+- Bare `haiku` resolves to Claude Haiku 5.5, while `haiku 4.5` resolves to Claude Haiku 4.5.
+- `--model` keeps an unknown enterprise or bring-your-own-key ID unchanged.
 - The user decides whether the model's blocker and recommend severities are useful.
 - Under `--ai`, the model catches listed words often enough. If it misses too many, restore the local avoid-word rule under `--ai`.
 - Agents use `--ai` only in the Q1 cases.
@@ -440,6 +533,9 @@ Acceptance checks:
 - A dirty worktree can include another session's edits.
 - AI severity can drift by model version.
 - The usage footer is exact only for fields the CLI reports.
+- The catalog normalizes model IDs from documented names. Public model names and availability can change.
+- The bare `haiku` alias means Claude Haiku 5.5. Use `haiku 4.5` for Claude Haiku 4.5.
+- "Cheapest" means the lowest sum of default input, cached input, cache-write and output rates. It is not an estimate for a real token mix.
 - AI review sends selected prose to the model service. Don't use it for text that must stay private.
 
 ## References

@@ -8,6 +8,225 @@ import { fileURLToPath } from 'node:url';
 
 const STYLE_CORE = new URL('../.github/instructions/writing-style.instructions.md', import.meta.url);
 const DEFAULT_AI_MODEL = 'claude-haiku-5.5';
+export const COPILOT_MODEL_CATALOG_SOURCE = Object.freeze({
+  snapshotDate: '2026-11-26',
+  supportedModelsUrl: 'https://docs.github.com/en/copilot/reference/ai-models/supported-models',
+  pricingUrl: 'https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing',
+  legacyPricingUrl: 'https://docs.github.com/en/copilot/reference/copilot-billing/request-based-billing-legacy/model-multipliers-for-annual-plans',
+});
+
+function tokenPricing(input, cachedInput, output, cacheWrite = null) {
+  return Object.freeze({ input, cachedInput, cacheWrite, output });
+}
+
+function longContextPricing(startsAboveInputTokens, input, cachedInput, output, cacheWrite = null) {
+  return Object.freeze({
+    startsAboveInputTokens,
+    pricing: tokenPricing(input, cachedInput, output, cacheWrite),
+  });
+}
+
+function model(
+  id,
+  name,
+  provider,
+  category,
+  pricing,
+  {
+    aliases = [],
+    legacyPremiumMultiplier = null,
+    longContext = null,
+    pricingPromotion = null,
+    preview = false,
+  } = {},
+) {
+  const shortName = name
+    .replace(/^(?:Claude|Gemini|Grok|Kimi)\s+/u, '')
+    .replace(new RegExp(`^${provider.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'u'), '')
+    .trim();
+  const catalogAliases = [...new Set([shortName, ...aliases])];
+  return Object.freeze({
+    id,
+    name,
+    provider,
+    category,
+    releaseStatus: preview ? 'preview' : 'ga',
+    aliases: Object.freeze(catalogAliases),
+    pricingUsdPerMillionTokens: Object.freeze({
+      default: pricing,
+      longContext,
+    }),
+    pricingPromotion,
+    legacyPremiumMultiplier,
+  });
+}
+
+export const COPILOT_MODEL_CATALOG = Object.freeze([
+  model('gpt-5.3-codex', 'GPT-5.3-Codex', 'OpenAI', 'powerful', tokenPricing(1.75, 0.175, 14), {
+    legacyPremiumMultiplier: 6,
+  }),
+  model('gpt-5.4-nano', 'GPT-5.4 nano', 'OpenAI', 'lightweight', tokenPricing(0.2, 0.02, 1.25)),
+  model('gpt-5.6-luna', 'GPT-5.6 Luna', 'OpenAI', 'lightweight', tokenPricing(0.2, 0.02, 1.2, 0.25), {
+    longContext: longContextPricing(200_000, 0.4, 0.04, 1.8, 0.5),
+  }),
+  model('gpt-5.6-sol', 'GPT-5.6 Sol', 'OpenAI', 'powerful', tokenPricing(4, 0.4, 20, 5), {
+    longContext: longContextPricing(272_000, 8, 0.8, 30, 10),
+  }),
+  model('gpt-6-astra', 'GPT-6 Astra', 'OpenAI', 'powerful', tokenPricing(10, 1, 50, 12.5), {
+    longContext: longContextPricing(272_000, 20, 2, 75, 25),
+  }),
+  model('gpt-6-luna', 'GPT-6 Luna', 'OpenAI', 'lightweight', tokenPricing(0.1, 0.01, 0.5, 0.125), {
+    longContext: longContextPricing(272_000, 0.2, 0.02, 0.75, 0.25),
+  }),
+  model('gpt-6-sol', 'GPT-6 Sol', 'OpenAI', 'powerful', tokenPricing(2, 0.2, 10, 2.5), {
+    longContext: longContextPricing(272_000, 4, 0.4, 15, 5),
+  }),
+  model('gpt-6.1-sol', 'GPT-6.1 Sol', 'OpenAI', 'powerful', tokenPricing(2, 0.1, 10, 2.5), {
+    longContext: longContextPricing(272_000, 4, 0.2, 15, 5),
+  }),
+  model('gpt-6.1-terra', 'GPT-6.1 Terra', 'OpenAI', 'versatile', tokenPricing(1, 0.05, 5, 1.25), {
+    longContext: longContextPricing(272_000, 2, 0.1, 7.5, 2.5),
+  }),
+  model('gpt-6.2-astra', 'GPT-6.2 Astra', 'OpenAI', 'powerful', tokenPricing(8, 0.4, 40, 10), {
+    longContext: longContextPricing(272_000, 16, 0.8, 60, 20),
+  }),
+  model('gpt-6.2-sol', 'GPT-6.2 Sol', 'OpenAI', 'powerful', tokenPricing(2, 0.1, 10, 2.5), {
+    longContext: longContextPricing(272_000, 4, 0.2, 15, 5),
+  }),
+  model('claude-fable-5', 'Claude Fable 5', 'Anthropic', 'powerful', tokenPricing(10, 1, 50, 12.5)),
+  model('claude-fable-5.1', 'Claude Fable 5.1', 'Anthropic', 'powerful', tokenPricing(10, 0.25, 50, 12.5)),
+  model('claude-fable-5.2', 'Claude Fable 5.2', 'Anthropic', 'powerful', tokenPricing(8, 0.2, 40, 10)),
+  model('claude-haiku-4.5', 'Claude Haiku 4.5', 'Anthropic', 'versatile', tokenPricing(1, 0.1, 5, 1.25), {
+    legacyPremiumMultiplier: 0.33,
+  }),
+  model('claude-haiku-5.5', 'Claude Haiku 5.5', 'Anthropic', 'lightweight', tokenPricing(0.1, 0.01, 0.5, 0.125), {
+    aliases: ['haiku', 'claude-haiku', 'claude haiku'],
+    longContext: longContextPricing(100_000, 0.5, 0.05, 2.5, 0.625),
+  }),
+  model('claude-opus-4.8', 'Claude Opus 4.8', 'Anthropic', 'powerful', tokenPricing(5, 0.5, 25, 6.25), {
+    legacyPremiumMultiplier: 27,
+  }),
+  model(
+    'claude-opus-4.8-fast',
+    'Claude Opus 4.8 (fast mode) (preview)',
+    'Anthropic',
+    'powerful',
+    tokenPricing(10, 1, 50, 12.5),
+    { aliases: ['claude-opus-4.8-fast-mode', 'claude-opus-4.8-preview'], preview: true },
+  ),
+  model('claude-opus-5.5', 'Claude Opus 5.5', 'Anthropic', 'powerful', tokenPricing(4, 0.2, 20, 5)),
+  model('claude-sonnet-4.6', 'Claude Sonnet 4.6', 'Anthropic', 'versatile', tokenPricing(3, 0.3, 15, 3.75), {
+    legacyPremiumMultiplier: 9,
+  }),
+  model('claude-sonnet-5', 'Claude Sonnet 5', 'Anthropic', 'versatile', tokenPricing(2, 0.2, 10, 2.5)),
+  model('claude-sonnet-5.5', 'Claude Sonnet 5.5', 'Anthropic', 'versatile', tokenPricing(2, 0.1, 10, 2.5)),
+  model('gemini-3.8-flash', 'Gemini 3.8 Flash', 'Google', 'versatile', tokenPricing(0.75, 0.075, 3.75), {
+    pricingPromotion: Object.freeze({ endsOn: '2026-12-31', next: null }),
+  }),
+  model('gemini-4-argon', 'Gemini 4 Argon', 'Google', 'powerful', tokenPricing(2, 0.1, 10), {
+    pricingPromotion: Object.freeze({ endsOn: '2026-12-01', next: null }),
+  }),
+  model('gemini-4-carbon', 'Gemini 4 Carbon', 'Google', 'powerful', tokenPricing(2, 0.1, 10), {
+    pricingPromotion: Object.freeze({
+      endsOn: '2026-12-01',
+      next: tokenPricing(4, 0.2, 20),
+    }),
+  }),
+  model('gemini-4-hydrogen', 'Gemini 4 Hydrogen', 'Google', 'versatile', tokenPricing(1.5, 0.075, 7.5)),
+  model('gemini-4-neon', 'Gemini 4 Neon', 'Google', 'versatile', tokenPricing(3, 0.15, 15)),
+  model('mai-code-1.1-flash', 'MAI-Code-1.1-Flash', 'Microsoft', 'lightweight', tokenPricing(0.2, 0.02, 1.2), {
+    legacyPremiumMultiplier: 0.25,
+  }),
+  model('mai-code-2', 'MAI Code 2', 'Microsoft', 'powerful', tokenPricing(0.5, 0.025, 2.5), {
+    legacyPremiumMultiplier: 1,
+    pricingPromotion: Object.freeze({
+      endsOn: '2027-05-17',
+      next: tokenPricing(1, 0.05, 5),
+    }),
+  }),
+  model('mai-code-2-flash', 'MAI Code 2 Flash', 'Microsoft', 'lightweight', tokenPricing(0.05, 0.005, 0.25), {
+    legacyPremiumMultiplier: 0.33,
+    pricingPromotion: Object.freeze({
+      endsOn: '2027-05-17',
+      next: tokenPricing(0.1, 0.01, 0.5),
+    }),
+  }),
+  model('grok-4.5', 'Grok 4.5', 'xAI', 'versatile', tokenPricing(2, 0.5, 6), {
+    longContext: longContextPricing(200_000, 4, 1, 12),
+  }),
+  model('grok-4.6', 'Grok 4.6', 'xAI', 'versatile', tokenPricing(2, 0.5, 6), {
+    longContext: longContextPricing(200_000, 4, 1, 12),
+  }),
+  model('grok-4.7', 'Grok 4.7', 'xAI', 'versatile', tokenPricing(2, 0.5, 6), {
+    longContext: longContextPricing(200_000, 4, 1, 12),
+  }),
+  model('kimi-k3', 'Kimi K3', 'Moonshot AI', 'powerful', tokenPricing(3, 0.3, 15)),
+]);
+
+const normalizeModelSelector = (selector) => selector
+  .trim()
+  .toLowerCase()
+  .replace(/[_\s]+/gu, '-')
+  .replace(/[^a-z0-9.-]+/gu, '')
+  .replace(/-+/gu, '-');
+const compactModelSelector = (selector) => normalizeModelSelector(selector).replace(/[^a-z0-9]/gu, '');
+const MODEL_BY_SELECTOR = new Map();
+const COMPACT_MODEL_BY_SELECTOR = new Map();
+for (const entry of COPILOT_MODEL_CATALOG) {
+  for (const selector of [entry.id, entry.name, ...entry.aliases]) {
+    const normalized = normalizeModelSelector(selector);
+    const compact = compactModelSelector(selector);
+    if (normalized)
+      MODEL_BY_SELECTOR.set(normalized, entry);
+    if (compact)
+      COMPACT_MODEL_BY_SELECTOR.set(compact, entry);
+  }
+}
+
+export function findCopilotModel(selector) {
+  const normalized = normalizeModelSelector(selector);
+  return MODEL_BY_SELECTOR.get(normalized)
+    ?? COMPACT_MODEL_BY_SELECTOR.get(compactModelSelector(normalized));
+}
+
+function defaultTokenPriceTotal(entry) {
+  const prices = entry.pricingUsdPerMillionTokens.default;
+  return prices.input + prices.cachedInput + (prices.cacheWrite ?? 0) + prices.output;
+}
+
+export function selectCopilotModel(selector) {
+  const exact = findCopilotModel(selector);
+  if (exact)
+    return { model: exact, matches: [exact], kind: 'exact' };
+
+  const normalized = normalizeModelSelector(selector);
+  const compact = compactModelSelector(normalized);
+  if (!normalized || !compact)
+    return { model: null, matches: [], kind: 'unknown' };
+
+  const matches = COPILOT_MODEL_CATALOG.filter((entry) =>
+    [entry.id, entry.name, ...entry.aliases].some((candidate) => {
+      const candidateNormalized = normalizeModelSelector(candidate);
+      const candidateCompact = compactModelSelector(candidate);
+      return candidateNormalized.includes(normalized) || candidateCompact.includes(compact);
+    }));
+  if (!matches.length)
+    return { model: null, matches, kind: 'unknown' };
+
+  matches.sort((left, right) =>
+    defaultTokenPriceTotal(left) - defaultTokenPriceTotal(right)
+    || left.id.localeCompare(right.id));
+  return {
+    model: matches[0],
+    matches,
+    kind: matches.length === 1 ? 'partial' : 'cheapest',
+  };
+}
+
+export function resolveCopilotModelId(selector) {
+  return selectCopilotModel(selector).model?.id ?? selector;
+}
+
 const AI_TIMEOUT_MS = 120_000;
 const AI_MAX_CHARS = 60_000;
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'temp-tool-output', 'test']);
@@ -130,6 +349,8 @@ export function parseArgs(argv) {
     maxWords: 20,
     ai: false,
     model: DEFAULT_AI_MODEL,
+    requestedModel: DEFAULT_AI_MODEL,
+    modelSelection: null,
     reasoningEffort: null,
     stdin: false,
     paths: [],
@@ -144,8 +365,18 @@ export function parseArgs(argv) {
       options.maxWords = Number(argv[++index]);
     else if (argument === '--ai')
       options.ai = true;
-    else if (argument === '--model')
-      options.model = argv[++index];
+    else if (argument === '--model') {
+      const requestedModel = argv[++index] ?? '';
+      const selection = selectCopilotModel(requestedModel);
+      options.requestedModel = requestedModel;
+      options.model = selection.model?.id ?? requestedModel;
+      options.modelSelection = selection.kind === 'cheapest'
+        ? {
+            kind: selection.kind,
+            message: `${selection.matches.length} models matched "${requestedModel}". Selected the cheapest model: ${selection.model.id}.`,
+          }
+        : null;
+    }
     else if (argument === '--reasoning-effort')
       options.reasoningEffort = argv[++index];
     else if (argument === '--stdin')
@@ -666,6 +897,8 @@ export function reviewWithModel(sources, options, runtime = {}) {
   };
   const metadata = {
     model: options.model,
+    requestedModel: options.requestedModel ?? options.model,
+    modelSelection: options.modelSelection ?? null,
     reasoning: options.reasoningEffort ?? 'default',
     cliVersion: cliVersion(command, runner),
     promptBytes: 0,
@@ -755,6 +988,12 @@ export function formatUsageFooter(result, sourceCount, passageCount) {
   return [
     'AI review',
     `model=${models}`,
+    ...(result.metadata.requestedModel === result.metadata.model
+      ? []
+      : [`requestedModel=${result.metadata.requestedModel}`]),
+    ...(result.metadata.modelSelection?.kind === 'cheapest'
+      ? [`selection=${result.metadata.modelSelection.message}`]
+      : []),
     `reasoning=${result.metadata.reasoning}`,
     `credits=${credits}`,
     `premium=${numberText(result.usage.premium)}`,
@@ -808,6 +1047,8 @@ export function main(argv = process.argv.slice(2), runtime = {}) {
 
   let aiResult = null;
   if (options.ai) {
+    if (options.modelSelection?.kind === 'cheapest')
+      console.log(options.modelSelection.message);
     try {
       aiResult = reviewWithModel(sources, options, runtime);
     } catch (error) {

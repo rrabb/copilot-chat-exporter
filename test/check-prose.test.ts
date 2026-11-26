@@ -6,13 +6,18 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   checkText,
+  COPILOT_MODEL_CATALOG,
   collectReviewSources,
   exitCodeForFindings,
+  findCopilotModel,
   formatUsageFooter,
   parseAiReview,
+  parseArgs,
   parseDiffRanges,
   parseUsageReport,
+  resolveCopilotModelId,
   reviewWithModel,
+  selectCopilotModel,
 } from '../scripts/check-prose.mjs';
 
 const options = (values = {}) => ({
@@ -21,10 +26,78 @@ const options = (values = {}) => ({
   maxWords: 20,
   ai: false,
   model: 'claude-haiku-5.5',
+  requestedModel: 'claude-haiku-5.5',
+  modelSelection: null,
   reasoningEffort: null,
   stdin: false,
   paths: [],
   ...values,
+});
+
+test('catalog enumerates the documented models with unique IDs', () => {
+  assert.equal(COPILOT_MODEL_CATALOG.length, 34);
+  assert.equal(new Set(COPILOT_MODEL_CATALOG.map((model) => model.id)).size, COPILOT_MODEL_CATALOG.length);
+  assert.equal(findCopilotModel('Claude Haiku 5.5')?.id, 'claude-haiku-5.5');
+  assert.equal(findCopilotModel('claude-opus-4.8-fast-mode')?.releaseStatus, 'preview');
+  assert.equal(findCopilotModel('custom-enterprise-model'), undefined);
+  assert.equal(resolveCopilotModelId('Claude Haiku 5.5'), 'claude-haiku-5.5');
+  assert.equal(resolveCopilotModelId('custom-enterprise-model'), 'custom-enterprise-model');
+});
+
+test('catalog keeps current token prices separate from legacy premium multipliers', () => {
+  const codex = findCopilotModel('gpt-5.3-codex');
+  assert.equal(codex?.pricingUsdPerMillionTokens.default.input, 1.75);
+  assert.equal(codex?.legacyPremiumMultiplier, 6);
+
+  const haiku = findCopilotModel('claude-haiku-5.5');
+  assert.equal(haiku?.pricingUsdPerMillionTokens.default.output, 0.5);
+  assert.equal(haiku?.pricingUsdPerMillionTokens.longContext?.startsAboveInputTokens, 100_000);
+  assert.equal(haiku?.pricingUsdPerMillionTokens.longContext?.pricing.input, 0.5);
+  assert.equal(haiku?.legacyPremiumMultiplier, null);
+
+  const carbon = findCopilotModel('gemini-4-carbon');
+  assert.equal(carbon?.pricingPromotion?.endsOn, '2026-12-01');
+  assert.equal(carbon?.pricingPromotion?.next?.input, 4);
+});
+
+test('model argument accepts a catalog name and keeps a custom ID', () => {
+  assert.equal(parseArgs(['--stdin', '--model', 'Claude Haiku 5.5']).model, 'claude-haiku-5.5');
+  assert.equal(parseArgs(['--stdin', '--model', 'my-company/model']).model, 'my-company/model');
+});
+
+test('model lookup accepts case, spaces and short Haiku names', () => {
+  const selectors = [
+    'haiku-5.5',
+    'haiku 5.5',
+    'haiku',
+    'claude haiku',
+    'CLAUDE  HAIKU 5.5',
+    'Claude-Haiku-5.5',
+    'haiku5.5',
+  ];
+  for (const selector of selectors)
+    assert.equal(resolveCopilotModelId(selector), 'claude-haiku-5.5');
+
+  assert.equal(resolveCopilotModelId('Haiku 4.5'), 'claude-haiku-4.5');
+  assert.equal(resolveCopilotModelId('haiku4.5'), 'claude-haiku-4.5');
+  assert.equal(resolveCopilotModelId('KIMI K3'), 'kimi-k3');
+  assert.equal(resolveCopilotModelId('MAI CODE 2'), 'mai-code-2');
+});
+
+test('model lookup selects the cheapest match for partial names', () => {
+  const selection = selectCopilotModel('luna');
+  assert.equal(selection.kind, 'cheapest');
+  assert.equal(selection.model?.id, 'gpt-6-luna');
+  assert.deepEqual(selection.matches.map((model) => model.id), ['gpt-6-luna', 'gpt-5.6-luna']);
+  assert.equal(resolveCopilotModelId('codex'), 'gpt-5.3-codex');
+
+  const options = parseArgs(['--stdin', '--ai', '--model', 'luna']);
+  assert.equal(options.model, 'gpt-6-luna');
+  assert.equal(options.requestedModel, 'luna');
+  assert.equal(
+    options.modelSelection?.message,
+    '2 models matched "luna". Selected the cheapest model: gpt-6-luna.',
+  );
 });
 
 function git(cwd: string, ...args: string[]) {
