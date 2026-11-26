@@ -7,13 +7,18 @@ import { defaultSourceCacheRoot, legacySourceCacheRoots } from './cache-paths.ts
 const OWNER_FILE = '.cce-capture.json';
 const temporaryCaptures = new Map<string, string>();
 const leases = new Set<string>();
+// Normal-exit cleanup. One failed removal mustn't skip the rest. A registration stays when its folder
+// can't be removed, so `--cache --clean` can still find the abandoned capture.
 process.once('exit', () => {
   for (const lease of leases)
-    rmSync(lease, { force: true });
-  for (const [directory, registration] of temporaryCaptures) {
-    rmSync(directory, { recursive: true, force: true });
-    rmSync(registration, { force: true });
-  }
+    try {
+      rmSync(lease, { force: true });
+    } catch {}
+  for (const [directory, registration] of temporaryCaptures)
+    try {
+      rmSync(directory, { recursive: true, force: true });
+      rmSync(registration, { force: true });
+    } catch {}
 });
 interface CaptureOwner {
   version: 1;
@@ -50,7 +55,13 @@ export async function createSourceCacheDirectory (prefix: string): Promise<strin
   const root = sourceCacheRoot();
   await fs.mkdir(root, { recursive: true });
   const directory = await fs.mkdtemp(path.join(root, prefix));
-  await registerCapture(directory, prefix.includes('local') ? 'local' : 'sdk');
+  try {
+    await registerCapture(directory, prefix.includes('local') ? 'local' : 'sdk');
+  } catch (error) {
+    // This call just created the folder, so removing it can't touch user data.
+    await fs.rm(directory, { recursive: true, force: true });
+    throw error;
+  }
   return directory;
 }
 
@@ -81,10 +92,16 @@ export async function registerCapture (directory: string, kind: CaptureOwner['ki
   await noLinks(directory);
   const owner: CaptureOwner = { version: 1, id: randomUUID(), directory, kind,
     createdAt: new Date().toISOString(), activePid: process.pid, kept: false, receipts: [] };
-  await fs.writeFile(path.join(directory, OWNER_FILE), `${JSON.stringify(owner)}\n`, { flag: 'wx' });
+  const marker = path.join(directory, OWNER_FILE);
+  await fs.writeFile(marker, `${JSON.stringify(owner)}\n`, { flag: 'wx' });
   const registration = registrationFile(directory);
-  await fs.mkdir(path.dirname(registration), { recursive: true });
-  await fs.writeFile(registration, `${JSON.stringify({ directory, id: owner.id })}\n`, { flag: 'wx' });
+  try {
+    await fs.mkdir(path.dirname(registration), { recursive: true });
+    await fs.writeFile(registration, `${JSON.stringify({ directory, id: owner.id })}\n`, { flag: 'wx' });
+  } catch (error) {
+    await fs.rm(marker, { force: true });
+    throw error;
+  }
   temporaryCaptures.set(directory, registration);
 }
 
@@ -208,7 +225,7 @@ export async function discardCapture (directory: string): Promise<number> {
     for (const receipt of owner.receipts)
       await fs.rm(receipt);
     await fs.rm(directory, { recursive: true });
-    await fs.rm(registrationFile(directory));
+    await fs.rm(registrationFile(directory), { force: true });
     temporaryCaptures.delete(path.resolve(directory));
     return bytes;
   } finally {
@@ -226,25 +243,56 @@ export interface CacheEntry {
   receipts: string[];
   active: boolean;
   kept: boolean;
+  /** Not kept, and its owner process is gone, for example after a crash or forced kill. */
+  abandoned: boolean;
   outputs: string[];
 }
 
-export async function listSourceCache (): Promise<CacheEntry[]> {
-  const folder = path.join(sourceCacheRoot(), 'registrations');
-  let entries;
+/** A registration whose capture folder no longer exists. It holds no chat data. */
+export interface StaleRegistration {
+  file: string;
+  directory: string;
+  modifiedAt: string;
+  identity: string;
+}
+
+async function missing (file: string): Promise<boolean> {
   try {
-    entries = await fs.readdir(folder);
+    await fs.lstat(file);
+    return false;
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-      return [];
+      return true;
+    throw error;
+  }
+}
+
+async function scanSourceCache (): Promise<{ entries: CacheEntry[]; stale: StaleRegistration[] }> {
+  const folder = path.join(sourceCacheRoot(), 'registrations');
+  let names;
+  try {
+    names = await fs.readdir(folder);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+      return { entries: [], stale: [] };
     throw error;
   }
   await noLinks(folder);
   const results: CacheEntry[] = [];
-  for (const entry of entries) {
-    const registration = path.join(folder, entry);
+  const stale: StaleRegistration[] = [];
+  for (const name of names) {
+    const registration = path.join(folder, name);
     await noLinks(registration);
-    const registered: { directory: string } = JSON.parse(await fs.readFile(registration, 'utf8'));
+    const text = await fs.readFile(registration, 'utf8');
+    const registered: { directory: string } = JSON.parse(text);
+    if (typeof registered.directory !== 'string' || registrationFile(registered.directory) !== registration)
+      throw new Error('Capture ownership does not match its cache registration.');
+    if (await missing(registered.directory)) {
+      const stat = await fs.stat(registration);
+      stale.push({ file: registration, directory: registered.directory, modifiedAt: stat.mtime.toISOString(),
+        identity: `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${text}` });
+      continue;
+    }
     const owner = await captureOwner(registered.directory);
     const size = await treeSize(owner.directory);
     const outputs: string[] = [];
@@ -255,11 +303,22 @@ export async function listSourceCache (): Promise<CacheEntry[]> {
       const value: { output?: string } = JSON.parse(await fs.readFile(receipt, 'utf8'));
       value.output && outputs.push(value.output);
     }
+    const active = running(owner.activePid) || await leased(owner.directory);
     results.push({ ownerId: owner.id, directory: owner.directory, kind: owner.kind, createdAt: owner.createdAt, ...size,
-      receipts: owner.receipts, outputs, active: running(owner.activePid) || await leased(owner.directory), kept: owner.kept });
+      receipts: owner.receipts, outputs, active, kept: owner.kept, abandoned: !owner.kept && !active });
   }
 
-  return results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  stale.sort((a, b) => a.modifiedAt.localeCompare(b.modifiedAt));
+  return { entries: results, stale };
+}
+
+export async function listSourceCache (): Promise<CacheEntry[]> {
+  return (await scanSourceCache()).entries;
+}
+
+export async function listStaleRegistrations (): Promise<StaleRegistration[]> {
+  return (await scanSourceCache()).stale;
 }
 
 export async function sourceCacheSize () {
@@ -328,25 +387,35 @@ export async function cleanSourceCache (options: {
   olderThanDays?: number; dryRun?: boolean; yes?: boolean; includeCorpus?: boolean;
   targets?: CacheEntry[];
   failureLogTargets?: CachedFailureLog[];
+  staleTargets?: StaleRegistration[];
 } = {}) {
   const days = options.olderThanDays ?? 0;
   if (!Number.isFinite(days) || days < 0)
     throw new Error('--older-than requires a nonnegative number of days.');
   const cutoff = Date.now() - days * 86_400_000;
-  const entries = await listSourceCache();
+  const { entries, stale } = await scanSourceCache();
   const failureLogs = await listFailureLogs();
   const selectedFailureLogs = failureLogs.filter((log) => Date.parse(log.modifiedAt) <= cutoff
     && (!options.failureLogTargets || options.failureLogTargets.some((target) => target.file === log.file && target.identity === log.identity)));
-  const selected = entries.filter((entry) => entry.kept && !entry.active && Date.parse(entry.createdAt) <= cutoff
+  const selected = entries.filter((entry) => (entry.kept || entry.abandoned) && !entry.active && Date.parse(entry.createdAt) <= cutoff
     && (entry.kind !== 'corpus' || options.includeCorpus)
     && (!options.targets || options.targets.some((target) => target.directory === entry.directory && target.ownerId === entry.ownerId)));
+  const selectedStale = stale.filter((item) => Date.parse(item.modifiedAt) <= cutoff
+    && (!options.staleTargets || options.staleTargets.some((target) => target.file === item.file && target.identity === item.identity)));
   let freedBytes = 0;
   if (options.yes && !options.dryRun)
     for (const entry of selected) {
       const owner = await captureOwner(entry.directory);
-      if (owner.id !== entry.ownerId || !owner.kept || running(owner.activePid) || await leased(entry.directory))
+      if (owner.id !== entry.ownerId || owner.kept !== entry.kept || running(owner.activePid) || await leased(entry.directory))
         throw new Error('The source capture changed or is in use; cleanup refused.');
       freedBytes += await discardCapture(entry.directory);
+    }
+  if (options.yes && !options.dryRun)
+    for (const item of selectedStale) {
+      const current = (await scanSourceCache()).stale.find((candidate) => candidate.file === item.file);
+      if (!current || current.identity !== item.identity)
+        throw new Error('Stale registration changed after preview; cleanup refused.');
+      await fs.unlink(item.file);
     }
   if (options.yes && !options.dryRun)
     for (const log of selectedFailureLogs) {
@@ -356,5 +425,5 @@ export async function cleanSourceCache (options: {
       await fs.unlink(log.file);
       freedBytes += log.bytes;
     }
-  return { entries, selected, failureLogs, selectedFailureLogs, freedBytes, dryRun: options.dryRun === true || !options.yes };
+  return { entries, selected, failureLogs, selectedFailureLogs, stale, selectedStale, freedBytes, dryRun: options.dryRun === true || !options.yes };
 }

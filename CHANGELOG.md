@@ -6,6 +6,8 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- `--cache` no longer stops with `ENOENT` when a registration points to a missing capture folder. It lists these stale registrations, and `--cache --clean` removes them after the usual preview and confirmation. Cleanup also finds abandoned captures, which are unkept captures whose owner process died, for example after a forced kill. A failed registration now removes the new capture folder. One failed removal at exit no longer skips the rest (WI-083).
+
 - Agent Host exports group tools from the same `assistant.message`, show quiet path/query headers and failed status, and keep questions and sub-agents outside ordinary groups. Sub-agents now use a prominent standalone block with a visible task, result and work summary (WI-071).
 - Agent Host tool groups now summarize command/read/search/edit counts like the GUI. Child tools use request order by default, while `--tool-group-order completion` selects recorded completion order without moving questions, sub-agents, prose or reasoning (WI-071).
 - Terminal tool headers show the recorded human-readable command `description` as a yellow summary beside the exact command. Matching Intent text isn't repeated.

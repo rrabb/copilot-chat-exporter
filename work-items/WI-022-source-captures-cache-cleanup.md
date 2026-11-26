@@ -2,6 +2,15 @@
 
 Canonical entry: [WI-022](../work-log.md#wi-022).
 
+## At a glance
+
+- **Goal:** use stable source copies for export and saved-file verification.
+- **Delivered policy:** normal success deletes the copy, while `--keep-source`, warnings and failures keep it.
+- **Later finding 261125:** the current policy can leave large private copies after problems. Crash leftovers and stale registrations also weaken cleanup.
+- **Follow-up:** [WI-083](WI-083-capture-retention-and-crash-recovery.md) reviews a new default-delete policy and crash recovery.
+- **Next step:** review WI-083's policy questions before approving code.
+- **Scope limit:** WI-022's delivered behavior remains the current behavior until the follow-up is approved and implemented.
+
 ## Original goal
 
 Make export verification repeatable against the inputs actually exported. Live active-chat logs changed during comparisons, so apparent losses and before/after differences could not reliably establish exporter behavior.
@@ -16,6 +25,14 @@ The goal expanded through approved necessary work: keep the selected evidence, v
 - Tests isolate their caches, and scoped validation supports the delivered behavior.
 
 The repeatability criterion comes from the original objective. Saved-file checking, capture reduction, and safe cleanup were later approved additions. These criteria describe the delivered boundary, not the initial task verbatim. The [dashboard](../work-log.md#wi-022) owns its current status. Independent policy and evidence follow-ups do not reopen it.
+
+## Work tree
+
+Progress as of 261125: 0 of 1 child done.
+
+| # | Item | Type | Size | Do after |
+| --- | --- | --- | --- | --- |
+| 1 | [WI-083 Capture retention and crash recovery](WI-083-capture-retention-and-crash-recovery.md) | [research] | M | - |
 
 ## Current understanding
 
@@ -55,6 +72,8 @@ The work resolved several blockers that otherwise invalidated the original goal:
 - Preview, fall-through, and error paths leaked owned SDK captures. Ownership distinguishes newly allocated captures from borrowed retained corpus inputs.
 - Initial broad SDK captures kept approximately 1.51 GB in the measured case. Selected capture was approximately 153 MB, 89.89% smaller in that same-source comparison. This is one historical measurement, not a universal reduction.
 - Unsafe cleanup deleted before inventory/confirmation. Approved behavior now previews and requires approval, rechecks readers, and protects unknown or linked entries.
+- A 261125 live cache review found one 80.59 MiB kept SDK capture and nine stale registrations. The stale records made the cache report stop with `ENOENT` before it listed the valid capture.
+- The normal exit hook removes temporary captures. It can't recover them after a forced kill or power loss. Cleanup currently selects only kept captures, so a dead process can leave an unkept capture that cleanup skips.
 
 The chronology contains apparently conflicting proposals and completion statements. The approved safety receipt supersedes earlier “not implemented” cache-location/confirmation proposals. Earlier “success keeps capture” wording predates the approved default-delete/`--keep-source` policy.
 
@@ -77,7 +96,9 @@ Frozen inputs, genuine saved-file checking, selected retention, and approved cle
 
 This does not establish byte-lossless export. Text redaction, missing optional stores, opaque data, persisted-resource clipping, and verification coverage limits remain distinct. Captures remain private and can be manually removed. Earlier regenerated-file checks do not prove old Markdown was repaired. Missing required source evidence causes an error rather than a live-source substitution.
 
-Related independent work remains visible: [manual acceptance](../work-log.md#wi-003), [fidelity policy](../work-log.md#wi-004), [resource clipping](../work-log.md#wi-006), and [historical tool-identity closure](../work-log.md#wi-025). WI-003 covers legacy listing/browser/print checks. The reviewed completion receipts identify no remaining capture/cache-specific acceptance gate. Image presentation differs from the delivered byte companions in [WI-024](../work-log.md#wi-024).
+WI-083 returns these later cleanup and retention findings to the main goal: stable verification should not leave a large private copy that the user never chose to keep. It records the proposed policy, counterarguments and cleanup work without changing the delivered WI-022 behavior.
+
+Related work remains visible: [manual acceptance](../work-log.md#wi-003), [fidelity policy](../work-log.md#wi-004), [resource clipping](../work-log.md#wi-006), [failure-log write errors](../work-log.md#wi-043), and [historical tool-identity closure](../work-log.md#wi-025). WI-003 covers legacy listing/browser/print checks. Image presentation differs from the delivered byte companions in [WI-024](../work-log.md#wi-024).
 
 ## References
 

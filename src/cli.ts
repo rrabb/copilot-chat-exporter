@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { checkExportOutputHash, keepFailedExportCopy, readExportCopy, saveExportCopy } from './session/source-snapshot.ts';
 import type { ExportOutputHashCheck } from './session/source-snapshot.ts';
-import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listFailureLogs, listSourceCache, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
+import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailure, leaseCapture, legacySourceCacheSizes, listFailureLogs, listSourceCache, listStaleRegistrations, sourceCacheRoot, sourceCacheSize } from './session/source-cache.ts';
 import { exportFailureFromReport, failureDetails, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
 import path from 'node:path';
@@ -263,30 +263,36 @@ if (cacheMode) {
     console.log(`Private source cache: ${sourceCacheRoot()}`);
     console.log('Created (UTC) | Age (days) | Kind | Bytes | Files | Status | Capture');
     for (const entry of entries) {
-      console.log(`${entry.createdAt} | ${Math.max(0, (Date.now() - Date.parse(entry.createdAt)) / 86_400_000).toFixed(2)} | ${entry.kind} | ${entry.bytes} | ${entry.files} | ${entry.active ? 'in use' : entry.kept ? 'kept' : 'temporary'} | ${entry.directory}`);
+      console.log(`${entry.createdAt} | ${Math.max(0, (Date.now() - Date.parse(entry.createdAt)) / 86_400_000).toFixed(2)} | ${entry.kind} | ${entry.bytes} | ${entry.files} | ${entry.active ? 'in use' : entry.kept ? 'kept' : 'abandoned'} | ${entry.directory}`);
       result && console.log(`  ${result.selected.some((target) => target.directory === entry.directory) ? 'Eligible' : 'Skipped'}`);
       for (const output of entry.outputs)
         console.log(`  Export: ${output}`);
     }
     console.log(`Total: ${entries.length} captures, ${entries.reduce((sum, entry) => sum + entry.bytes, 0)} bytes.`);
+    const stale = result?.stale ?? await listStaleRegistrations();
+    for (const item of stale) {
+      console.log(`Stale registration (capture folder missing) | ${item.modifiedAt} | ${item.directory}`);
+      result && console.log(`  ${result.selectedStale.some((target) => target.file === item.file) ? 'Eligible' : 'Skipped'}`);
+    }
+    stale.length && !result && console.log(`${stale.length} stale registrations hold no chat data. Remove them with --cache --clean.`);
     for (const log of result?.failureLogs ?? await listFailureLogs()) {
       console.log(`Failure log | ${log.modifiedAt} | ${Math.max(0, (Date.now() - Date.parse(log.modifiedAt)) / 86_400_000).toFixed(2)} days | ${log.bytes} bytes | ${log.file}`);
       result && console.log(`  ${result.selectedFailureLogs.some((target) => target.file === log.file) ? 'Eligible' : 'Skipped'}`);
     }
     for (const legacy of await legacySourceCacheSizes())
       console.log(`Legacy cache (report only): ${legacy.directory} | ${legacy.bytes} bytes | ${legacy.files} files`);
-    if (result && !dryRun && (result.selected.length || result.selectedFailureLogs.length)) {
+    if (result && !dryRun && (result.selected.length || result.selectedFailureLogs.length || result.selectedStale.length)) {
       let approved = yes;
       if (!approved && process.stdin.isTTY && process.stdout.isTTY) {
         const prompt = createInterface({ input: process.stdin, output: process.stdout });
         try {
-          approved = /^(?:y|yes)$/iu.test((await prompt.question('Delete the eligible captures, their receipts and cached failure logs? [y/N] ')).trim());
+          approved = /^(?:y|yes)$/iu.test((await prompt.question('Delete the eligible captures, their receipts, stale registrations and cached failure logs? [y/N] ')).trim());
         } finally {
           prompt.close();
         }
       }
       if (approved)
-        result = await cleanSourceCache({ yes: true, includeCorpus, olderThanDays: olderThanDays ?? undefined, targets: result.selected, failureLogTargets: result.selectedFailureLogs });
+        result = await cleanSourceCache({ yes: true, includeCorpus, olderThanDays: olderThanDays ?? undefined, targets: result.selected, failureLogTargets: result.selectedFailureLogs, staleTargets: result.selectedStale });
       else
         console.log('Nothing deleted. Noninteractive deletion requires --yes; interactive confirmation defaults to No.');
     }
@@ -295,7 +301,7 @@ if (cacheMode) {
       console.log(`Cache directory: ${size.bytes} bytes including receipts and registrations; external corpus snapshots: ${size.externalSnapshotBytes} bytes.`);
     }
     if (result)
-      console.log(`${result.dryRun ? 'Would remove' : 'Removed'} ${result.selected.length} captures and their receipts; ${result.selectedFailureLogs.length} cached failure logs; ${result.dryRun
+      console.log(`${result.dryRun ? 'Would remove' : 'Removed'} ${result.selected.length} captures and their receipts; ${result.selectedStale.length} stale registrations; ${result.selectedFailureLogs.length} cached failure logs; ${result.dryRun
         ? result.selected.reduce((sum, entry) => sum + entry.bytes, 0) + result.selectedFailureLogs.reduce((sum, log) => sum + log.bytes, 0) : result.freedBytes} bytes ${result.dryRun ? 'eligible' : 'freed'}.`);
     process.exit(0);
   } catch (error) {

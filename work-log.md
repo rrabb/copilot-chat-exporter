@@ -1,6 +1,6 @@
 # Work dashboard
 
-Updated 261124. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
+Updated 261125. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
 🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
@@ -100,7 +100,8 @@ Updated 261124. New here? Read the [handbook](work-items/README.md) first. Produ
 
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| <a name="wi-022"></a>[WI-022 Frozen captures and cleanup](work-items/WI-022-source-captures-cache-cleanup.md) | Freezes source inputs, checks the saved file, keeps captures safely and deletes only after you approve. | ✅ Done | [build] | - | - | - | WI-023 |
+| <a name="wi-022"></a>[WI-022 Frozen captures and cleanup](work-items/WI-022-source-captures-cache-cleanup.md) | Freezes source inputs, checks the saved file, keeps captures safely and deletes only after you approve. WI-083 reviews later retention and recovery policy without reopening the delivered work. | ✅ Done | [build] | - | - | - | WI-023; [WI-083](#wi-083) |
+| <a name="wi-083"></a>↳ **WI-083 Capture retention and crash recovery** | Part of WI-022. Slice A accepted 261125: `--cache` lists stale registrations instead of failing, and `--clean` removes them and abandoned captures after confirmation. Slice B (retention policy, `--keep-source-on-problem`, diagnostic limit, WI-043) waits for your decisions. | 📋 Backlog · High | [build] | you | M | - | [Slice A and how to check](work-items/WI-083-capture-retention-and-crash-recovery.md#slice-a-cleanup-bug-fixes-built-261125), [Related: WI-043](#wi-043) |
 | <a name="wi-023"></a>[WI-023 Failed-export handling](work-items/WI-023-failed-export-handling.md) | Keeps evidence and diagnostics when export verification fails. [WI-043](#wi-043) covers errors writing logs. | ✅ Done | [build] | - | - | - | [WI-022](#wi-022) |
 | <a name="wi-043"></a>↳ **WI-043** Failure log write errors | Part of WI-023. Keep the receipt and report the retained source when a diagnostic log write fails. | 📋 Backlog · Medium | [build] | agent | S | - | [Finding](work-items/WI-023-failed-export-handling.md#failure-log-write-errors) |
 

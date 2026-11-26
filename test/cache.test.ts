@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { checkExportOutputHash, readExportCopy, saveExportCopy } from '../src/session/source-snapshot.ts';
-import { cleanSourceCache, createSourceCacheDirectory, finishCapture, leaseCapture, listSourceCache, registerCapture } from '../src/session/source-cache.ts';
+import { cleanSourceCache, createSourceCacheDirectory, finishCapture, leaseCapture, listSourceCache, listStaleRegistrations, registerCapture } from '../src/session/source-cache.ts';
 
 test('cleanup lists and ages cache failure logs but leaves export-side logs and unknown files alone', async () => {
   const root = process.env.CCE_CACHE_DIR!;
@@ -155,4 +156,55 @@ test('capture allocation rejects native store destinations even when configured'
     process.env.CCE_CACHE_DIR = root;
   }
   await assert.rejects(fs.stat(path.join(root, 'User')), { code: 'ENOENT' });
+});
+
+test('stale registrations do not stop the listing and cleanup removes only the registration', async () => {
+  const kept = await createSourceCacheDirectory('cce-sources-');
+  await finishCapture(kept, true);
+  const gone = await createSourceCacheDirectory('cce-sources-');
+  await finishCapture(gone, true);
+  await fs.rm(gone, { recursive: true });
+  const listed = await listSourceCache();
+  assert.ok(listed.some((entry) => entry.directory === kept));
+  assert.ok(!listed.some((entry) => entry.directory === gone));
+  const stale = await listStaleRegistrations();
+  assert.equal(stale.filter((item) => item.directory === gone).length, 1);
+  const preview = await cleanSourceCache({ dryRun: true });
+  assert.ok(preview.selectedStale.some((item) => item.directory === gone));
+  assert.ok(await fs.stat(stale.find((item) => item.directory === gone)!.file));
+  await cleanSourceCache({ yes: true, targets: [], staleTargets: preview.selectedStale });
+  assert.ok(!(await listStaleRegistrations()).some((item) => item.directory === gone));
+  assert.ok(await fs.stat(kept), 'an empty target list deletes no captures');
+  await cleanSourceCache({ yes: true });
+});
+
+test('cleanup recovers captures whose owner process died without keeping them', async () => {
+  const abandoned = await createSourceCacheDirectory('cce-sources-');
+  const live = await createSourceCacheDirectory('cce-sources-');
+  const marker = path.join(abandoned, '.cce-capture.json');
+  const deadPid = spawnSync(process.execPath, ['-e', '']).pid!;
+  await fs.writeFile(marker, `${JSON.stringify({ ...JSON.parse(await fs.readFile(marker, 'utf8')), activePid: deadPid })}\n`);
+  const entries = await listSourceCache();
+  assert.equal(entries.find((entry) => entry.directory === abandoned)?.abandoned, true);
+  assert.equal(entries.find((entry) => entry.directory === live)?.abandoned, false);
+  const preview = await cleanSourceCache();
+  assert.ok(preview.selected.some((entry) => entry.directory === abandoned));
+  assert.ok(!preview.selected.some((entry) => entry.directory === live), 'a running owner protects its capture');
+  await cleanSourceCache({ yes: true, targets: preview.selected });
+  await assert.rejects(fs.stat(abandoned), { code: 'ENOENT' });
+  assert.ok(await fs.stat(live));
+});
+
+test('a failed registration removes the new capture folder', async () => {
+  const root = process.env.CCE_CACHE_DIR!;
+  const isolated = path.join(root, 'broken-registrations');
+  await fs.mkdir(isolated);
+  await fs.writeFile(path.join(isolated, 'registrations'), 'not a folder');
+  process.env.CCE_CACHE_DIR = isolated;
+  try {
+    await assert.rejects(createSourceCacheDirectory('cce-sources-'));
+  } finally {
+    process.env.CCE_CACHE_DIR = root;
+  }
+  assert.deepEqual((await fs.readdir(isolated)).filter((name) => name.startsWith('cce-')), []);
 });
