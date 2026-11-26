@@ -9,9 +9,9 @@ Part of [WI-021](WI-021-source-aware-verification.md), found while reviewing a p
 - **Failure policy:** successful and failed verification both create a sidecar.
 - **Reference:** `temp-tool-output/261118-EXPORTS/cc-exporter-results-explanation.md`.
 - **Design rule:** explain the same structured results used by the console. Don't parse console text a second time.
-- **Status 261123:** the dev accepted v4. Implementation and completion checks pass.
-- **Next:** stage and review commit 1, then continue with separately approved follow-up work.
-- **Related:** [WI-077](WI-077-ai-verification-diagnostics.md) owns AI repair diagnostics and exact-sample privacy.
+- **Status 261124:** the dev accepted v4 on 261123. The feature and tracking are committed. This item is complete.
+- **Next:** none. Public regression fixtures belong to [WI-078](WI-078-verification-report-fixtures.md).
+- **Related:** [WI-077](WI-077-ai-verification-diagnostics.md) owns AI repair diagnostics and exact-sample privacy. [WI-078](WI-078-verification-report-fixtures.md) owns reusable public report fixtures.
 - **Reference guide:** [Verification output guide](../docs/VERIFICATION.md) maps every console warning and failure family to plain English.
 - **Console-only case:** `--verify <session>` explains the in-memory check in the console and writes no sidecar.
 
@@ -134,7 +134,7 @@ The sidecar must keep the distinction between:
 - verification failure
 - schema-drift warning
 
-## Plan
+## Original plan, implemented 261119
 
 1. **Define a report model.**
    - Keep result values, categories, counts, file paths and failure states in a typed object.
@@ -384,16 +384,40 @@ The report links only an actual generated log. Verification-result failures and 
 
 The dirty worktree state before this work is saved in `temp-tool-output/261119-173552-wi076-start/`. Completion checks found no missing Done-when criterion. No unrelated file was staged or committed.
 
-## Resume point 261120
+## Follow-up review 261124
 
-The implementation, validation and acceptance are complete. The dev accepted v4 on 261123.
+WI-076's focused tests already cover the renderer, Local and SDK branches, warning/failure wording, exception reports and collision-safe writes. A second renderer test suite would add cost without much confidence.
 
-When work resumes:
+The useful follow-up isn't more WI-076 implementation. It's a small public fixture pair owned by [WI-078](WI-078-verification-report-fixtures.md):
 
-1. Stage commit group 1 with only WI-076 feature files and selected hunks.
-2. Review the staged diff before committing.
-3. Stage the matching tracking/docs commit separately if needed.
-4. Then choose whether WI-077 research or another priority should start.
+| Need | Reuse | Don't duplicate |
+| --- | --- | --- |
+| Stable reader-facing output | Two invented `VerificationExplanationInput` records and exact expected sidecars | Private v1-v4 review bundles |
+| Regression confidence | Render both reports directly through the existing explanation renderer | Rebuild report logic in a fixture generator |
+| CLI evidence | Existing focused CLI and collision tests | Full real-CLI fixtures for each report |
+| Diagnostic coverage | Synthetic events and `scripts/lib/cli-sandbox.mjs` from [WI-079](WI-079-diagnostic-bundle-coverage.md) | Copy the sandbox into a report-fixture script |
+| Deliberate updates | Follow the SDK golden's `--check` and `--update` pattern | Rewrite expected files during normal tests |
+
+WI-078 should test the sidecar's reader contract, not repeat the verifier. Keep the fixture fast and independent of user-data roots:
+
+1. Render one failed sidecar and one passed-with-warnings sidecar.
+2. Compare complete Markdown bytes.
+3. Keep a few semantic checks for the meaning that must remain: verdict, causes, limits and next action.
+4. Don't add exact terminal-output files yet. They duplicate existing CLI coverage and would make every prose edit a two-output migration.
+5. Link a small, reviewed excerpt from `docs/VERIFICATION.md`. Keep complete generated files in the test fixture.
+6. Add a deliberate `--update` command. Normal tests remain read-only.
+
+The useful overlap with WI-079 is input construction and the sandbox only. WI-079 tests fault collection and CLI behavior. WI-078 tests the human report rendered from a structured result. Keep those responsibilities separate.
+
+## Completion point 261124
+
+Implementation, validation and acceptance are complete. The dev accepted v4 on 261123. Commits `0f6813b` and `6558db8` cover the feature and its acceptance tracking.
+
+No WI-076 action remains:
+
+1. Keep the feature closed.
+2. Use WI-078 for public, small report fixtures if you still want them.
+3. Use WI-079 for diagnostic-bundle paths, not plain-English report wording.
 
 The original implementation samples are kept for comparison:
 
@@ -402,7 +426,7 @@ The original implementation samples are kept for comparison:
 - [Clean sample v2](../temp-tool-output/261119-173552-wi076-start/samples/clean-with-warnings.verification.md)
 - [Failed sample v2](../temp-tool-output/261119-173552-wi076-start/samples/failed.verification.md)
 
-The enhancement is paused until the dev reviews the [Verification output guide](../docs/VERIFICATION.md).
+The [Verification output guide](../docs/VERIFICATION.md) remains the public reference. The private implementation samples stay useful only for review history.
 
 ## Alternatives
 
