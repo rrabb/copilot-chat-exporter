@@ -5,6 +5,8 @@
 - **Goal:** Assess an end-of-turn writing-style review for VS Code Copilot chats.
 - **Scope:** Local and Agent Host chats, not Git hooks or CI.
 - **Proposal:** Track files changed during a prompt, then check their user-facing text when the turn ends.
+- **Checker owner:** [WI-060](WI-060-prose-check-pilot.md) owns the standalone checker contract, Git-aware scope, AI batching and usage footer.
+- **Deferred here:** phase 6 hook guards and turn-level repeat state wait for the standalone checker work.
 - **Reviewer:** Call a configured low-cost model only when eligible text changed.
 - **Review modes:** Let the script write suggestions, or ask the main agent to apply them through its edit tools.
 - **Boundary:** This topic records a proposal. It does not approve implementation.

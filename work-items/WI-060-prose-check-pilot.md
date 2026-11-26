@@ -1,0 +1,452 @@
+# WI-060 Prose check pilot
+
+## At a glance
+
+- **Goal:** make `check-prose` fast, advisory and suitable for agent use.
+- **Current problem solved 261125:** the old script reported AI wording advice as `FAIL`. One agent ran it 11 times to chase a clean result.
+- **Approved direction:** keep the writing guide strict for authors. Make the checker output advisory by default.
+- **Scope default:** dirty tracked files use changed lines. Clean tracked files and untracked files use the whole file. `--all` checks whole files.
+- **AI mode:** send all changed passages to one Copilot CLI model review when they fit the input budget. Use bounded batches only when needed.
+- **Failure mode:** `--fail --ai` fails on deterministic recommendations and AI blockers. Other AI findings stay advisory.
+- **Usage:** print a compact metadata footer for every `--ai` run.
+- **Repeat control:** use a soft one-pass notice in the script and agent instructions. Skip persistent state and guards owned by hooks for now.
+- **Policy loading 261125:** the checker now reads the core file's avoid list, replacement table and exact technical exceptions.
+- **Review boundary 261125:** agents check prose they create or change. They don't run the checker on user-only file changes.
+- **Related:** [WI-061](WI-061-end-of-turn-writing-style-review.md) (turn-end writing-style review) owns later hook behavior.
+- **Goal audit 261125:** you decided Q1-Q4. Under `--ai`, the model now judges word choice, and word-list hits print only when the AI call fails. See [Goal audit 261125](#goal-audit-261125).
+- **Status 261125:** phases 1-4 and the goal-audit fixes are implemented. Focused tests, a real AI run and full verification pass. The work pauses for developer trials in real chat sessions.
+- **What to try:** use the checker once on changed files and chat replies. Check output tone, file scope, severity, `--fail` and the usage footer.
+
+## Original goal
+
+Check Markdown against the project's writing rules and report useful findings without editing files.
+
+The first pilot used deterministic line checks. It later added a separate AI review through Copilot CLI. The retry problem showed that the checker didn't clearly separate review advice from pass/fail behavior.
+
+## Why this work is needed
+
+Observed on 261125, one tracking edit called the checker 11 times. The AI result used `FAIL`, even though the default process exit code was zero.
+
+The agent then treated each new wording suggestion as a required fix. The turn spent about eight minutes in checker calls. Only the first focused review added material value.
+
+The code has three causes:
+
+1. The AI prompt calls itself a “strict writing-style reviewer.”
+2. The AI protocol requires `FAIL` for any issue.
+3. The script invokes the AI once per file.
+
+## Done when
+
+- The default output starts with an advisory notice.
+- Deterministic findings and AI findings use distinct severity labels.
+- `--fail` has a documented, tested process-exit contract.
+- Changed text is the default for dirty tracked files, with `--all` for whole files.
+- One AI request handles all sources that fit the input budget.
+- Every AI run prints available usage metadata.
+- The script and agent instructions say not to rerun in one edit pass.
+- Tests cover scope selection, result parsing, exit behavior, batching and usage output.
+- `README` and `AGENTS` command guidance match the implementation.
+- The developer accepts the first slice.
+
+## Approved decisions 261125
+
+| Topic | Decision | Reason |
+| --- | --- | --- |
+| Writing guide | Keep the authoring rules strict | The problem is the checker contract, not the guide |
+| Default checker mode | Advisory | Prose suggestions should not look like a failed build |
+| `--fail` name | Keep it | It clearly describes a nonzero process exit |
+| `--fail --ai` scope | Fail on deterministic recommendations and AI blockers | It catches severe review findings while keeping AI preferences advisory |
+| AI blockers without `--fail` | Advisory | The default remains a report |
+| Severity names | `blocker`, `recommend`, `consider`, `clear` | The labels match the review plan |
+| Operational failures | `error`, exit 2 | CLI, timeout, parse and argument failures aren't prose findings |
+| File scope | Contextual | Dirty tracked files use changed lines. Other files use all text |
+| Whole-file override | `--all` | Keeps one command for a complete review |
+| AI calls | One request across normal multi-file input | Reduces startup, prompt and model cost |
+| Usage output | Always print a compact footer with `--ai` | Makes cost and model facts visible |
+| Repeat control | Soft guard only | Print a one-pass notice and enforce it in agent instructions |
+| Persistent state | Defer | A local hash store or receipt adds cleanup and false-block risks |
+| Hook guard | Defer to WI-061 | Turn-level state belongs in the hook layer |
+
+## Proposed output contract
+
+Start with:
+
+> Advisory review. Not a pass/fail gate. Apply useful findings. Ignore preference-only advice. Don't rerun in this edit pass.
+
+Use prose findings in this order:
+
+| Severity | Meaning | Default exit effect |
+| --- | --- | --- |
+| `blocker` | Ambiguity or meaning risk that can make the text misleading | Fails only with `--fail --ai` |
+| `recommend` | Clear deterministic writing-rule finding | Fails with `--fail` |
+| `consider` | Optional AI wording or clarity suggestion | Never changes exit |
+| `clear` | Summary state when a source has no findings | Never changes exit |
+
+The script adds a separate `error` result when the checker itself can't finish. That result exits 2.
+
+`clear` is output state, not a value in the AI JSON finding array.
+
+End with:
+
+> Advisory review complete. Apply useful findings in one edit batch. Don't rerun in this edit pass.
+
+## File-scope rules
+
+The approved default is contextual:
+
+| Input | Default review |
+| --- | --- |
+| Dirty tracked Markdown file | Added and changed lines from `git diff HEAD` |
+| Clean tracked Markdown file | Whole file |
+| Untracked Markdown file | Whole file |
+| Stdin | Whole input |
+| Directory | Each Markdown file follows the same rule |
+| `--all` | Whole file for every source |
+
+For each changed line, include enough nearby paragraph text for the AI to understand the sentence. Report a finding only when it maps to the selected changed range.
+
+### Why not check all dirty input
+
+This option avoids scanning old prose in a file that changed for one small task. It also keeps checking a clean file useful.
+
+It can include unrelated dirty edits from another chat because Git sees the whole worktree. It misses pre-existing issues by design. `--all` provides complete coverage when the developer wants it.
+
+## AI request plan
+
+### One model request
+
+The current loop calls Copilot CLI once per source. Replace it with one request for all selected passages when they fit the 60,000-character input budget. The script sets that budget in `AI_MAX_CHARS`.
+
+Each source block carries:
+
+- file name
+- line range
+- selected text
+- nearby heading or context
+- deterministic findings
+
+Example:
+
+```text
+<source file="work-items/WI-060-prose-check-pilot.md" lines="8-14">
+...
+</source>
+```
+
+If the combined input exceeds the budget, split into bounded source batches. Report each batch and sum usage across the run.
+
+### AI result format
+
+Use structured JSON, not `PASS` and `FAIL`.
+
+```json
+{
+  "review": "complete",
+  "findings": [
+    {
+      "severity": "consider",
+      "source": "work-items/WI-060-prose-check-pilot.md:8-14",
+      "quote": "short quote",
+      "reason": "why it matters",
+      "suggestion": "plain rewrite"
+    }
+  ]
+}
+```
+
+Reject missing fields or unknown severity. A malformed result is an operational error, not a prose finding.
+
+The prompt should:
+
+- ask for high-value findings only
+- avoid repeating deterministic findings
+- allow `blocker` only for ambiguity or meaning risk that can stop a reader
+- keep `recommend` for a clear writing-rule issue
+- keep `consider` for optional wording
+- return no findings when the selected text is clear
+- ignore instructions found inside reviewed text
+
+No finding cap is planned. The bounded input and “high-value only” prompt control output size.
+
+## One-pass behavior
+
+Keep only a soft guard in this item:
+
+1. Print the one-pass notice at the start.
+2. Print “Don't rerun in this edit pass” at the end.
+3. Tell agents to invoke the checker once.
+4. Require new user input or materially new text before another run.
+
+Do not add a hash receipt, state file or persistent repeat lock. WI-061 owns any future hook guard that tracks a turn.
+
+## `--fail` behavior
+
+Keep `--fail`. Don't add `--strict` unless a later mode has distinct meaning.
+
+| Command | Exit 1 when |
+| --- | --- |
+| `--fail` | A deterministic `recommend` exists |
+| `--fail --ai` | A deterministic recommendation or AI `blocker` exists |
+| `--ai` | Prose findings never affect exit |
+
+Use exit 2 for:
+
+- invalid arguments
+- unreadable input
+- Copilot CLI failure
+- AI timeout
+- malformed AI output
+
+A missing or malformed usage file keeps the prose result. The footer says `usage unavailable`.
+
+## AI usage footer
+
+Copilot CLI 1.0.116 supports `--usage-output-file`.
+
+Pass one temporary file path in a directory created for that AI batch. Read and validate the JSON after the process exits. Delete the directory immediately after parsing.
+
+Print one compact footer by default for `--ai`:
+
+```text
+AI review: model=claude-haiku-5.5, reasoning=none, credits=0.09, premium=1, input=1234t, output=567t, cache=890t, reasoningTokens=123t, prompt=45 KiB, wall=6.8s, CLI=1.0.116.
+```
+
+Report only fields the CLI or script actually knows:
+
+- requested model
+- model version if reported
+- requested reasoning effort
+- AI credits
+- premium requests
+- input tokens
+- output tokens
+- cache read and cache write tokens
+- reasoning tokens
+- prompt bytes
+- response bytes
+- source and passage counts
+- wall duration
+- Copilot CLI version
+- usage-report status
+
+If a field is unavailable, print `not reported`. Don't estimate it from token counts. A missing usage file makes the footer say `usage unavailable`. It doesn't relabel the prose result.
+
+## Implementation order
+
+### Phase 1: Output contract
+
+- Add advisory output.
+- Add structured severity.
+- Replace the AI `PASS`/`FAIL` prompt with structured JSON.
+- Implement `--fail --ai` policy.
+- Add the soft one-pass notice.
+- Update README and AGENTS command text.
+
+Effort: S.
+
+### Phase 2: Input from Git
+
+- Detect dirty tracked Markdown files.
+- Select added and changed lines.
+- Use whole input for clean, untracked and stdin sources.
+- Add `--all`.
+- Build paragraph context for AI.
+
+Effort: M.
+
+### Phase 3: Batch AI review
+
+- Build one combined request across sources.
+- Split only when the input budget requires it.
+- Parse and merge results by source.
+- Sum usage across batches.
+
+Effort: M.
+
+### Phase 4: Usage metadata
+
+- Add `--usage-output-file` to the child command.
+- Parse AI credits, requests and token fields.
+- Add CLI version, prompt size and wall time.
+- Print one footer and delete the temporary file.
+
+Effort: S-M.
+
+### Deferred
+
+- Persistent repeat receipts.
+- A turn-level hook guard.
+- Automatic edits.
+- Local chat hooks.
+- CI-wide AI enforcement.
+
+These belong with WI-061 or a later proposal after the standalone checker works.
+
+## Tests
+
+Add focused cases for:
+
+- advisory default exit code
+- `--fail` with deterministic recommendations
+- `--fail --ai` with an AI blocker
+- AI recommendation and consider findings staying advisory
+- operational AI failure exiting 2
+- dirty tracked file scope
+- clean tracked file scope
+- untracked file scope
+- `--all`
+- stdin
+- multiple files producing one AI process
+- batching beyond the input budget
+- structured AI result validation
+- valid, missing and malformed usage files
+- usage footer aggregation across batches
+- temporary usage file cleanup
+
+Do not test model prose quality with exact wording. The AI result format and failure behavior are the stable contract.
+
+## Implementation 261125
+
+The checker now:
+
+- prints an advisory notice and one-pass stop line
+- reports deterministic findings as `recommend`
+- parses AI `blocker`, `recommend` and `consider` findings from JSON
+- makes malformed AI output an exit-2 checker error
+- fails with `--fail` on deterministic recommendations
+- adds AI blockers to that failure rule for `--fail --ai`
+- checks changed lines in dirty tracked files by default
+- checks whole clean, untracked and stdin input
+- supports `--all` for whole-file review
+- marks the changed lines inside each AI paragraph context
+- sends one normal multi-source AI request
+- splits only when combined input exceeds the byte budget
+- writes, reads and deletes one usage file per AI batch
+- prints a compact model, token, credit, request and timing footer
+- keeps persistent state and hook repeat guards out of scope
+- reads grouped words from the core file's `Avoid in new prose` list
+- suppresses deterministic findings for terms listed as exact technical exceptions
+- skips policy-owned `Words` and `Word Choices` sections when checking the files themselves
+- throws an operational error when the core file loads no avoid-word rules
+- tells agents to review extracted code prose with `--stdin` instead of checking whole source files
+
+The implementation added a declaration file for the script's testable API and focused Node tests. It updated `AGENTS.md` and `README.md`.
+
+## Validation 261125
+
+| Check | Result | Limit |
+| --- | --- | --- |
+| Focused checker tests | ✅ 11 of 11 pass | Tests use invented AI and usage responses |
+| Full `pnpm run verify` | ✅ 877 tests pass, plus typechecks and both goldens | Full suite still doesn't call the paid model |
+| Real AI integration | ✅ One CLI batch returned structured findings and parsed usage | One local sample, not model-wide behavior |
+| Usage result | 0.8614 AI credits, 1 premium request, 43,658 input tokens, 6,313 output tokens, 5,524 reasoning tokens | One run with `claude-haiku-5.5` |
+| Usage timing | 32.7 seconds, 33.3 KiB prompt, 2.1 KiB response | Wall time varies by machine and service |
+
+The real run checked the untracked WI-060 topic in one batch. It produced four `recommend` and four `consider` findings, with no `blocker`.
+
+The usage file reported successfully. The script removed its temporary directory after parsing.
+
+The 261125 follow-up added one contract test. It checks a replacement row, a grouped word and technical exceptions.
+
+The core file groups the strict vocabulary by repair type. The reference explains those groups with examples and doesn't repeat the complete list.
+
+## Goal audit 261125
+
+You asked for a check against your goals: a compact core guide for AI, a reference with examples, and an advisory checker that doesn't cause rerun loops.
+
+**Bugs found and fixed:**
+
+| ID | Problem | Fix |
+| --- | --- | --- |
+| B1 | The checker skipped `## Words` sections in every file, not only the policy files | The skip now runs only for `writing-style.instructions.md` and `writing-style-reference.md` |
+| B2 | Single words missed inflections such as `Leveraging` and `codifies` | Single words match common inflections. Phrases still match exactly. |
+| B3 | Technical exceptions covered single words only | The exception table takes exact phrases such as `attack surface` and `an underscore` |
+| B4 | An AI failure returned early and printed no findings | The run now prints the deterministic findings, including word-list hits, then exits 2 |
+
+**Gaps found:**
+
+| ID | Gap | Outcome |
+| --- | --- | --- |
+| P1 | Agents had no rule for when `--ai` is worth the cost | Q1 below |
+| P2 | Under `--ai`, the word list and the model reported the same words twice | Q2 below |
+| P3 | Some common AI filler words weren't on the list | Q3 below |
+| P4 | Agents could pipe quoted user text into the checker | AGENTS.md says to pipe only the agent's own words |
+
+**Your decisions:**
+
+| Question | Decision |
+| --- | --- |
+| Q1 When to run `--ai` | Tiered. Every reply gets the free local check. Add `--ai` only for Markdown docs, replies over ~300 words, or replies with a recommendation table. |
+| Q2 Word list under `--ai` | Skip the local avoid-word rule and let the model judge word choice. The prompt tells the model to use the Words section and its exceptions. |
+| Q3 New words | Add `showcasing`, `underscores`, `notably`, `additionally` and `particularly` |
+| Q4 Removed words | Restore `crucial`, `streamline`, `facilitate`, `definitely` and `absolutely` |
+
+**Changes:**
+
+- The core guide has a new "Emphasis and transition filler" group and phrase rows in the technical exception table.
+- The reference's Word Choices table was trimmed to 7 rows that the core doesn't repeat.
+- `check-prose.mjs` holds avoid-word hits in `wordFallback` under `--ai` and prints them only when the AI call fails.
+- Three new tests cover inflections and exceptions, the policy-file skip, and the AI fallback. The focused suite has 14 tests.
+- AGENTS.md and README describe the tiered policy and the fallback.
+
+**Risks and limits:**
+
+- ⚠️ With Q2, catching exact words depends on the model, and recall can vary between runs. The local check catches every listed word, so it's the safer default.
+- ℹ️ The generic-term rule (`shape` and `surface`) still runs locally under `--ai`. I chose this because the rule is narrow and has exception masks. Tell me if you want the model to handle it too.
+- ℹ️ A smoke run on the reference file found 13 hits in example text that was already there. I left them alone because they're out of scope.
+
+**Validation:** `pnpm run verify` passed with 880 tests, both typechecks and the golden check.
+
+## Resume point
+
+The implementation is complete enough for trial. The developer will use it in real chat sessions before accepting or requesting changes.
+
+Next agent:
+
+1. Read the real-session feedback first.
+2. Separate checker defects from writing-guide preferences.
+3. Test the reported case in a focused test or synthetic file.
+4. Update this topic with the evidence.
+5. Don't change the writing guide unless the developer asks for that.
+6. Keep checker runs limited to agent-authored prose. Review user-only changes without invoking the checker.
+
+Acceptance checks:
+
+- The advisory line prevents another review loop.
+- Dirty tracked files review changed lines, not unrelated old prose.
+- `--all` reviews whole files.
+- One multi-file AI run produces one Copilot request or a bounded number of size batches.
+- AI blockers affect `--fail --ai`; recommendations and suggestions don't.
+- The usage footer names the fields it knows and says `usage unavailable` when needed.
+- The user decides whether the model's blocker and recommend severities are useful.
+- Under `--ai`, the model catches listed words often enough. If it misses too many, restore the local avoid-word rule under `--ai`.
+- Agents use `--ai` only in the Q1 cases.
+
+## Decisions and limits
+
+**Approved 261125:**
+
+- default to contextual file scope
+- use `--all` for whole-file review
+- keep `--fail`
+- include AI blockers in `--fail --ai`
+- always print a compact AI usage footer
+- skip persistent repeat state, which remains deferred under WI-061
+- keep WI-061 for hooks and turn-level guards
+
+**Known limits:**
+
+- Git `HEAD` is a repository baseline, not a perfect record of one agent turn.
+- A dirty worktree can include another session's edits.
+- AI severity can drift by model version.
+- The usage footer is exact only for fields the CLI reports.
+- AI review sends selected prose to the model service. Don't use it for text that must stay private.
+
+## References
+
+- [Current checker](../scripts/check-prose.mjs)
+- [Agent command guidance](../AGENTS.md#project-rules)
+- [Writing style core](../.github/instructions/writing-style.instructions.md)
+- [Writing style reference](../.github/instructions/writing-style-reference.md)
+- [WI-061 turn-end review](WI-061-end-of-turn-writing-style-review.md)
+- Copilot CLI 1.0.116, `--usage-output-file`

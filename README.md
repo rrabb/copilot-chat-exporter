@@ -315,6 +315,7 @@ Normal tests also check the portable synthetic SDK/Fusion goldens. Run `pnpm tes
 | `pnpm run build` | `node scripts/build.mjs` | bundle `dist/`; also runs on `prepare` |
 | `pnpm run demo:failure` | `node scripts/failure-demo.mjs` | generate synthetic failed-export review artifacts |
 | `pnpm run demo:diagnostics` | `node scripts/diagnostics-demo.mjs` | run injected-fault scenarios and record each diagnostic bundle |
+| (no pnpm script yet) | `node scripts/check-prose.mjs [--ai] [--fail] [--all] <file-or-folder...>` or `--stdin` | advisory writing review that never edits files. `--stdin` checks chat replies and prose extracted from code. Dirty tracked files use changed lines by default. `--all` checks whole files. `--ai` batches model review and prints usage metadata. With `--ai`, the model judges word choice in context, and word-list hits print only as a fallback if the AI review fails. `--fail --ai` fails on deterministic recommendations and AI blockers. |
 
 `pnpm run demo:failure` runs five synthetic Local and SDK verification failures using only the
 committed fixtures. It writes the failed Markdown, warning header, console output, failure log,

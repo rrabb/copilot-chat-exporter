@@ -34,28 +34,38 @@ Prefer tables/list/emojis/icons/diagrams/visual markers/aids etc over long prose
 
 ## Word Choices
 
-Prefer the plain option. Use the original word when it's shorter or more precise.
+The core file owns the main replacement table and the Avoid groups. These rows cover cases the core doesn't list. Use the original word when it's shorter or more precise.
 
 | Avoid | Prefer |
 | --- | --- |
-| retain, preserve | keep |
-| reveal | show |
 | surface (see the section below) | show, report, return, list |
 | shape (see the section below) | type, record, structure |
-| precedence | priority, or "X wins over Y" |
-| definite, definitely, definitive | (delete), or "main", "source of truth" |
-| absolutely, totally | (delete) |
-| explicit, explicitly | (delete), or "you must set" |
+| definite, definitive | (delete), or "main", "source of truth" |
+| totally | (delete) |
 | contentful | non-empty, has content |
 | contract (outside API compatibility) | rule, guarantee, expects |
 | only (when it adds nothing) | (delete) |
-| utilize, leverage | use |
-| in order to | to |
-| ensure that | make sure, or rephrase |
-| subsequently, prior to | then, before |
-| robust, seamless, comprehensive, powerful | (delete, or say what it actually does) |
-| note that, it's important to note | (delete) |
-| delve, crucial, pivotal, streamline, facilitate | (rephrase plainly) |
+
+### Style Rule: Plain Technical Prose
+
+The core file owns the exact Avoid list and technical exceptions. Use these patterns to choose a repair, not as a second list.
+
+- **Prefer concrete actions:** Use short, direct verbs (*runs, splits, blocks, caches, fixes*) and specific nouns. State what the code or system actually does rather than describing it in the abstract.
+- **Repair formal, legal, proposal or RFC language:** State the exact fact, rule, condition or authority.
+- **Repair academic language:** Name the exact action, result or concept.
+- **Repair corporate or marketing language:** Name the action, result, owner or customer benefit.
+- **Repair inflated modifiers:** Delete the modifier or replace it with a measured claim.
+- **Repair vague modifiers:** Add the missing condition, degree or threshold.
+- **Repair metaphors:** Use the literal code, product, process or system term.
+- **Cut word stacks:** Limit consecutive nouns to two (write *"service that routes events"*, not *"event routing orchestration layer"*). Do not stack three modifiers in front of a noun.
+- **Technical precision exception:** Keep normal engineering terms and formal CS terms when they carry exact meaning. The core file lists the exceptions the deterministic checker honors.
+
+| Pattern | Weak | Plain |
+| --- | --- | --- |
+| Inflated verb | "The service effectuates the update." | "The service applies the update." |
+| Corporate jargon | "The workstream adds value." | "The team adds a faster export option." |
+| Vague claim | "The operation is frictionless." | "The operation needs no extra step." |
+| Metaphor | "The parser is the cornerstone." | "The parser checks every record." |
 
 ## Facts vs. Guesses
 

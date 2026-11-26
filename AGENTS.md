@@ -36,7 +36,19 @@ Capture every Copilot chat session, wherever it lives (VS Code Local journals, A
 - Never add a `Co-authored-by` trailer. As a backstop, `.githooks/commit-msg` (enabled through `core.hooksPath`) strips Copilot co-author trailers.
 - Save review reports, runtime captures, and logs under `temp-tool-output/`, in timestamped run folders, and keep earlier outputs. For listing runs, pass `--html-output` explicitly. Don't change the CLI's default working-directory behavior. Automated test folders keep their own cleanup.
 - Keep changes focused. Don't reformat unrelated code or docs.
-- Follow [code-style](.github/instructions/code-style.instructions.md) for TypeScript and JavaScript, and [writing-style](.github/instructions/writing-style.instructions.md) for all prose, including chat. That file holds the core rules and is always loaded. The [full reference](.github/instructions/writing-style-reference.md) isn't auto-loaded. It has every replacement table, including the "shape" and "surface" rules.
+- Follow [code-style](.github/instructions/code-style.instructions.md) for TypeScript and JavaScript. Follow [writing-style](.github/instructions/writing-style.instructions.md) for all prose, including chat. That file holds the core rules and all word lists, and it's always loaded. The [full reference](.github/instructions/writing-style-reference.md) isn't auto-loaded. It has worked examples, naming rules and the detailed "shape" and "surface" rules.
+- **Style check (required before sending):** run the checker once on agent-authored prose. Skip chat replies under 3 sentences.
+  - Check each draft chat reply, commit message and prose file the agent created or changed in this task.
+  - Pipe only the agent's own words. Leave out quoted user text, code blocks and tool output.
+  - Don't run the checker on files changed by the user or another session unless the agent edits them.
+  - For comments, UI text, errors or other prose inside code, check extracted text with `--stdin` instead of checking the whole source file.
+  - **Default (free, local):** `@'` line, draft, then `'@ | node scripts/check-prose.mjs --stdin`. Files: `node scripts/check-prose.mjs <file>`.
+  - **Add `--ai` (costs credits) only for:** Markdown docs the agent wrote or changed, chat replies over ~300 words, or replies with a recommendation table.
+  - With `--ai`, the model judges word choice in context, so the deterministic word-list rule is held back. Those word hits print only if the AI review fails.
+  - Dirty tracked files use changed lines by default. Untracked and clean tracked files use the whole file. Add `--all` for a full review.
+  - Output is advice. Apply useful blockers and recommendations. Consider optional suggestions. Never rerun in the same edit pass.
+  - Mention checker errors. `--fail --ai` exits nonzero for deterministic recommendations and AI blockers.
+  - Every `--ai` run reports available model, token, credit, premium-request and timing metadata.
 - **Instruction loading:** new agent chats can keep old instruction text until you fully quit VS Code (all windows). We observed this on 261023. Agent and Local chats both read `~/.copilot/copilot-instructions.md`. Local chats also read the VS Code profile `prompts` folder and send identical text once. To see what a chat actually loaded, read the first `system.message` in `~/.copilot/session-state/<id>/events.jsonl` instead of asking the model.
 
 ## Runtime and package boundaries
@@ -99,6 +111,7 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 | `node src/cli.ts <id or 8-char prefix>` | Export one chat |
 | `node src/cli.ts --verify <id> <absolute-file>` | Layer D content check. The output path must be absolute. |
 | `pnpm run demo:diagnostics` | Injected-fault scenarios through the real CLI. For your own sandbox runs, see [Run the CLI on a copied chat](README.md#cli-sandbox). |
+| `node scripts/check-prose.mjs [--ai] <file-or-folder...>` | Pilot writing-style check for Markdown. It reports advisory findings and never edits files. The default check is local and free. `--ai` adds a cheap-model review (default `claude-haiku-5.5`, `--model` overrides) and sends the text to the model service. With `--ai`, the model judges word choice and the word-list rule only prints if the AI review fails. `--stdin` checks piped prose such as a chat reply or extracted code comment. Not part of `verify` yet. See [WI-060](work-log.md#wi-060). |
 
 - Run the narrowest relevant test right after the first real edit, then `pnpm run verify`.
 - Write inline probes as `temp-tool-output\*.mts` that import `../src/...`.
