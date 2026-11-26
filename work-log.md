@@ -1,6 +1,6 @@
 # Work dashboard
 
-Updated 261125. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
+Updated 261126. New here? Read the [handbook](work-items/README.md) first. Product goal and behavior live in [SPEC](docs/SPEC.md#project-goal-and-scope) and [README](README.md).
 
 🔜 Next · 🔨 Active · 📋 Backlog · ⏳ Waiting · 💤 Deferred · ✅ Done · ❌ Dropped · ↪️ Superseded
 
@@ -100,10 +100,11 @@ Updated 261125. New here? Read the [handbook](work-items/README.md) first. Produ
 
 | Item | What it is | Status | Type | Who | Size | Do after | Links |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| <a name="wi-022"></a>[WI-022 Frozen captures and cleanup](work-items/WI-022-source-captures-cache-cleanup.md) | Freezes source inputs, checks the saved file, keeps captures safely and deletes only after you approve. WI-083 reviews later retention and recovery policy without reopening the delivered work. | ✅ Done | [build] | - | - | - | WI-023; [WI-083](#wi-083) |
-| <a name="wi-083"></a>↳ **WI-083 Capture retention and crash recovery** | Part of WI-022. Slice A accepted 261125: `--cache` lists stale registrations instead of failing, and `--clean` removes them and abandoned captures after confirmation. Slice B decided 261125: delete sources by default, add `--keep-source-on-problem`, limit diagnostics to 4 MiB, fold in WI-043. Slice B built 261125 and waiting for your review: problem runs delete the source and print the freed size. | ⏳ Waiting · High | [build] | you | M | - | [Slice A and how to check](work-items/WI-083-capture-retention-and-crash-recovery.md#slice-a-cleanup-bug-fixes-built-261125), [Slice B and how to check](work-items/WI-083-capture-retention-and-crash-recovery.md#slice-b-delete-sources-after-problems-by-default-built-261125), [Related: WI-043](#wi-043) |
+| <a name="wi-022"></a>[WI-022 Frozen captures and cleanup](work-items/WI-022-source-captures-cache-cleanup.md) | Freezes source inputs, checks the saved file, and safely manages retained copies. WI-083 added crash cleanup, default deletion after problems and the evidence limit. | ✅ Done | [build] | - | - | - | WI-023; [WI-083](#wi-083) |
+| <a name="wi-083"></a>↳ **WI-083 Capture retention and crash recovery** | Part of WI-022. Slice A fixed stale and abandoned captures. Slice B deletes sources after problems by default, adds `--keep-source-on-problem`, caps diagnostic evidence at 4 MiB and folds in WI-043. Accepted 261126. | ✅ Done | [build] | - | M | - | [Outcome](work-items/WI-083-capture-retention-and-crash-recovery.md#slice-b-delete-sources-after-problems-by-default-built-261125), [Related: WI-043](#wi-043), [Deferred follow-up](#wi-084) |
+| <a name="wi-084"></a>↳↳ **WI-084 Exit-hook cleanup size notice** | Part of WI-083. Report the freed bytes when an exception leaves source deletion to the exit hook. Resume if real cleanup reports show that the missing size notice hurts diagnosis. | 💤 Deferred · Low | [build] | agent | S | - | [WI-083 limit](work-items/WI-083-capture-retention-and-crash-recovery.md#limits-after-acceptance-261126) |
 | <a name="wi-023"></a>[WI-023 Failed-export handling](work-items/WI-023-failed-export-handling.md) | Keeps evidence and diagnostics when export verification fails. [WI-043](#wi-043) covers errors writing logs. | ✅ Done | [build] | - | - | - | [WI-022](#wi-022) |
-| <a name="wi-043"></a>↳ **WI-043** Failure log write errors | Part of WI-023. Keep the receipt and report the retained source when a diagnostic log write fails. Built 261125 inside WI-083 Slice B, waiting for your review. | ⏳ Waiting · Medium | [build] | you | S | - | [Finding](work-items/WI-023-failed-export-handling.md#failure-log-write-errors) |
+| <a name="wi-043"></a>↳ **WI-043** Failure log write errors | Part of WI-023. A failure-log write error now keeps publishing the failed archive and receipt, then prints the log error. Built in WI-083 Slice B and accepted 261126. | ✅ Done | [build] | - | S | - | [Outcome](work-items/WI-023-failed-export-handling.md#failure-log-write-errors) |
 
 ### Project upkeep
 

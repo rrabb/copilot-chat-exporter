@@ -5,13 +5,21 @@ Part of [WI-022](WI-022-source-captures-cache-cleanup.md), the source capture an
 ## At a glance
 
 - **Goal:** keep stable source copies for the command without large private leftovers.
-- **Proposed policy:** delete the frozen source after a run unless the user chose to keep it.
-- **Proposed flags:** `--keep-source-on-problem` keeps a source after a problem. `--keep-source` keeps it after any run.
+- **Policy:** delete the frozen source after a run unless the user chose to keep it.
+- **Flags:** `--keep-source-on-problem` keeps a source after a problem. `--keep-source` keeps it after any run.
 - **Cleanup finding:** dead owners, stale registrations and partial registration failures can leave capture data that current cleanup misses or hides.
 - **Diagnostic limit:** diagnostic evidence needs a total size limit before it replaces keeping the full source.
 - **Related:** [WI-043](../work-log.md#wi-043) (errors when writing the failure log) keeps the run receipt, or result record, and console output working.
-- **Next step:** the developer reviews Slice B (built 261125) and stages or commits it. Slice A was accepted and committed as `604d867`.
-- **Scope:** Slice A is accepted. Slice B is built and waiting for review.
+- **Outcome:** the developer accepted Slices A and B on 261126. Commits: `604d867` and `f12b570`.
+- **Follow-up:** [WI-084](../work-log.md#wi-084) defers the missing byte count on the exit-hook path.
+
+## Work tree
+
+Progress as of 261126: 0 of 1 child done. The parent outcome is complete, and its deferred child remains open.
+
+| # | Item | Type | Size | Do after |
+| --- | --- | --- | --- | --- |
+| 1 | [WI-084 Exit-hook cleanup size notice](../work-log.md#wi-084) | [build] | S | - |
 
 ## Original goal
 
@@ -234,7 +242,7 @@ Files: [`source-cache.ts`](../src/session/source-cache.ts), [`cli.ts`](../src/cl
 
 ## Slice B: delete sources after problems by default (built 261125)
 
-**Waiting for the developer's review.** This slice changes what a problem run keeps.
+**Accepted 261126.** This slice changes what a problem run keeps. Commit `f12b570`.
 
 | Change | What it does now | Test |
 | --- | --- | --- |
@@ -250,13 +258,15 @@ Files: [`args.ts`](../src/args.ts), [`cli.ts`](../src/cli.ts), [`sdk-cli.ts`](..
 
 **Not built from the approved scope:**
 
-- No separate `cleanup-failed` receipt state. If deleting the source fails, the console says so and tells you to run `--cache --clean`. Slice A already lists that leftover as `abandoned`. A new receipt state would add a value that only this rare path writes. Ask if you still want it.
+- The developer dropped the separate `cleanup-failed` receipt state on 261126. The console already reports the deletion error and points to `--cache --clean`. Slice A lists the leftover as `abandoned`.
 - The diagnostic task Markdown doesn't mention shortening. The notice is inside each shortened text and in the manifest.
 
-**Limits:**
+### Limits after acceptance 261126
 
-- An exception before the failed archive is written can still leave the capture to the exit hook instead of the explicit delete. The hook removes it silently, without the size message.
-- The 4 MiB limit was tested with synthetic data only. The two real bundles are 1.7 MiB, so they're unchanged.
+- An exception before the failed archive is written can still leave the capture for the exit hook to delete. The hook deletes it without a size message. The developer deferred this to [WI-084](../work-log.md#wi-084).
+- The 4 MiB limit was tested with synthetic data only. The two real bundles are 1.7 MiB, so they're unchanged. Keep this limit until a larger real bundle can test the boundary.
+
+**Validation:** `pnpm run verify` passed 890 of 890 tests, both type checks, generated-file checks and the golden checks on 261125.
 
 ### How to check Slice B
 

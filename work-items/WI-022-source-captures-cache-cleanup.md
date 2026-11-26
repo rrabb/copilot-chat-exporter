@@ -5,11 +5,10 @@ Canonical entry: [WI-022](../work-log.md#wi-022).
 ## At a glance
 
 - **Goal:** use stable source copies for export and saved-file verification.
-- **Delivered policy:** normal success deletes the copy, while `--keep-source`, warnings and failures keep it.
-- **Later finding 261125:** the current policy can leave large private copies after problems. Crash leftovers and stale registrations also weaken cleanup.
-- **Follow-up:** [WI-083](WI-083-capture-retention-and-crash-recovery.md) reviews a new default-delete policy and crash recovery.
-- **Next step:** review WI-083's policy questions before approving code.
-- **Scope limit:** WI-022's delivered behavior remains the current behavior until the follow-up is approved and implemented.
+- **Delivered policy:** normal success deletes the copy. Problem runs do too, unless `--keep-source` or `--keep-source-on-problem` was set.
+- **Later finding 261125:** the earlier policy left large private copies after problems. Crash leftovers and stale registrations also weakened cleanup.
+- **Follow-up:** [WI-083](WI-083-capture-retention-and-crash-recovery.md) added crash recovery, default deletion after problems and a 4 MiB diagnostic limit.
+- **Outcome:** the developer accepted WI-083 on 261126. [WI-084](../work-log.md#wi-084) is a low-priority deferred message improvement.
 
 ## Original goal
 
@@ -28,7 +27,7 @@ The repeatability criterion comes from the original objective. Saved-file checki
 
 ## Work tree
 
-Progress as of 261125: 0 of 1 child done.
+Progress as of 261126: 1 of 1 child done.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -44,7 +43,7 @@ Local exports keep the journal and supplemental inputs the renderer uses: select
 
 SDK discovery reads live identity/index mappings, then captures the selected event log, selected identity/index data, and usage rows for the backing session, including child agents. A small SQLite file holds those rows from a read-only transaction. Unrelated sessions/tables and broad catalog/state copies are excluded. A missing usage source/table keeps the recorded-event fallback.
 
-Normal export verifies persisted staged Markdown and linked companions before publishing the normal destination. Success removes the source capture unless `--keep-source` was requested. Failure keeps evidence and exits nonzero; it must not replace an earlier successful archive. Later saved-file verification needs the same selector and retained capture. A not-kept receipt distinguishes intentional deletion from a missing kept copy. Neither case permits a silent switch to current live sources.
+Normal export verifies persisted staged Markdown and linked companions before publishing the normal destination. Success and problem runs remove the source capture unless a keep flag was set. Failure keeps output, diagnostics and a receipt; it must not replace an earlier successful archive. Later saved-file verification needs the same selector and retained capture. A not-kept receipt distinguishes intentional deletion from a missing kept copy. Neither case permits a silent switch to current live sources.
 
 ## Important decisions and tradeoffs
 
@@ -53,7 +52,7 @@ Normal export verifies persisted staged Markdown and linked companions before pu
 | Freeze before comparison; implemented in `2e404d1` | Changing live inputs prevented causal comparison. Per-file captures keep repeatability without claiming a global transaction. |
 | Verify saved SDK files; implemented in `7e410f6` | Regeneration had checked new output instead of the supplied file. Historical success from that path is not saved-file integrity evidence. |
 | Narrow selected captures; approved and implemented in `c09bffa` | Broad snapshots copied unrelated private data and cost time/disk. Selected metadata must still keep identity, usage fallback, and required enrichment. |
-| Default verify/delete, optional `--keep-source`; implemented | Limits routine retained private data. Later file verification requires opting to keep the source. Failures keep it automatically. |
+| Default delete after all runs, optional keep flags; implemented | Limits retained private data. Later file verification requires choosing `--keep-source`. `--keep-source-on-problem` keeps evidence after a problem only. |
 | Persistent platform cache, overridden by `CCE_CACHE_DIR`; approved and implemented | Avoids routine temp cleanup. It doesn't protect against manual removal or every OS policy. |
 | Preview before deletion, default No, corpus opt-in; approved and implemented | Earlier cleanup could delete before showing targets. Automation must pass `--yes`; no terminal without it deletes nothing. |
 | Legacy temporary captures remain report-only | Missing ownership evidence is not permission to migrate or delete existing directories. |
@@ -73,7 +72,7 @@ The work resolved several blockers that otherwise invalidated the original goal:
 - Initial broad SDK captures kept approximately 1.51 GB in the measured case. Selected capture was approximately 153 MB, 89.89% smaller in that same-source comparison. This is one historical measurement, not a universal reduction.
 - Unsafe cleanup deleted before inventory/confirmation. Approved behavior now previews and requires approval, rechecks readers, and protects unknown or linked entries.
 - A 261125 live cache review found one 80.59 MiB kept SDK capture and nine stale registrations. The stale records made the cache report stop with `ENOENT` before it listed the valid capture.
-- The normal exit hook removes temporary captures. It can't recover them after a forced kill or power loss. Cleanup currently selects only kept captures, so a dead process can leave an unkept capture that cleanup skips.
+- Slice A fixed stale registrations and dead-owner recovery for abandoned captures. Slice B deletes problem-run captures by default.
 
 The chronology contains apparently conflicting proposals and completion statements. The approved safety receipt supersedes earlier “not implemented” cache-location/confirmation proposals. Earlier “success keeps capture” wording predates the approved default-delete/`--keep-source` policy.
 
@@ -96,7 +95,9 @@ Frozen inputs, genuine saved-file checking, selected retention, and approved cle
 
 This does not establish byte-lossless export. Text redaction, missing optional stores, opaque data, persisted-resource clipping, and verification coverage limits remain distinct. Captures remain private and can be manually removed. Earlier regenerated-file checks do not prove old Markdown was repaired. Missing required source evidence causes an error rather than a live-source substitution.
 
-WI-083 returns these later cleanup and retention findings to the main goal: stable verification should not leave a large private copy that the user never chose to keep. It records the proposed policy, counterarguments and cleanup work without changing the delivered WI-022 behavior.
+WI-083 returned the cleanup and retention findings to the main goal. Stable verification shouldn't leave a large private copy the user never chose to keep.
+
+Accepted work removes problem-run sources by default. It keeps an opt-in replay path and caps diagnostic evidence.
 
 Related work remains visible: [manual acceptance](../work-log.md#wi-003), [fidelity policy](../work-log.md#wi-004), [resource clipping](../work-log.md#wi-006), [failure-log write errors](../work-log.md#wi-043), and [historical tool-identity closure](../work-log.md#wi-025). WI-003 covers legacy listing/browser/print checks. Image presentation differs from the delivered byte companions in [WI-024](../work-log.md#wi-024).
 
