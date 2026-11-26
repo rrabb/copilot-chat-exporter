@@ -1,5 +1,6 @@
 dist/
 *.tsbuildinfo
+.history/
 
 # Local regression fixture for the TS refactor: a ~30 MB verbatim copy of a real VS Code
 # workspace-storage session plus its ~2.4 MB expected render. Machine-local by design; the
