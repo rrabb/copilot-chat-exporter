@@ -103,7 +103,7 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 | `pnpm install` | Install dependencies. Uses `pnpm-lock.yaml`. Don't use npm. |
 | `pnpm test` | Full test suite. Don't use `node --test test/`. |
 | `pnpm test <file...>` | Focused tests with cache isolation, e.g. `pnpm test test\args.test.ts`. Prefer this over manual `node --test` commands. |
-| `pnpm run verify` | Generated-file check, both typechecks, tests, golden check. Run it before finishing. |
+| `pnpm run verify` | Generated-file check, both typechecks, tests, golden check. Use it for shared source, cross-cutting changes, generated output or public behavior. |
 | `pnpm run build` | Rebuild `dist/` |
 | `pnpm run verify:local` | `verify` plus the machine-local baseline (optional) |
 | `pnpm run golden:update` | Only for an intentional, reviewed rendering or contract change |
@@ -113,7 +113,9 @@ The rules are in SPEC [Agent usage and credits](docs/SPEC.md#agent-usage-and-cre
 | `pnpm run demo:diagnostics` | Injected-fault scenarios through the real CLI. For your own sandbox runs, see [Run the CLI on a copied chat](README.md#cli-sandbox). |
 | `node scripts/check-prose.mjs [--ai] <file-or-folder...>` | Pilot writing-style check for Markdown. It reports advisory findings and never edits files. The default check is local and free. `--ai` adds a cheap-model review (default `claude-haiku-5.5`, `--model` overrides) and sends the text to the model service. With `--ai`, the model judges word choice and the word-list rule only prints if the AI review fails. `--stdin` checks piped prose such as a chat reply or extracted code comment. Not part of `verify` yet. See [WI-060](work-log.md#wi-060). |
 
-- Run the narrowest relevant test right after the first real edit, then `pnpm run verify`.
+- Run the narrowest relevant test right after the first real edit. Then run the additional checks affected by the change.
+- Run `pnpm run verify` for shared source, cross-cutting changes, generated output or public behavior.
+- Do not require full verification for an isolated script with focused tests that cover the change.
 - Write inline probes as `temp-tool-output\*.mts` that import `../src/...`.
 - **Windows fallback:** For a custom preload invocation, use `pnpm test --command --import <preload-file-URL> --test <file...>`. Resolve `test\cache-isolation.ts` to an absolute `file:///` URL, not a backslash path. This keeps the wrapper's cache isolation and checks. The [WI-015 run](work-items/WI-015-discovery-and-selection.md#validation-and-limits) used a file URL after a backslash path failed.
 - Working copies are CRLF while `.gitattributes` pins LF, so Git's CRLF warnings are harmless. Use the `edit` tool for multi-line changes.
