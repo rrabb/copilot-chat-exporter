@@ -1,20 +1,20 @@
 # WI-087 Chat info command
 
-- Status: ⏳ Waiting · Medium. Implementation 261126. Review fixes done 261126 (see [Fix results](#fix-results-261126)). Waiting for dev acceptance.
+- Outcome: ✅ Accepted 261126. Implementation and review fixes are complete. Follow-up polish and contract work remains separate.
 - Tags: [build]
 - Related: [WI-015](WI-015-discovery-and-selection.md) (selectors), [WI-086](../work-log.md#wi-086) (terminal listing conventions)
 
 ## At a glance
 
 - Goal: inspect one chat through `--info <selector>`, with a compact default view, `--full` and unstable JSON.
-- Shared data: `ChatInfo` is a project data type. Terminal, JSON and the future HTML card should render from it.
+- Shared data: `ChatInfo` is the project data type for the terminal views and unstable JSON. Shared HTML rendering is follow-up research in WI-088.
 - Scope: Local and agent chats use the same selector rules. These rules refuse ambiguous matches.
 - Decisions:
   - Schema 0
   - 100-word final-response previews
   - Unique top-level artifact totals
   - No chat-to-chat comparison in terminal output
-- Progress: argument parsing and focused tests pass. Real Local and Agent Host checks pass. Regular and detailed HTML listings are in `temp-tool-output/261126-2040-wi087-validation/` for review.
+- Result: argument parsing, text renderers, JSON and real Local and Agent Host checks passed. The dev accepted the result on 261126.
 
 ## Goal
 
@@ -38,7 +38,7 @@
 2. Render it three ways: terminal default view, terminal `--full`, and `--json`.
 3. Next month, the HTML per-chat card should render from the same object. That's a refactor of `detailed-listing`, not a new HTML page.
 
-**JSON:** `--info <selector> --json` prints the object with `schemaVersion: 0`. It's an unstable debug format, and fields may change until the HTML renderer uses it. It isn't a SPEC contract yet (decided 261126).
+**JSON:** `--info <selector> --json` prints the object with `schemaVersion: 0`. It's an unstable debug format. Fields may change after a schema review or shared-renderer decision. It isn't a SPEC contract yet (decided 261126).
 
 ## Default view (target about 40 lines)
 
@@ -98,14 +98,10 @@ Effort: about 1-1.5 days for both chat kinds. The HTML refactor is separate, pla
 ## Implementation and review
 
 - 261126: argument parsing, `ChatInfo`, terminal default/full renderers and unstable JSON are implemented.
-- Real Agent Host check: `79df1255` resolved to the underlying chat `474cc940-6847-4e78-b701-b87f663910d5`, 7 prompts, 422.02 credits, 4 sub-agents and 15 related artifacts.
+- Real Agent Host check: `79df1255` resolved to chat `474cc940-6847-4e78-b701-b87f663910d5`. It has 7 prompts, 422.02 credits and 15 related artifacts. The regular listing has 4 sub-agent occurrence rows. The detailed listing and `--info` merge them into 2 verified child conversations.
 - Real Local check: `e47df75c` resolved as a verified journal, 2 prompts and a partial 1.3 MB top-level artifact total. An unreadable resources directory stays unknown instead of hiding the known size.
 - Regular and detailed `--last25` reports ran sequentially with the same Code root. Both showed 777 source occurrences across 622 conversations, with 216 sub-agent chats hidden. HTML sizes and main sections were reviewed.
-- Remaining work:
-  - Make the full terminal view easier to read
-  - Add CLI and library tests for ambiguous and current paths
-  - Run `pnpm run verify`
-  - Add final docs
+- Completion 261126: the full terminal view is readable, focused tests cover selection and rendering, `pnpm run verify` passes, and the CLI docs are updated.
 
 ## Review 261126 and approved plan
 
@@ -150,6 +146,28 @@ A build agent did all three phases in three passes. The coordinator reviewed eac
 | Color | ✅ ANSI color only on a terminal with `NO_COLOR` unset. Piped output has no color codes. |
 
 Known limits: `--full` repeats the Cost section from the default view. Each chat still takes about 10.5 s because it builds the full inventory.
+
+## Acceptance 261126
+
+The dev accepted WI-087 on 261126 after comparing `--info`, `--info --full`, JSON, the regular listing and the detailed card.
+
+Validation passed:
+
+- 27 focused tests
+- Real Agent Host and Local checks
+- Regular and detailed `--last25` HTML checks
+- `pnpm run verify`
+- `pnpm run build`
+- Plain piped output with 0 ANSI bytes
+
+The implementation keeps the current terminal layout. Follow-on findings about rounding, JSON structure, HTML reuse and the duplicate evidence read stay outside this completed item.
+
+## Work tree
+
+Progress: 1 parent item is complete. 1 follow-up remains open.
+
+- ✅ WI-087 Chat info command
+- 📋 [WI-088 Chat info enhancements](WI-088-chat-info-enhancements.md) - Part of WI-087. Contains the 261126 comparison, JSON review, recommended order and performance test.
 
 ## Risks
 
