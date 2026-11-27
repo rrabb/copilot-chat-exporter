@@ -30,6 +30,11 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- `--info <selector>` prints a compact terminal detail view for one Local or agent chat. It now includes:
+  - Identity, local activity span, model chain and cancellation or error counts
+  - Recorded AI credits, cache use, cost by model and expensive turns
+  - Unique changed files, exact sub-agent selectors and grouped storage
+  `--full` puts aligned turn, file and sub-agent tables before source evidence. It wraps stripped prompt and response previews. `--json` prints an unstable `schemaVersion: 0` JSON record. Both modes reuse verified selectors and create no chat archive or source capture (WI-087, chat info command).
 - A local `scripts/check-prose.mjs` command checks project prose against the writing guide. Optional `--ai` review recognizes documented model names and short names. It rejects ambiguous partial matches. It reports the model, tokens, credits and timing as metadata for WI-060 (the prose-check work).
 - Verification warnings, failures and exporter or verifier exceptions now write collision-safe private AI diagnostic tasks and JSON manifests. Schema samples keep field names and value types while redacting free text, IDs, paths, tokens and binary bodies. Failed content checks keep exact selected source and best-match evidence, and large samples move to a hash-linked restricted folder. Clean verification and clean ordinary tool failures create no bundle. `--verify --json` still keeps stdout to one JSON document (WI-077).
 - Diagnostic manifest version 2 maps each failure reason to a repair category, records the exception stage and stack frames, shows failed parser checks with fence excerpts, locates missing images and broken companion links, and adds a replay command. An optional `.raw-records.jsonl` keeps the exact records behind each finding (WI-077).

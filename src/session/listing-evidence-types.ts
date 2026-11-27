@@ -58,6 +58,8 @@ export interface ListingSessionUsage {
 export interface ListingTurnEvidence {
   id: string;
   prompt: string;
+  /** First 100 words of the final recorded assistant response; reasoning is excluded. */
+  responsePreview?: string | null;
   role: 'human' | 'delegated' | 'follow-up';
   timestamp: number | null;
   selectedModel: string | null;

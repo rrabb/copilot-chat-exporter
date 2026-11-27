@@ -63,6 +63,8 @@ test('no arguments is valid: it means listing, never implicit export', () => {
   const options = ok([]);
   assert.deepEqual(options, {
     list: true,
+    info: false,
+    full: false,
     showIgnored: false,
     last25: false,
     subagents: false,
@@ -170,6 +172,32 @@ test('root selection and current-session intent are explicit', () => {
   assert.match(err(['--verify', '--golden', 'check']), /Choose one action/);
 });
 
+test('chat info is a distinct action with full and JSON views', () => {
+  const selector = ok(['--info', '11111111-2222-4333-8444-555555555555']);
+  assert.equal(selector.info, true);
+  assert.equal(selector.full, false);
+  assert.equal(selector.json, false);
+  assert.deepEqual(selector.positionals, ['11111111-2222-4333-8444-555555555555']);
+
+  const full = ok(['--info', '11111111-2222-4333-8444-555555555555', '--full', '--json']);
+  assert.equal(full.info, true);
+  assert.equal(full.full, true);
+  assert.equal(full.json, true);
+
+  const current = ok(['--info', '--current', '--full']);
+  assert.equal(current.info, true);
+  assert.equal(current.current, true);
+  assert.equal(current.full, true);
+
+  assert.match(err(['--info']), /--info requires/);
+  assert.match(err(['--info', '--current', 'out.md']), /--info --current/);
+  assert.match(err(['--full']), /--full requires --info/);
+  assert.match(err(['--info', 'one', '--full', '--full']), /more than once/);
+  assert.match(err(['--info', 'one', '--list']), /Choose one action/);
+  assert.match(err(['--verify', '--info', 'one']), /Choose one action/);
+  assert.match(err(['--info', 'one', 'out.md']), /Too many positional arguments/);
+});
+
 test('listing filters require a listing action and are parsed independently', () => {
   const options = ok(['--show-ignored', '--last25', '--full-ids', '--html-output', 'report.html']);
   assert.equal(options.list, true);
@@ -226,11 +254,12 @@ test('--list is a mode, and junk beside it is still refused', () => {
   assert.match(err(['--list', '--bogus']), /Unknown option/);
 });
 
-test('--json is a verify-only option that sets json', () => {
+test('--json is available for verification and chat info', () => {
   assert.equal(ok(['--verify', 'the-session', '--json']).json, true);
   assert.equal(ok(['--verify', 'the-session']).json, false);
-  assert.match(err(['the-session', '--json']), /--json is available only with --verify/);
-  assert.match(err(['--list', '--json']), /--json is available only with --verify/);
+  assert.equal(ok(['--info', 'the-session', '--json']).json, true);
+  assert.match(err(['the-session', '--json']), /--json is available only with --verify or --info/);
+  assert.match(err(['--list', '--json']), /--json is available only with --verify or --info/);
 });
 
 test('--explain is available for chat export and verification only', () => {

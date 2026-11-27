@@ -35,6 +35,8 @@ export { inventorySessions } from './session/inventory.ts';
 export type { SessionInventory } from './session/inventory.ts';
 export { formatSessionListing } from './session/listing.ts';
 export { collectListingEvidence } from './session/listing-evidence.ts';
+export { buildChatInfo, formatChatInfo, formatChatInfoFull, formatChatInfoJson, selectChatInfoOccurrence } from './session/chat-info.ts';
+export type { ChatInfo, ChatInfoArtifact, ChatInfoDate, ChatInfoFileChange, ChatInfoProject, ChatInfoRelationship, ChatInfoStorageGroup, ChatInfoSubagent, ChatInfoTitle, ChatInfoTopTurn, ChatInfoTurn, ChatInfoUsage, ChatInfoUsageModel } from './session/chat-info.ts';
 export { formatDetailedSessionListingHtml } from './session/detailed-listing.ts';
 export { compressDetailedListingHtml } from './session/compressed-listing.ts';
 export type { ReportCompression } from './session/compressed-listing.ts';

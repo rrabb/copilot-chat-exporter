@@ -207,6 +207,25 @@ node src/cli.ts --current docs/temp/current.md --user-data-root "C:\Users\you\Ap
 node src/cli.ts <sessionId-or-unique-prefix> docs/temp/name.md
 ```
 
+Inspect one chat before exporting it:
+
+```
+node src/cli.ts --info <sessionId-or-unique-prefix> --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --info <sessionId-or-unique-prefix> --full --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --info --current --full --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --info <sessionId-or-unique-prefix> --json --user-data-root "C:\Users\you\AppData\Roaming\Code"
+```
+
+`--info` uses the same verified selector rules as export and listing. It refuses ambiguous matches. The terminal default shows identity, activity, cost, changes and storage. It keeps canceled turns, unique edited files, sub-agent selectors and this chat's records visible.
+
+`--full` puts turns, cost by model, changed files and sub-agents first. Sources come last. Turns show model, effort, recorded usage, unique file counts, and wrapped prompt and response previews. Storage separates this chat's data, VS Code's per-chat data and files shared by the workspace.
+
+Text uses local dates such as `1126-14:44`, with the UTC offset named once. Unknown values stay `?`. Piped output has no ANSI codes. Interactive output can add color unless `NO_COLOR` is set.
+
+`--json` prints a redacted, project-owned JSON record with `schemaVersion: 0`. This prototype format is unstable until it is reviewed and reused by the future HTML renderer.
+
+Agent credits remain recorded AI credits. Local `request.copilotCredits` values stay labelled as an unverified Local unit. Never convert them to AI credits or mix the two. The `~` mark and recorded/total coverage show a partial counter. Storage totals count each path once inside its group and mark partial sums. The record count measures this chat's journal or events records, not whole-disk storage.
+
 Listing writes a self-contained offline HTML report in the invoking directory by default and prints its path. Use `--no-html` to suppress it or `--html-output <path>` to choose a destination. Existing reports are preserved unless `--overwrite` is explicit; no browser opens automatically. The report includes searchable, sortable and filterable rows, inventory charts, copyable selectors, row-level source explanations, and a linked collapsible guide to storage paths, unknown values, statuses, ambiguities and coverage limits. Its table remains readable without JavaScript.
 
 For development and review in this repository, put generated reports, runtime captures, test output and validation logs in the Git-ignored `temp-tool-output/` directory. Pass `--html-output temp-tool-output/<report-name>.html` for listing reports and use timestamped log names to preserve earlier runs. This is a development convention, not a change to the CLI default. Automated test fixture sandboxes still use their existing temporary locations and cleanup.

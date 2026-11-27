@@ -5,6 +5,7 @@ import { cleanSourceCache, discardCapture, finishCapture, keepCaptureDuringFailu
 import { exportFailureFromReport, failureDetails, writeFailureLog } from './verify/export-failure.ts';
 import type { ExportFailure } from './verify/export-failure.ts';
 import path from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import type { Census } from './types.ts';
@@ -20,6 +21,7 @@ import { resolveUserDataRoot, UserDataRootError } from './session/roots.ts';
 import { inventorySessions } from './session/inventory.ts';
 import { formatSessionListing, formatSessionListingHtml } from './session/listing.ts';
 import { collectListingEvidence } from './session/listing-evidence.ts';
+import { buildChatInfo, formatChatInfo, formatChatInfoFull, formatChatInfoJson, selectChatInfoOccurrence } from './session/chat-info.ts';
 import { formatDetailedSessionListingHtml } from './session/detailed-listing.ts';
 import { compressDetailedListingHtml } from './session/compressed-listing.ts';
 import { defaultListingHtmlPath, writeListingHtml } from './session/listing-report.ts';
@@ -244,7 +246,7 @@ if (!parsed.ok) {
   process.exit(1);
 }
 const {
-  list: listMode, current: currentMode, verify: verifyMode, strict: strictMode, json: jsonMode,
+  list: listMode, info: infoMode, full: fullMode, current: currentMode, verify: verifyMode, strict: strictMode, json: jsonMode,
   explain: explainMode,
   showIgnored: showIgnoredMode, last25: last25Mode, fullIds: fullIdsMode, subagents: subagentsMode, find: findText, noHtml: noHtmlMode, detailed: detailedMode,
   compression: compressionMode,
@@ -344,7 +346,7 @@ const firstArgument = goldenMode ? GOLDEN_FIXTURE_PATH : positionalArgs[0];
 const firstIsSource = looksLikeSessionArgument(firstArgument);
 const sourceArgument = firstIsSource && !currentMode ? firstArgument : undefined;
 const outputArgument = goldenMode ? undefined : (firstIsSource ? positionalArgs[1] : firstArgument);
-if (!listMode && !goldenMode && ((!currentMode && !firstIsSource) || (currentMode && firstIsSource))) {
+if (!listMode && !infoMode && !goldenMode && ((!currentMode && !firstIsSource) || (currentMode && firstIsSource))) {
   console.error('Export/verify/snapshot requires an explicit session UUID, unique short UUID prefix, or .jsonl path, or --current [outputPath].');
   process.exit(1);
 }
@@ -356,7 +358,7 @@ try {
     fileVerificationReceipt = await readExportCopy(path.resolve(outputArgument), sourceArgument ?? '--current');
   if (fileVerificationReceipt && outputArgument)
     fileOutputHash = await checkExportOutputHash(outputArgument, fileVerificationReceipt);
-  if (!fileVerificationReceipt && (listMode || currentMode || userDataRootArg !== null || (firstIsSource && !firstArgument?.endsWith('.jsonl')))) {
+  if (!fileVerificationReceipt && (listMode || infoMode || currentMode || userDataRootArg !== null || (firstIsSource && !firstArgument?.endsWith('.jsonl')))) {
     selectedRoot = await resolveUserDataRoot({
       userDataRoot: userDataRootArg ?? undefined,
       choose: process.stdin.isTTY && process.stdout.isTTY ? chooseRoot : undefined,
@@ -402,13 +404,40 @@ try {
     process.stdout.isTTY && console.log(`\n${'-'.repeat(60)}\n`);
     process.exit(0);
   }
+  if (infoMode) {
+    if (selectedRoot === undefined)
+      throw new Error('Chat info requires a resolved user-data root.');
+    const inventory = await inventorySessions(selectedRoot);
+    const selector = positionalArgs[0];
+    const selected = selectChatInfoOccurrence(inventory, currentMode ? undefined : selector);
+    const info = await buildChatInfo(inventory, selected, selectedRoot);
+    if (jsonMode)
+      console.log(formatChatInfoJson(info));
+    else
+      console.log(fullMode
+        ? formatChatInfoFull(info, {
+          terminalWidth: process.stdout.columns,
+          now: Date.now(),
+          referenceYear: new Date().getFullYear(),
+          color: process.stdout.isTTY && process.env.NO_COLOR === undefined,
+          homeDir: homedir(),
+        })
+        : formatChatInfo(info, {
+          terminalWidth: process.stdout.columns,
+          now: Date.now(),
+          referenceYear: new Date().getFullYear(),
+          color: process.stdout.isTTY && process.env.NO_COLOR === undefined,
+          homeDir: homedir(),
+        }));
+    process.exit(0);
+  }
 } catch (error) {
   console.error(errorLabel(error));
   process.exit(1);
 }
 // The golden fixture's "workspace" is the package itself, so its committed render stays
 // byte-identical no matter where the package lives or which directory it is run from.
-if (!goldenMode && !currentMode && !snapshotAction && sourceArgument !== undefined && !sourceArgument.endsWith('.jsonl')
+if (!goldenMode && !infoMode && !currentMode && !snapshotAction && sourceArgument !== undefined && !sourceArgument.endsWith('.jsonl')
   && (selectedRoot !== undefined || fileVerificationReceipt?.sdk)) {
   // Agent Host and Copilot CLI chats are not Local journals; the inventory decides which path applies.
   const sdkExit = await runSdkCommand({

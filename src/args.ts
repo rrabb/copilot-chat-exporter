@@ -8,6 +8,8 @@ import type { ToolGroupOrder } from './types.ts';
 
 export interface CliOptions {
   list: boolean;
+  info: boolean;
+  full: boolean;
   showIgnored: boolean;
   last25: boolean;
   fullIds: boolean;
@@ -50,7 +52,7 @@ export type ParsedArgs =
   | { ok: false; error: string };
 
 const BOOLEAN_FLAGS = new Set([
-  '--list', '--current', '--overwrite', '--verify', '--audit', '--explain', '--strict', '--json',
+  '--list', '--info', '--full', '--current', '--overwrite', '--verify', '--audit', '--explain', '--strict', '--json',
   '--show-ignored', '--last25', '--full-ids', '--subagents', '--no-html', '--detailed', '--compressed',
   '--keep-source', '--keep-source-on-problem', '--cache', '--clean', '--dry-run', '--yes', '--include-corpus',
 ]);
@@ -109,7 +111,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
   }
 
   const modes = [
-    booleans.has('--list'), values.has('--golden'), values.has('--snapshot'), values.has('--install-skill'),
+    booleans.has('--list'), booleans.has('--info'), values.has('--golden'), values.has('--snapshot'), values.has('--install-skill'),
     booleans.has('--verify') || booleans.has('--audit'),
     booleans.has('--cache') || booleans.has('--clean'),
   ].filter(Boolean).length;
@@ -131,6 +133,14 @@ export function parseArgs (argv: string[]): ParsedArgs {
     && ([...booleans].some((flag) => !['--cache', '--clean', '--dry-run', '--yes', '--include-corpus'].includes(flag))
       || [...values.keys()].some((flag) => flag !== '--older-than')))
     return { ok: false, error: 'Cache commands accept only --cache, --clean, --older-than, --dry-run, --yes and --include-corpus.' };
+  if (booleans.has('--full') && !booleans.has('--info'))
+    return { ok: false, error: '--full requires --info.' };
+  if (argv.filter((arg) => arg === '--full').length > 1)
+    return { ok: false, error: 'Option --full was supplied more than once.' };
+  if (booleans.has('--info') && !booleans.has('--current') && positionals.length === 0)
+    return { ok: false, error: '--info requires a session selector or --current.' };
+  if (booleans.has('--info') && booleans.has('--current') && positionals.length > 0)
+    return { ok: false, error: '--info --current accepts no session positional.' };
   if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
     || booleans.has('--subagents') || values.has('--find')
     || booleans.has('--no-html') || booleans.has('--detailed') || booleans.has('--compressed') || values.has('--compression') || values.has('--html-output')) && !listRequested)
@@ -149,26 +159,30 @@ export function parseArgs (argv: string[]): ParsedArgs {
   if (booleans.has('--explain') && (listRequested || booleans.has('--cache') || booleans.has('--clean')
     || values.has('--golden') || values.has('--snapshot') || values.has('--install-skill')))
     return { ok: false, error: '--explain is available only for chat export or verification.' };
-  if (booleans.has('--json') && !(booleans.has('--verify') || booleans.has('--audit')))
-    return { ok: false, error: '--json is available only with --verify.' };
+  if (booleans.has('--json') && !(booleans.has('--verify') || booleans.has('--audit') || booleans.has('--info')))
+    return { ok: false, error: '--json is available only with --verify or --info.' };
   const groupOrder = values.get('--tool-group-order');
   if (groupOrder !== undefined && groupOrder !== 'request' && groupOrder !== 'completion')
     return { ok: false, error: 'Usage: --tool-group-order request|completion' };
   if (groupOrder !== undefined && (listRequested || values.has('--golden') || values.has('--snapshot') || values.has('--install-skill')))
     return { ok: false, error: '--tool-group-order is available only for chat export or verification.' };
   if (modes > 1)
-    return { ok: false, error: 'Choose one action: --list, --verify, --snapshot, --golden or --install-skill.' };
+    return { ok: false, error: 'Choose one action: --list, --info, --verify, --snapshot, --golden or --install-skill.' };
   if (booleans.has('--current') && (booleans.has('--list') || values.has('--golden') || values.has('--install-skill')))
     return { ok: false, error: '--current cannot be combined with --list, --golden or --install-skill.' };
   if (booleans.has('--list') && positionals.length)
     return { ok: false, error: '--list does not accept a session or output positional argument.' };
-  if (positionals.length > (booleans.has('--current') ? 1 : 2))
+  if (booleans.has('--info') && positionals.length > 1)
+    return { ok: false, error: 'Too many positional arguments.' };
+  if (positionals.length > (booleans.has('--current') ? 1 : 2) && !booleans.has('--info'))
     return { ok: false, error: 'Too many positional arguments.' };
 
   return {
     ok: true,
     options: {
       list: listRequested,
+      info: booleans.has('--info'),
+      full: booleans.has('--full'),
       showIgnored: booleans.has('--show-ignored'),
       last25: booleans.has('--last25'),
       fullIds: booleans.has('--full-ids'),

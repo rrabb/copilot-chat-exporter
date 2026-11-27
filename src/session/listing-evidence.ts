@@ -22,6 +22,32 @@ function missing (error: unknown): boolean {
 function text (value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
+export function listingResponsePreview (value: string | null): string | null {
+  if (!value)
+    return null;
+  const sourceLines = value.trim().split(/\r?\n/u);
+  const kept: string[] = [];
+  let count = 0;
+  let clipped = false;
+  for (const [index, line] of sourceLines.entries()) {
+    const words = line.trim().split(/\s+/u).filter(Boolean);
+    const remaining = 100 - count;
+    if (words.length > remaining) {
+      kept.push(words.slice(0, remaining).join(' '));
+      count = 100;
+      clipped = true;
+      break;
+    }
+    kept.push(line.trimEnd());
+    count += words.length;
+    if (count === 100 && index < sourceLines.length - 1) {
+      clipped = true;
+      break;
+    }
+  }
+  const preview = kept.join('\n').trim();
+  return preview ? `${preview}${clipped ? ' …' : ''}` : null;
+}
 export function listingTimestamp (value: unknown): number | null {
   const number = typeof value === 'number' ? value
     : typeof value === 'string' && /^\d{10,13}$/u.test(value) ? Number(value) : null;
@@ -209,8 +235,11 @@ export function sdkListingTurns (all: readonly SdkEvent[], source: SdkEventSourc
       event.type === 'assistant.message' && text(event.data.model) ? [String(event.data.model)] : []));
     const files = filesFor(records);
     const assistant = records.filter((event) => event.type === 'assistant.message');
+    const assistantText = [...assistant].reverse().map((event) =>
+      typeof event.data.content === 'string' ? event.data.content : '').find((value) => value.trim()) ?? null;
     result.push({
       id: prompt.id ?? `line:${prompt.line}`, prompt: String(prompt.data.content),
+      responsePreview: listingResponsePreview(assistantText),
       role: source.scope.kind === 'subagent'
         ? typeof prompt.data.source === 'string' && prompt.data.source !== '' && prompt.data.source.toLowerCase() !== 'user'
           ? index === 0 ? 'delegated' : 'follow-up' : 'follow-up'
@@ -233,8 +262,14 @@ export function sdkListingTurns (all: readonly SdkEvent[], source: SdkEventSourc
     else if (task) {
       const firstPrompt = prompts[0];
       const initial = scoped.slice(0, firstPrompt ? scoped.indexOf(firstPrompt) : scoped.length);
+      const initialAssistant = [...initial].reverse().find((event) =>
+        event.type === 'assistant.message' && typeof event.data.content === 'string'
+        && event.data.content.trim()) as SdkEvent | undefined;
+      const initialText = initialAssistant?.type === 'assistant.message'
+        && typeof initialAssistant.data.content === 'string' ? initialAssistant.data.content : null;
       result.unshift({
         id: parentToolCallId, prompt: task, role: 'delegated', timestamp: listingTimestamp(calls[0].timestamp),
+        responsePreview: listingResponsePreview(initialText),
         selectedModel: settings.get(calls[0])?.selected ?? null,
         models: uniqueModels(initial.flatMap((event) => event.type === 'assistant.message' && text(event.data.model) ? [String(event.data.model)] : [])),
         auto: isAutoListingModel(settings.get(calls[0])?.selected ?? null),
@@ -365,7 +400,11 @@ export async function collectListingEvidence (occurrences: readonly SessionOccur
           const request = requests.get(turn.requestId)?.shift();
           if (!request)
             throw new Error(`Replayed request identity missing for turn ${turn.number}; rich evidence omitted.`);
-          return localListingTurn(request, turn.requestId, turn.prompt);
+          const item = localListingTurn(request, turn.requestId, turn.prompt);
+          const prose = turn.prose.filter((node) => node.type === 'text' || node.type === 'ref')
+            .map((node) => node.text).join('\n');
+          item.responsePreview = listingResponsePreview(prose);
+          return item;
         });
         session.rawRequests.forEach((request, index) => fields(evidence, request, `request.${index + 1}`));
         session.rawRequests.some(incompleteLocalListingEdits) && evidence.flags.push('incomplete-edit-evidence');
@@ -492,6 +531,11 @@ export async function collectListingEvidence (occurrences: readonly SessionOccur
       const redacted = redactText(turn.prompt);
       turn.prompt = redacted.text;
       redacted.counts.size && evidence.flags.push('redacted-text');
+      if (turn.responsePreview) {
+        const preview = redactText(turn.responsePreview);
+        turn.responsePreview = preview.text;
+        preview.counts.size && evidence.flags.push('redacted-text');
+      }
     }
     evidence.titles = evidence.titles.map((title) => ({ ...title, value: redactText(title.value).text }));
     evidence.flags = [...new Set(evidence.flags)];
