@@ -81,6 +81,20 @@ export const COPILOT_MODEL_CATALOG: readonly Readonly<CopilotModel>[];
 export function findCopilotModel(selector: CopilotModelSelector): Readonly<CopilotModel> | undefined;
 export function selectCopilotModel(selector: CopilotModelSelector): CopilotModelSelection;
 export function resolveCopilotModelId(selector: CopilotModelSelector): string;
+export const AI_CHARS_PER_TOKEN: number;
+export const AI_MIN_CHARS_PER_TOKEN: number;
+export const AI_CLI_OVERHEAD_TOKENS: number;
+export const AI_COMPACTION_FRACTION: number;
+export const AI_DEFAULT_PROMPT_TOKENS: number;
+export const AI_MAX_PROMPT_TOKENS: number;
+export const AI_DEFAULT_MAX_CREDITS: number;
+export function aiPromptTokenBudget(modelId: string): number;
+/** Lowers the ratio from one batch's reported input tokens. Never raises it. */
+export function calibrateCharsPerToken(
+  current: number,
+  promptChars: number,
+  usage: Pick<UsageMetrics, 'tokens' | 'requests'>,
+): number;
 
 export interface CopilotModelSelection {
   model: Readonly<CopilotModel> | null;
@@ -100,6 +114,8 @@ export interface ProseOptions {
     message: string;
   } | null;
   reasoningEffort: string | null;
+  /** Spend cap for one --ai run, in credits. Default 10. */
+  maxAiCredits: number;
   stdin: boolean;
   paths: string[];
 }
@@ -152,6 +168,8 @@ export interface UsageMetrics {
     reasoning: number;
   };
   models: string[];
+  /** Model requests the CLI made. More than 1 per batch means tool loops or compaction. */
+  requests?: number | null;
 }
 
 export interface AiReviewResult {
@@ -167,9 +185,16 @@ export interface AiReviewResult {
     } | null;
     reasoning: string;
     cliVersion: string;
+    promptTokenBudget?: number;
+    /** Characters-per-token estimate at the start and after calibration. */
+    charsPerToken?: { start: number; final: number };
     promptBytes: number;
     responseBytes: number;
     batches: number;
+    /** Credit cap for the whole run. Checked between batches, so the last batch can go over it. */
+    maxCredits?: number;
+    /** Findings the model returned that were invalid or cited an unknown passage. */
+    droppedFindings?: number;
     usageStatus: string;
     wallMs: number;
   };
@@ -182,22 +207,40 @@ interface ProcessResult {
   error?: Error;
 }
 
+interface StyleFile {
+  path: string;
+  url: URL;
+}
+
+interface StyleFiles {
+  core: StyleFile;
+  reference: StyleFile;
+}
+
 interface ReviewRuntime {
   cwd?: string;
   copilotCommand?: string;
   temporaryDirectory?: () => string;
   now?: () => number;
   spawnSync?: (command: string, args: string[], options: Record<string, unknown>) => ProcessResult;
+  styleFiles?: StyleFiles;
+}
+
+export interface AiReviewParse {
+  findings: AiFinding[];
+  /** Findings skipped because they were invalid or cited an unknown passage. */
+  dropped: Array<{ source?: string; reason: 'invalid finding' | 'unknown passage' }>;
 }
 
 export function parseArgs(argv: string[]): ProseOptions;
 export function checkText(text: string, options: ProseOptions, ranges?: number[][], sourceName?: string): ProseFinding[];
 export function parseDiffRanges(diff: string, lineCount: number): number[][];
 export function collectReviewSources(options: ProseOptions, runtime?: ReviewRuntime): ReviewSource[];
-export function parseAiReview(text: string, passageIds: string[]): AiFinding[];
+export function parseAiReview(text: string, passageIds: string[]): AiReviewParse;
 export function parseUsageReport(text: string): UsageMetrics;
 export function reviewWithModel(sources: ReviewSource[], options: ProseOptions, runtime?: ReviewRuntime): AiReviewResult;
 export function formatUsageFooter(result: AiReviewResult, sourceCount: number, passageCount: number): string;
+export function main(argv?: string[], runtime?: ReviewRuntime): number;
 export function exitCodeForFindings(
   options: ProseOptions,
   counts: { deterministicRecommend: number; blocker: number },

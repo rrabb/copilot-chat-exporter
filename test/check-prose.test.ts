@@ -1,16 +1,26 @@
 import assert from 'node:assert/strict';
 import { spawnSync as realSpawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 import {
+  AI_CHARS_PER_TOKEN,
+  AI_CLI_OVERHEAD_TOKENS,
+  AI_COMPACTION_FRACTION,
+  AI_DEFAULT_PROMPT_TOKENS,
+  AI_MAX_PROMPT_TOKENS,
+  AI_MIN_CHARS_PER_TOKEN,
+  aiPromptTokenBudget,
+  calibrateCharsPerToken,
   checkText,
   COPILOT_MODEL_CATALOG,
   collectReviewSources,
   exitCodeForFindings,
   findCopilotModel,
   formatUsageFooter,
+  main,
   parseAiReview,
   parseArgs,
   parseDiffRanges,
@@ -29,6 +39,7 @@ const options = (values = {}) => ({
   requestedModel: 'claude-haiku-5.5',
   modelSelection: null,
   reasoningEffort: null,
+  maxAiCredits: 10,
   stdin: false,
   paths: [],
   ...values,
@@ -219,8 +230,7 @@ test('AI findings require structured severity and source identity', () => {
       suggestion: 'Name the source behavior.',
     }],
   });
-  assert.equal(parseAiReview(text, ['S1P1'])[0].severity, 'blocker');
-  assert.throws(() => parseAiReview(text, ['S2P1']), /invalid finding/u);
+  assert.equal(parseAiReview(text, ['S1P1']).findings[0].severity, 'blocker');
   assert.throws(() => parseAiReview('FAIL', ['S1P1']), /JSON/u);
 });
 
@@ -242,6 +252,7 @@ test('usage report reads the CLI billing and token fields', () => {
         cacheReadTokens: 300,
         cacheWriteTokens: 40,
         reasoningTokens: 50,
+        requests: { count: 2, cost: 1 },
       },
     },
     agentMetrics: {
@@ -250,15 +261,17 @@ test('usage report reads the CLI billing and token fields', () => {
   }));
   assert.equal(usage.credits, 0.09);
   assert.equal(usage.premium, 1);
+  assert.equal(usage.requests, 2);
   assert.deepEqual(usage.models, ['claude-haiku-5.5']);
   assert.deepEqual(usage.tokens, { input: 1000, output: 200, cacheRead: 300, cacheWrite: 40, reasoning: 50 });
 });
 
-function fakeCopilotResponse(result: string, usagePaths: string[]) {
-  return (command: string, args: string[]) => {
+function fakeCopilotResponse(result: string, usagePaths: string[], prompts: string[] = [], inputTokens = 100) {
+  return (command: string, args: string[], spawnOptions: Record<string, unknown> = {}) => {
     if (args[0] === '--version')
       return { status: 0, stdout: 'GitHub Copilot CLI 1.0.116.\n', stderr: '' };
     assert.equal(command, 'copilot');
+    prompts.push(String(spawnOptions.input));
     const usageFlag = args.indexOf('--usage-output-file');
     assert.ok(usageFlag >= 0);
     const usagePath = args[usageFlag + 1];
@@ -268,7 +281,7 @@ function fakeCopilotResponse(result: string, usagePaths: string[]) {
       totalPremiumRequestCost: 1,
       modelMetrics: {
         'claude-haiku-5.5': {
-          inputTokens: 100,
+          inputTokens,
           outputTokens: 20,
           cacheReadTokens: 10,
           cacheWriteTokens: 0,
@@ -310,10 +323,12 @@ test('AI review uses one model process for several sources and removes usage fil
 
 test('AI review batches inputs over the model budget', () => {
   const usagePaths: string[] = [];
+  const args: string[][] = [];
   const response = JSON.stringify({ review: 'complete', findings: [] });
+  const size = aiPromptTokenBudget('claude-haiku-5.5') * AI_CHARS_PER_TOKEN * 2;
   const sources = [{
     name: 'large.md',
-    text: 'x'.repeat(120_000),
+    text: 'x'.repeat(size),
     findings: [],
     scope: { name: 'all', ranges: [[1, 1]] },
     passages: [{
@@ -321,17 +336,251 @@ test('AI review batches inputs over the model budget', () => {
       source: 'large.md',
       startLine: 1,
       endLine: 1,
-      text: 'x'.repeat(120_000),
+      text: 'x'.repeat(size),
       deterministic: [],
     }],
   }];
+  const fake = fakeCopilotResponse(response, usagePaths);
   const result = reviewWithModel(sources, options({ ai: true }), {
-    spawnSync: fakeCopilotResponse(response, usagePaths),
+    spawnSync: (command: string, callArgs: string[], spawnOptions?: Record<string, unknown>) => {
+      args.push(callArgs);
+      return fake(command, callArgs, spawnOptions);
+    },
   });
   assert.equal(result.error, undefined);
   assert.ok(usagePaths.length > 1);
   assert.equal(result.metadata.batches, usagePaths.length);
   assert.equal(result.usage.credits, usagePaths.length * 0.01);
+  const reviewCall = args.find((callArgs) => callArgs.includes('--model'));
+  assert.ok(reviewCall);
+  assert.equal(reviewCall[reviewCall.indexOf('--context') + 1], 'default');
+  // A bare --available-tools gives the model every tool. The empty value turns them off.
+  assert.equal(reviewCall[reviewCall.indexOf('--available-tools') + 1], '');
+  assert.match(formatUsageFooter(result, 1, 1), new RegExp(`budget=${aiPromptTokenBudget('claude-haiku-5.5')} tokens/batch`, 'u'));
+});
+
+test('characters-per-token calibration only lowers the ratio', () => {
+  const usage = (input: number, requests: number | null = 1) => ({
+    tokens: { input, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 },
+    requests,
+  });
+  assert.equal(calibrateCharsPerToken(2.75, 20_000, usage(10_000)), 2);
+  assert.equal(calibrateCharsPerToken(2.75, 40_000, usage(10_000)), 2.75);
+  assert.equal(calibrateCharsPerToken(2.75, 20_000, usage(20_000, 2)), 2);
+  assert.equal(calibrateCharsPerToken(2.75, 1_000, usage(10_000)), AI_MIN_CHARS_PER_TOKEN);
+  assert.equal(calibrateCharsPerToken(2.75, 20_000, usage(0)), 2.75);
+});
+
+test('AI review shrinks later batches after a dense batch', () => {
+  const usagePaths: string[] = [];
+  const prompts: string[] = [];
+  const response = JSON.stringify({ review: 'complete', findings: [] });
+  const passages = Array.from({ length: 60 }, (_, index) => ({
+    id: `S1P${index + 1}`,
+    source: 'dense.md',
+    startLine: index + 1,
+    endLine: index + 1,
+    text: 'y'.repeat(10_000),
+    deterministic: [],
+  }));
+  const sources = [{
+    name: 'dense.md',
+    text: '',
+    findings: [],
+    scope: { name: 'all', ranges: [[1, 60]] },
+    passages,
+  }];
+  // Reports 1 token per 2 prompt characters, denser than the 2.75 start ratio.
+  const firstCap = aiPromptTokenBudget('claude-haiku-5.5') * AI_CHARS_PER_TOKEN;
+  const result = reviewWithModel(sources, options({ ai: true }), {
+    spawnSync: fakeCopilotResponse(response, usagePaths, prompts, Math.ceil(firstCap / 2)),
+  });
+  assert.equal(result.error, undefined);
+  assert.ok(prompts.length >= 3);
+  assert.ok(result.metadata.charsPerToken);
+  assert.ok(result.metadata.charsPerToken.final < AI_CHARS_PER_TOKEN);
+  assert.ok(prompts[1].length < prompts[0].length);
+  assert.match(formatUsageFooter(result, 1, 60), /charsPerToken=2\.75->\d/u);
+});
+
+test('AI prompt budget stays under the CLI compaction point', () => {
+  assert.equal(aiPromptTokenBudget('claude-haiku-5.5'),
+    100_000 * AI_COMPACTION_FRACTION - AI_CLI_OVERHEAD_TOKENS);
+  const wide = COPILOT_MODEL_CATALOG.find((model) =>
+    (model.pricingUsdPerMillionTokens.longContext?.startsAboveInputTokens ?? 0) >= 200_000);
+  assert.ok(wide);
+  assert.equal(aiPromptTokenBudget(wide.id), AI_MAX_PROMPT_TOKENS);
+  assert.equal(aiPromptTokenBudget('local-model'), AI_DEFAULT_PROMPT_TOKENS);
+});
+
+test('AI review drops bad findings and keeps the valid ones', () => {
+  const text = JSON.stringify({ review: 'complete', findings: [
+    { severity: 'recommend', source: 'docs/a.md:L16', quote: 'q', reason: 'r', suggestion: 's' },
+    { severity: 'urgent', source: 'S1P1', quote: 'q', reason: 'r', suggestion: 's' },
+    { severity: 'consider', source: 'S1P1', quote: 'q', reason: 'r', suggestion: 's' },
+  ] });
+  const review = parseAiReview(text, ['S1P1']);
+  assert.deepEqual(review.findings.map((finding) => finding.severity), ['consider']);
+  assert.deepEqual(review.dropped, [
+    { source: 'docs/a.md:L16', reason: 'unknown passage' },
+    { reason: 'invalid finding' },
+  ]);
+
+  const result = reviewWithModel(clearSource(), options({ ai: true }), {
+    spawnSync: fakeCopilotResponse(text, []),
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.findings.length, 1);
+  assert.match(formatUsageFooter(result, 1, 1), /dropped=2/u);
+});
+
+test('AI prompt encodes passages by file with line ranges and review scope', () => {
+  const prompts: string[] = [];
+  const sources = [{
+    name: 'one.md',
+    text: '',
+    findings: [],
+    scope: { name: 'git-changed', ranges: [[3, 3]] },
+    passages: [{
+      id: 'S1P1',
+      source: 'one.md',
+      startLine: 2,
+      endLine: 4,
+      text: 'Before.\nChanged; line.\nAfter.',
+      reviewRanges: [[3, 3]],
+      deterministic: [{ line: 3, rule: 'semicolon', message: 'm' }],
+    }],
+  }];
+  reviewWithModel(sources, options({ ai: true }), {
+    spawnSync: fakeCopilotResponse(JSON.stringify({ review: 'complete', findings: [] }), [], prompts),
+  });
+  const encoded = prompts[0].slice(prompts[0].indexOf('SELECTED PASSAGES:\n') + 'SELECTED PASSAGES:\n'.length).trim();
+  assert.deepEqual(JSON.parse(encoded), { files: [{ file: 'one.md', passages: [{
+    id: 'S1P1', lines: '2-4', text: 'Before.\nChanged; line.\nAfter.', review: '3', found: ['3 semicolon'],
+  }] }] });
+});
+
+test('long passages split into pieces with their own review lines and findings', () => {
+  const prompts: string[] = [];
+  const line = 'z'.repeat(1000);
+  const lines = Array.from({ length: 600 }, () => line);
+  const sources = [{
+    name: 'long.md',
+    text: '',
+    findings: [],
+    scope: { name: 'git-changed', ranges: [[1, 1], [600, 600]] },
+    passages: [{
+      id: 'S1P1',
+      source: 'long.md',
+      startLine: 1,
+      endLine: 600,
+      text: lines.join('\n'),
+      reviewRanges: [[1, 1], [600, 600]],
+      deterministic: [{ line: 600, rule: 'semicolon', message: 'm' }],
+    }],
+  }];
+  const response = (prompt: string) => JSON.parse(prompt.slice(prompt.indexOf('SELECTED PASSAGES:\n') + 19));
+  const result = reviewWithModel(sources, options({ ai: true }), {
+    spawnSync: fakeCopilotResponse(JSON.stringify({ review: 'complete', findings: [] }), [], prompts),
+  });
+  assert.equal(result.error, undefined);
+  const pieces = prompts.flatMap((prompt) => response(prompt).files[0].passages);
+  // Middle pieces have no review lines, so they are skipped.
+  assert.ok(pieces.length >= 2);
+  assert.ok(pieces.every((piece: { id: string }) => /^S1P1\.\d+$/u.test(piece.id)));
+  assert.equal(pieces[0].review, '1');
+  assert.equal(pieces[0].found, undefined);
+  assert.equal(pieces.at(-1).review, '600');
+  assert.deepEqual(pieces.at(-1).found, ['600 semicolon']);
+});
+
+test('the credit cap stops before the next batch once the spent credits reach it', () => {
+  assert.equal(parseArgs(['--stdin']).maxAiCredits, 10);
+  assert.equal(parseArgs(['--stdin', '--max-ai-credits', '0.5']).maxAiCredits, 0.5);
+  assert.throws(() => parseArgs(['--stdin', '--max-ai-credits', '0']), /Usage/u);
+  assert.throws(() => parseArgs(['--stdin', '--max-ai-credits', 'lots']), /Usage/u);
+
+  const args: string[][] = [];
+  const passages = Array.from({ length: 60 }, (_, index) => ({
+    id: `S1P${index + 1}`, source: 'big.md', startLine: index + 1, endLine: index + 1,
+    text: 'w'.repeat(10_000), deterministic: [],
+  }));
+  const sources = [{ name: 'big.md', text: '', findings: [], scope: { name: 'all', ranges: [[1, 60]] }, passages }];
+  const finding = { severity: 'recommend', source: 'S1P1', quote: 'q', reason: 'r', suggestion: 's' };
+  const fake = fakeCopilotResponse(JSON.stringify({ review: 'complete', findings: [finding] }), []);
+  // Each fake batch reports 0.01 credits, so a 0.015 cap allows 2 batches.
+  const result = reviewWithModel(sources, options({ ai: true, maxAiCredits: 0.015 }), {
+    spawnSync: (command: string, callArgs: string[], spawnOptions?: Record<string, unknown>) => {
+      args.push(callArgs);
+      return fake(command, callArgs, spawnOptions);
+    },
+  });
+  assert.ok(args.length > 2);
+  assert.ok(args.every((callArgs) => !callArgs.includes('--max-ai-credits')));
+  assert.match(result.error ?? '', /Stopped before batch 3: the 0\.015-credit cap is spent/u);
+  // Batch 2 doesn't hold S1P1, so its copy of the finding is dropped.
+  assert.equal(result.findings.length, 1);
+  assert.equal(result.metadata.droppedFindings, 1);
+  assert.match(formatUsageFooter(result, 1, 60), /maxCredits=0\.015/u);
+});
+
+const clearSource = () => [{
+  name: 'one.md',
+  text: 'Clear text.',
+  findings: [],
+  scope: { name: 'all', ranges: [[1, 1]] },
+  passages: [{ id: 'S1P1', source: 'one.md', startLine: 1, endLine: 1, text: 'Clear text.', deterministic: [] }],
+}];
+
+test('AI prompt sends the core and reference writing rules with their paths', () => {
+  const prompts: string[] = [];
+  const response = JSON.stringify({ review: 'complete', findings: [] });
+  const result = reviewWithModel(clearSource(), options({ ai: true }), {
+    spawnSync: fakeCopilotResponse(response, [], prompts),
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(prompts.length, 1);
+  const prompt = prompts[0];
+  const reference = readFileSync(new URL('../.github/instructions/writing-style-reference.md', import.meta.url), 'utf8');
+  const coreHeading = prompt.indexOf('CORE WRITING RULES (.github/instructions/writing-style.instructions.md, wins on conflict):');
+  const referenceHeading = prompt.indexOf('REFERENCE WRITING RULES (.github/instructions/writing-style-reference.md,');
+  assert.ok(coreHeading >= 0);
+  assert.ok(referenceHeading > coreHeading);
+  assert.ok(prompt.indexOf('SELECTED PASSAGES:') > referenceHeading);
+  assert.ok(prompt.includes(reference.trim()));
+});
+
+test('AI review names a writing-style file it cannot read', (context) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'cce-prose-style-'));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const styleFiles = {
+    core: {
+      path: '.github/instructions/writing-style.instructions.md',
+      url: new URL('../.github/instructions/writing-style.instructions.md', import.meta.url),
+    },
+    reference: { path: 'missing-reference.md', url: pathToFileURL(path.join(root, 'missing-reference.md')) },
+  };
+  assert.throws(
+    () => reviewWithModel(clearSource(), options({ ai: true }), {
+      spawnSync: fakeCopilotResponse('{}', []),
+      styleFiles,
+    }),
+    /Writing-style file can't be read: missing-reference\.md \(ENOENT\)/u,
+  );
+});
+
+test('every run starts with a header that names both writing-style files', (context) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'cce-prose-header-'));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, 'draft.md');
+  writeFileSync(file, 'Clear text.\n');
+  const log = context.mock.method(console, 'log', () => {});
+  assert.equal(main(['--all', file], { cwd: root }), 0);
+  const header = log.mock.calls[0].arguments.join(' ');
+  assert.match(header, /^Project writing rules \(copilot-chat-exporter\):/u);
+  assert.match(header, /core: {6}\.github\/instructions\/writing-style\.instructions\.md \(wins on conflict\)/u);
+  assert.match(header, /reference: \.github\/instructions\/writing-style-reference\.md/u);
+  assert.match(header, /Read both before applying findings\./u);
 });
 
 test('malformed AI output returns an operational review error', () => {
