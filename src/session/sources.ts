@@ -56,6 +56,15 @@ export interface InventoryDiagnostic {
   hidesSessionId?: string;
 }
 
+/**
+ * True for a child-scope key: `#subagent/<id>` scopes, and VS Code's background sub-agent index
+ * entries `<parent>?subagentChatResource%3D...`. A child exports inside its parent and never
+ * competes with the parent for a selector.
+ */
+export function isChildScopeKey (sessionId: string): boolean {
+  return sessionId.includes('#subagent/') || sessionId.includes('?subagentChatResource');
+}
+
 export function diagnosticAffectsSelector (diagnostic: InventoryDiagnostic, selector: string): boolean {
   if (!diagnostic.affectsCandidateDiscovery)
     return false;

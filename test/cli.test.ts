@@ -23,7 +23,7 @@ test('detailed listing writes only a detailed report while retaining compact con
   assert.match(report, /Detailed VS Code chat session listing/u);
   assert.match(report, /Ordered prompts \/ delegated tasks/u);
   assert.match(report, /journal.customTitle/u);
-  assert.match(result.stdout, /ID \/ PREFIX/u);
+  assert.match(result.stdout, /ID\/PREFIX/u);
   assert.doesNotMatch(result.stdout, /Model-switch timeline/u);
 });
 
@@ -45,7 +45,7 @@ test('compressed detailed listing writes an offline shell and gzip payload', asy
   assert.match(report, /id="report-payload"/u);
   assert.match(report, /new DecompressionStream\(["']gzip["']\)/u);
   assert.doesNotMatch(report, /<iframe/u);
-  assert.match(result.stdout, /ID \/ PREFIX/u);
+  assert.match(result.stdout, /ID\/PREFIX/u);
 });
 
 for (const codec of ['gzip', 'brotli']) {
@@ -747,12 +747,13 @@ test('no-argument CLI lists even when a current-session environment exists', asy
   const result = invoke();
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Showing 3 of 3 eligible conversations/);
-  assert.match(result.stdout, /PROMPTS/);
+  assert.match(result.stdout, /TURNS/);
+  assert.match(result.stdout, /TURNS = user prompts\. With child chats: add delegated prompts and one delegation per child\./);
   assert.match(result.stdout, /CREATED/);
   assert.match(result.stdout, /GUI title/);
   assert.match(result.stdout, /No journal/);
   assert.match(result.stdout, /Provider row/);
-  assert.match(result.stdout, /agent\s+\|.*unresolved/);
+  assert.match(result.stdout, /agent\s+\|.*❓/);
   assert.match(result.stdout, /HTML report:/);
   assert.doesNotMatch(result.stdout, /Exported session|Output:/);
   assert.equal(await fs.readFile(sessionPath, 'utf8'), raw);
@@ -887,8 +888,8 @@ test('approved Agent Host default fallback is visible in console warnings', asyn
   ].map((event) => JSON.stringify(event)).join('\n'));
   const result = invoke('--list', '--no-html', '--user-data-root', root);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /agent\s+\|.*verified/);
-  assert.match(result.stdout, /(?:\d{2})?\d{4}-\d{2}:\d{2} \(UTC[+-]\d+(?:h|:\d{2})\)\s+\|\s+(?:\d{2})?\d{4}-\d{2}:\d{2} \(UTC[+-]\d+(?:h|:\d{2})\)\s+\|\s+1/);
+  assert.match(result.stdout, /agent\s+\|.*✅/);
+  assert.match(result.stdout, /(?:\d{2})?\d{4}-\d{2}:\d{2}(?:[+-][\d:]+h?)?\s+\|\s+(?:\d{2})?\d{4}-\d{2}:\d{2}(?:[+-][\d:]+h?)?\s+\|\s+1/);
   assert.match(result.stdout, /identity warning\(s\)/);
   assert.doesNotMatch(result.stdout, /existing local session database and matching SDK session.start/);
   assert.doesNotMatch(result.stderr, /Identity warning/);
@@ -922,9 +923,9 @@ test('ambiguous children show orange question icons without invalidating main id
   assert.match(result.stdout, /Main stays available/);
   assert.doesNotMatch(result.stdout, /Ambiguous subagent/);
   assert.match(result.stdout, /Ignored by default: 1 ambiguous child scope/);
-  const all = invoke('--list', '--show-ignored', '--no-html', '--user-data-root', root);
+  const all = invoke('--list', '--show-ignored', '--subagents', '--no-html', '--user-data-root', root);
   assert.equal(all.status, 0, all.stderr);
-  assert.match(all.stdout, /🟠 ❓ ambiguous/);
+  assert.match(all.stdout, /⚠️/);
   assert.match(all.stdout, /Ambiguous subagent/);
 });
 

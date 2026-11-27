@@ -1,4 +1,5 @@
 import type { InventoryDiagnostic, SessionOccurrence } from './sources.ts';
+import { isChildScopeKey } from './sources.ts';
 import { formatLocalListingDate } from './listing-preview.ts';
 
 export interface SessionListingOptions {
@@ -6,6 +7,14 @@ export interface SessionListingOptions {
   last25?: boolean;
   fullIds?: boolean;
   terminalWidth?: number;
+  /** Show sub-agent rows. Hidden by default because they export inside their parent chat. */
+  subagents?: boolean;
+  /** Case-insensitive text that a row's title, ID or selector must contain. */
+  find?: string;
+  /** Dim unresolved rows and unknown cells with ANSI codes. Set only for an interactive terminal. */
+  color?: boolean;
+  /** Time used for the shared UTC offset line. Defaults to the current time. */
+  now?: number;
   /** Local year of the listing run. Omit to keep the year in every console date. */
   referenceYear?: number;
   diagnostics?: readonly InventoryDiagnostic[];
@@ -39,32 +48,52 @@ function groupKey (session: SessionOccurrence): string | null {
   return null;
 }
 
+/**
+ * Shortest unique selector per group, keyed by group key. Local and SDK rows both use a prefix of
+ * the chat UUID. A full-UUID collision falls back to the exact Local path or the qualified SDK key.
+ * Sub-agent rows reuse their parent's selector, because they export inside the parent chat.
+ */
 export function shortIds (groups: readonly ConversationGroup[]): Map<string, string> {
-  const aliases = groups.flatMap((group) =>
+  const isChild = (group: ConversationGroup) => sessionType(group.representative) === 'sub-agent';
+  const aliases = groups.filter((group) => !isChild(group)).flatMap((group) =>
     group.occurrences.flatMap((occurrence) => {
       const values = [occurrence.sessionId];
       const backing = occurrence.backing;
       if (backing.status === 'verified' && backing.source.kind === 'sdk-events')
         values.push(backing.source.chatIdentity, backing.source.sessionId);
       return values.flatMap((value) => {
-        const candidate = value.replace(/^.*?:\//u, '').split('#')[0]!;
+        const candidate = nativeId(value);
         return UUID.test(candidate) ? [candidate.replaceAll('-', '').toLowerCase()] : [];
       }).map((id) => ({ group, id }));
     }));
-  return new Map(groups.map((group, index) => {
-    const id = group.representative.sessionId;
+  const pick = (group: ConversationGroup): string => {
+    const session = group.representative;
+    if (session.provider !== 'local' && session.backing.status !== 'verified')
+      return '-';
+    const id = nativeId(session.sessionId);
     if (!UUID.test(id))
-      return [group.key, id] as const;
-    const compactId = id.replaceAll('-', '');
+      return session.sessionId;
+    const compactId = id.replaceAll('-', '').toLowerCase();
     let prefixLength = 8;
     while (prefixLength < compactId.length && aliases.some((candidate) =>
-      candidate.group !== groups[index] && candidate.id.startsWith(compactId.slice(0, prefixLength).toLowerCase())))
+      candidate.group !== group && candidate.id.startsWith(compactId.slice(0, prefixLength))))
       prefixLength += 1;
-    const collidesAtFullId = aliases.some((candidate) =>
-      candidate.group !== groups[index] && candidate.id === compactId.toLowerCase());
-    const localPath = groups[index]!.representative.localJournalPath;
-    return [group.key, collidesAtFullId && localPath ? localPath : compactId.slice(0, prefixLength)] as const;
-  }));
+    const collidesAtFullId = aliases.some((candidate) => candidate.group !== group && candidate.id === compactId);
+    if (!collidesAtFullId)
+      return compactId.slice(0, prefixLength);
+    if (session.provider === 'local')
+      return session.localJournalPath ?? compactId;
+    return session.sessionId;
+  };
+  const result = new Map<string, string>();
+  for (const group of groups.filter((candidate) => !isChild(candidate)))
+    result.set(group.key, pick(group));
+  for (const group of groups.filter(isChild)) {
+    const parentId = parentKey(group.representative.sessionId);
+    const parent = groups.find((candidate) => !isChild(candidate) && candidate.representative.sessionId === parentId);
+    result.set(group.key, parent ? result.get(parent.key)! : pick(group));
+  }
+  return result;
 }
 
 export function sessionType (session: SessionOccurrence): string {
@@ -72,7 +101,7 @@ export function sessionType (session: SessionOccurrence): string {
     && session.backing.source.kind === 'sdk-events'
     && session.backing.source.scope.kind === 'subagent')
     return 'sub-agent';
-  if (session.sessionId.includes('#subagent/'))
+  if (isChildScopeKey(session.sessionId))
     return 'sub-agent';
   if (session.provider === 'agent-host')
     return 'agent';
@@ -138,20 +167,36 @@ export function fit (value: string, width: number): string {
   return `${characters.slice(0, Math.max(0, width - 1)).join('')}…`;
 }
 
-export function dateCell (timestamp: number | null, referenceYear?: number): string {
-  if (timestamp === null || !Number.isFinite(timestamp))
-    return 'unknown';
-  const date = new Date(timestamp);
-  if (!Number.isFinite(date.getTime()))
-    throw new RangeError('Timestamp is outside the supported date range.');
-  const offsetMinutes = -date.getTimezoneOffset();
+/** Local UTC offset label such as `UTC-5h` or `UTC+5:30`. */
+export function offsetLabel (timestamp: number): string {
+  const offsetMinutes = -new Date(timestamp).getTimezoneOffset();
   const offsetSign = offsetMinutes >= 0 ? '+' : '-';
   const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
   const offsetRemainder = String(Math.abs(offsetMinutes) % 60).padStart(2, '0');
-  const offset = offsetRemainder === '00' ? `${offsetHours}h` : `${offsetHours}:${offsetRemainder}`;
+  return `UTC${offsetSign}${offsetRemainder === '00' ? `${offsetHours}h` : `${offsetHours}:${offsetRemainder}`}`;
+}
+
+/** Formats a local date with a compact UTC offset when it differs from the listing's shared offset. */
+export function dateCell (timestamp: number | null, referenceYear?: number, sharedOffset?: string): string {
+  if (timestamp === null || !Number.isFinite(timestamp))
+    return '?';
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime()))
+    throw new RangeError('Timestamp is outside the supported date range.');
+  const offset = offsetLabel(timestamp);
   const full = formatLocalListingDate(timestamp).replace('_', '-');
   const localDate = date.getFullYear() === referenceYear ? full.slice(2) : full;
-  return `${localDate} (UTC${offsetSign}${offset})`;
+  return offset === sharedOffset ? localDate : `${localDate}${offset.slice(3)}`;
+}
+
+/** The parent chat key of a child-scope key. */
+export function parentKey (sessionId: string): string {
+  return sessionId.split(/#subagent\/|\?subagentChatResource/u)[0]!;
+}
+
+/** The chat UUID inside a Local ID or a qualified SDK key such as `agent-host-copilotcli:/<uuid>#...`. */
+export function nativeId (sessionId: string): string {
+  return sessionId.replace(/^.*?:\//u, '').split(/[#?]/u)[0]!;
 }
 
 export function ignoredCounts (groups: readonly ConversationGroup[]) {

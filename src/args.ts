@@ -11,6 +11,8 @@ export interface CliOptions {
   showIgnored: boolean;
   last25: boolean;
   fullIds: boolean;
+  subagents: boolean;
+  find: string | null;
   noHtml: boolean;
   detailed: boolean;
   compressed: boolean;
@@ -49,7 +51,7 @@ export type ParsedArgs =
 
 const BOOLEAN_FLAGS = new Set([
   '--list', '--current', '--overwrite', '--verify', '--audit', '--explain', '--strict', '--json',
-  '--show-ignored', '--last25', '--full-ids', '--no-html', '--detailed', '--compressed',
+  '--show-ignored', '--last25', '--full-ids', '--subagents', '--no-html', '--detailed', '--compressed',
   '--keep-source', '--keep-source-on-problem', '--cache', '--clean', '--dry-run', '--yes', '--include-corpus',
 ]);
 
@@ -59,6 +61,7 @@ const VALUE_FLAGS: Record<string, string> = {
   '--out-dir': '--out-dir <path>',
   '--user-data-root': '--user-data-root <path>',
   '--html-output': '--html-output <path>',
+  '--find': '--find <text>',
   '--compression': '--compression gzip|brotli',
   '--golden': '--golden check|update',
   '--snapshot': '--snapshot check|update [sessionId]',
@@ -129,6 +132,7 @@ export function parseArgs (argv: string[]): ParsedArgs {
       || [...values.keys()].some((flag) => flag !== '--older-than')))
     return { ok: false, error: 'Cache commands accept only --cache, --clean, --older-than, --dry-run, --yes and --include-corpus.' };
   if ((booleans.has('--show-ignored') || booleans.has('--last25') || booleans.has('--full-ids')
+    || booleans.has('--subagents') || values.has('--find')
     || booleans.has('--no-html') || booleans.has('--detailed') || booleans.has('--compressed') || values.has('--compression') || values.has('--html-output')) && !listRequested)
     return { ok: false, error: 'Listing options are available only when listing sessions.' };
   const compression = values.get('--compression');
@@ -168,6 +172,8 @@ export function parseArgs (argv: string[]): ParsedArgs {
       showIgnored: booleans.has('--show-ignored'),
       last25: booleans.has('--last25'),
       fullIds: booleans.has('--full-ids'),
+      subagents: booleans.has('--subagents'),
+      find: values.get('--find') ?? null,
       noHtml: booleans.has('--no-html'),
       detailed: booleans.has('--detailed'),
       compressed: booleans.has('--compressed'),

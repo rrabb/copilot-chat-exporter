@@ -65,6 +65,8 @@ test('no arguments is valid: it means listing, never implicit export', () => {
     list: true,
     showIgnored: false,
     last25: false,
+    subagents: false,
+    find: null,
     fullIds: false,
     noHtml: false,
     detailed: false,

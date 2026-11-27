@@ -5,7 +5,7 @@ import type { ParsedSession, ToolGroupOrder } from '../types.ts';
 import { eventsInScope, readSdkEvents } from './sdk-events.ts';
 import type { SdkEvent } from './sdk-events.ts';
 import type { InventoryDiagnostic, SdkEventSource, SessionOccurrence } from './sources.ts';
-import { diagnosticAffectsSelector } from './sources.ts';
+import { diagnosticAffectsSelector, isChildScopeKey } from './sources.ts';
 import { buildSdkSession } from './sdk-session.ts';
 import { attachRunningTotals, attachUsage, copilotHomeOf, readUsageLedger, selectUsage, usageForScope } from './sdk-usage.ts';
 import type { UsageCall } from './sdk-usage.ts';
@@ -137,6 +137,8 @@ export function inspectSdkSelection (
     if (occurrence.provider !== 'agent-host' && occurrence.provider !== 'copilot-cli')
       return false;
     if (occurrence.backing.status === 'verified' && occurrence.backing.source.kind === 'sdk-events')
+      return false;
+    if (isChildScopeKey(occurrence.sessionId))
       return false;
     if (qualified)
       return occurrence.sessionId.toLowerCase() === selector.toLowerCase();

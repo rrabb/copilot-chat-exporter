@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { Script } from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { formatSessionListing, formatSessionListingHtml } from '../src/session/listing.ts';
-import { dateCell, groupOccurrences, shortIds } from '../src/session/listing-model.ts';
+import { dateCell, groupOccurrences, offsetLabel, shortIds } from '../src/session/listing-model.ts';
 import type { SessionOccurrence } from '../src/session/sources.ts';
 
 function localOccurrence (
@@ -143,18 +143,46 @@ test('listing filters ignored entries, groups exact duplicate journals, and summ
   assert.match(listing, /1 chat with a title starting with \/fix/);
   assert.match(listing, /1 entry with unresolved identity or scope/);
   assert.match(listing, /1 ambiguous child scope/);
-  assert.match(listing, /\d{6}-\d{2}:\d{2} \(UTC[+-]\d+(?:h|:\d{2})\)\s+\|\s+\d{6}-\d{2}:\d{2} \(UTC[+-]\d+(?:h|:\d{2})\)\s+\|\s+4/);
+  assert.match(listing, /\d{6}-\d{2}:\d{2}(?:[+-][\d:]+h?)?\s+\|\s+\d{6}-\d{2}:\d{2}(?:[+-][\d:]+h?)?\s+\|\s+4/);
   assert.match(listing, /Safe title Injected console row/);
   assert.doesNotMatch(listing, /Injected console row\s+\n/);
   assert.doesNotMatch(listing, /private-storage-path/);
   assert.match(listing, /events are missing|unresolved/);
-  assert.match(listing, /CREATED \(LOCAL\)/);
-  assert.match(listing, /Dates use this machine.s local time; each timestamp includes its UTC offset/);
+  assert.match(listing, /CREATED/);
+  assert.match(listing, /Times are local \(UTC[+-]\d+(?:h|:\d{2})\)\. A different offset is appended/);
+  assert.match(listing, /cli-agt/);
+  assert.match(listing, /❓/);
 
-  const all = formatSessionListing(occurrences, { showIgnored: true });
+  const all = formatSessionListing(occurrences, { showIgnored: true, subagents: true });
   assert.match(all, /Showing 5 of 5 total conversations \(2 eligible before ignored filters\)/);
-  assert.match(all, /🟠 ❓ ambiguous/);
+  assert.match(all, /⚠️/);
   assert.match(all, /1 ambiguous child scope/);
+});
+
+test('console listing hides sub-agents with a count, filters with find and dims only with color', () => {
+  const parent = localOccurrence('agent-host-copilotcli:/parent', {
+    title: 'Parent chat', provider: 'agent-host',
+    backing: { status: 'unresolved', reason: 'missing SDK backing' },
+  });
+  const child = localOccurrence('agent-host-copilotcli:/parent#subagent/child', {
+    title: 'Child chat', provider: 'agent-host',
+    backing: { status: 'unresolved', reason: 'missing SDK backing' },
+  });
+  const other = localOccurrence('99999999-9999-4999-8999-999999999999', { title: 'Other topic' });
+  const options = { showIgnored: true };
+
+  const listing = formatSessionListing([parent, child, other], options);
+  assert.match(listing, /1 sub-agent chat not shown\. Sub-agent conversations are included in the parent chat export\. Pass --subagents to list them\./);
+  assert.match(listing, /Parent chat \(\+1 sub\)/);
+  assert.doesNotMatch(listing, /Child chat/);
+  assert.doesNotMatch(listing, /\u001b\[2m/);
+  assert.match(formatSessionListing([parent, child, other], { ...options, subagents: true }), /Child chat/);
+
+  const found = formatSessionListing([parent, child, other], { ...options, find: 'OTHER' });
+  assert.match(found, /Other topic/);
+  assert.doesNotMatch(found, /Parent chat/);
+
+  assert.match(formatSessionListing([parent, child, other], { ...options, color: true }), /\u001b\[2m/);
 });
 
 test('console listing explains external provider references', () => {
@@ -164,7 +192,8 @@ test('console listing explains external provider references', () => {
   });
   const listing = formatSessionListing([external]);
 
-  assert.match(listing, /external = provider reference outside Local, Agent Host and CLI sources\. External references are unsupported for export/);
+  assert.match(listing, /external \(unsupported provider\)/);
+  assert.match(listing, /❌/);
 });
 
 test('console dates use local time and include the timestamp UTC offset', () => {
@@ -182,9 +211,9 @@ test('console dates use local time and include the timestamp UTC offset', () => 
   ].join('');
   const localTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 
-  assert.equal(dateCell(timestamp), `${localDate}-${localTime} (UTC${sign}${offset})`);
-  assert.equal(dateCell(timestamp, date.getFullYear()), `${localDate.slice(2)}-${localTime} (UTC${sign}${offset})`);
-  assert.equal(dateCell(null), 'unknown');
+  assert.equal(dateCell(timestamp), `${localDate}-${localTime}${sign}${offset}`);
+  assert.equal(dateCell(timestamp, date.getFullYear()), `${localDate.slice(2)}-${localTime}${sign}${offset}`);
+  assert.equal(dateCell(null), '?');
   assert.throws(() => dateCell(Number.MAX_VALUE), /outside the supported date range/u);
 });
 
@@ -192,20 +221,20 @@ test('console dates keep other years and use the supplied local reference year',
   for (const year of [2025, 2026, 2027]) {
     const timestamp = new Date(year, 10, 2, 16, 48).getTime();
     const expectedDate = year === 2026 ? '1102' : `${String(year).slice(2)}1102`;
-    assert.ok(dateCell(timestamp, 2026).startsWith(`${expectedDate}-16:48 `));
-    assert.ok(dateCell(timestamp).startsWith(`${String(year).slice(2)}1102-16:48 `));
+    assert.ok(dateCell(timestamp, 2026).startsWith(`${expectedDate}-16:48`));
+    assert.ok(dateCell(timestamp).startsWith(`${String(year).slice(2)}1102-16:48`));
   }
 });
 
 test('console dates handle daylight saving, fractional offsets and local year boundaries', () => {
   const cases = [
-    { zone: 'UTC', timestamp: '2026-11-02T16:48:00Z', expected: '1102-16:48 (UTC+0h)' },
-    { zone: 'America/New_York', timestamp: '2026-07-02T20:48:00Z', expected: '0702-16:48 (UTC-4h)' },
-    { zone: 'America/New_York', timestamp: '2026-11-02T21:48:00Z', expected: '1102-16:48 (UTC-5h)' },
-    { zone: 'America/New_York', timestamp: '2026-01-01T00:30:00Z', expected: '251231-19:30 (UTC-5h)' },
-    { zone: 'Asia/Kolkata', timestamp: '2026-11-02T16:48:00Z', expected: '1102-22:18 (UTC+5:30)' },
-    { zone: 'Asia/Kathmandu', timestamp: '2026-11-02T16:48:00Z', expected: '1102-22:33 (UTC+5:45)' },
-    { zone: 'America/St_Johns', timestamp: '2026-11-02T16:48:00Z', expected: '1102-13:18 (UTC-3:30)' },
+    { zone: 'UTC', timestamp: '2026-11-02T16:48:00Z', expected: '1102-16:48+0h' },
+    { zone: 'America/New_York', timestamp: '2026-07-02T20:48:00Z', expected: '0702-16:48-4h' },
+    { zone: 'America/New_York', timestamp: '2026-11-02T21:48:00Z', expected: '1102-16:48-5h' },
+    { zone: 'America/New_York', timestamp: '2026-01-01T00:30:00Z', expected: '251231-19:30-5h' },
+    { zone: 'Asia/Kolkata', timestamp: '2026-11-02T16:48:00Z', expected: '1102-22:18+5:30' },
+    { zone: 'Asia/Kathmandu', timestamp: '2026-11-02T16:48:00Z', expected: '1102-22:33+5:45' },
+    { zone: 'America/St_Johns', timestamp: '2026-11-02T16:48:00Z', expected: '1102-13:18-3:30' },
   ];
   const moduleUrl = new URL('../src/session/listing-model.ts', import.meta.url).href;
   for (const { zone, timestamp, expected } of cases) {
@@ -224,15 +253,15 @@ test('compact console dates reclaim column space without clipping dates or short
     title, createdTimestamp: timestamp, activityTimestamp: timestamp,
   })], { referenceYear: 2026, terminalWidth: 140 });
   const lines = listing.split('\n');
-  const header = lines.findIndex((line) => line.startsWith('CREATED (LOCAL)'));
+  const header = lines.findIndex((line) => line.startsWith('CREATED'));
   assert.ok(header >= 0);
   const rows = lines.slice(header, header + 3);
   assert.equal(rows.length, 3);
   for (const row of rows)
     assert.equal(Array.from(row).length, 140);
   const cells = rows[2]!.split(' | ');
-  assert.equal(cells[0]!.trim(), dateCell(timestamp, 2026));
-  assert.equal(cells[1]!.trim(), dateCell(timestamp, 2026));
+  assert.equal(cells[0]!.trim(), dateCell(timestamp, 2026, offsetLabel(timestamp)));
+  assert.equal(cells[1]!.trim(), dateCell(timestamp, 2026, offsetLabel(timestamp)));
   assert.equal(cells[5]!.trim(), title);
   assert.match(listing, /Year 2026 is omitted/);
   assert.doesNotMatch(formatSessionListing([]), /Year \d+ is omitted/);
@@ -248,7 +277,8 @@ test('--show-ignored restores New Chat rows hidden for unknown creation and prom
   const listing = formatSessionListing([placeholder], { showIgnored: true });
 
   assert.match(listing, /New Chat/);
-  assert.match(listing, /ignored:new-chat\?/);
+  assert.match(listing, /⏭/);
+  assert.match(listing, /\?\s+\|\s+\d{6}-\d{2}:\d{2}/);
   assert.match(listing, /Showing 1 of 1 total conversations/);
 });
 
@@ -396,13 +426,24 @@ test('listing exposes chat type, explains status and marks duplicate Local IDs a
       },
     },
   });
-  const listing = formatSessionListing([first, second, agent, subagent]);
+  const listing = formatSessionListing([first, second, agent, subagent], { subagents: true });
 
   assert.match(listing, /local\s+\|\s+abcdef12\s+\|\s+Session/);
   assert.match(listing, /agent\s+\|/);
   assert.match(listing, /sub-agent\s+\|/);
-  assert.match(listing, /path required/);
-  assert.match(listing, /verified = backing identity checked/);
-  assert.match(listing, /unresolved = no verified chat backing/);
-  assert.match(listing, /ambiguous \(🟠 ❓\)/);
+  assert.match(listing, /📁/);
+  assert.match(listing, /✅ verified/);
+  assert.match(listing, /❓ unresolved/);
+  assert.match(listing, /⚠ \+N = N ambiguous child scopes/);
+});
+
+test('console titles are capped at 90 characters on wide terminals', () => {
+  const title = 'x'.repeat(120);
+  const listing = formatSessionListing([localOccurrence('wide-title', { title })], {
+    terminalWidth: 300,
+  });
+  const row = listing.split('\n').find((line) => line.includes('x'.repeat(10)))!;
+  const titleCell = row.split(' | ')[5]!;
+  assert.equal(Array.from(titleCell).length, 90);
+  assert.match(titleCell, /…\s*$/u);
 });

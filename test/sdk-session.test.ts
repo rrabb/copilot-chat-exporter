@@ -335,6 +335,17 @@ test('selection checks Local collisions, unverified SDK mappings and incomplete 
   assert.equal(qualified.qualified, true);
   assert.equal(qualified.unresolvedSdk.length, 1);
   assert.equal(qualified.blockingDiagnostics.length, 0, 'a qualified key does not rescan unrelated selectors');
+
+  const childKeys = ['#subagent/child', '?subagentChatResource%3Dahp-chat%253A%252F%252Fdefault#child'];
+  for (const suffix of childKeys) {
+    const child = detailedOccurrence(`child${suffix}`, {
+      provider: 'agent-host',
+      sessionId: `agent-host-copilotcli:/${localId}${suffix}`,
+      backing: { status: 'unresolved', reason: 'Chat resource does not belong to the indexed provider session' },
+    });
+    const parentSelection = inspectSdkSelection([sdk, child], [], localId);
+    assert.equal(parentSelection.unresolvedSdk.length, 0, `an unresolved child ${suffix} doesn't block its parent`);
+  }
 });
 
 test('a delegated agent is nested at its call, labelled, and its conversation is complete', () => {

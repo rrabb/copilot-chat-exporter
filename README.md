@@ -197,6 +197,7 @@ node src/cli.ts --list
 node src/cli.ts --list --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --last25 --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --show-ignored --user-data-root "C:\Users\you\AppData\Roaming\Code"
+node src/cli.ts --list --subagents --find "review" --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --full-ids --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --list --no-html --user-data-root "C:\Users\you\AppData\Roaming\Code"
 node src/cli.ts --detailed --user-data-root "C:\Users\you\AppData\Roaming\Code"
@@ -212,7 +213,22 @@ For development and review in this repository, put generated reports, runtime ca
 
 HTML dates use the generator's local time in `YYMMDD_HH:MM` format, with smaller Arial Narrow styling for dates and selectors and bold prompt counts. Each “Why / source” section includes full IDs, workspace storage hash, recorded folder/workspace URI, URI-basename labels, provenance, diagnostics and local path/JSONL links. Missing metadata stays unknown; multi-root project folders are not inferred. Links do not guarantee that a file still exists, and browsers may restrict opening them. All ignored sessions are retained in a separate collapsed section at the bottom, independently of `--last25` and the main-table filters. `--show-ignored` also includes them in the main table and console.
 
-Console dates also use local time, with compact UTC offsets such as `1102-16:48 (UTC-4h)` or `1102-22:18 (UTC+5:30)`. The run's year is omitted from matching dates and named in the legend; other years keep `YY`. Successful terminal listing runs end with a dashed separator. Redirected output has no separator, and JSON output is unchanged.
+Console dates use local time with compact offsets. A line above the table names the current offset, for example `Times are local (UTC-5h)`. A cell shows a different offset as `0722-11:26-4h` or `1102-22:18+5:30`. The current year's `YY` is omitted and named in the legend. Successful terminal listing runs end with a dashed separator. Redirected output has no separator. JSON output is unchanged.
+
+The console table is built for copying a selector:
+
+| Feature | What it does |
+| --- | --- |
+| `ID/PREFIX` | A copy-ready selector. Local chats show a unique ID prefix. Verified agent chats show a unique prefix of their native UUID. Rows that can't be exported show `-`. |
+| `see [n]` | A selector longer than 36 characters, such as a qualified SDK key, prints in a numbered note under the table. |
+| Sub-agents | Hidden by default. A line above the table counts them, and the parent title gets `(+N sub)`. The count line says that parent exports include sub-agent conversations. Pass `--subagents` to list child rows. |
+| `--find <text>` | Shows only rows whose title, ID or selector contains the text (case-insensitive). |
+| Dimming | In a color terminal, unresolved rows and `unknown` cells are dimmed. `NO_COLOR` or redirected output turns this off. |
+| Types | `local` (VS Code), `agent` (Agent Host), `cli-agt` (Copilot CLI), `sub-agent` (child chat), and `external` (unsupported provider). |
+| Status | `✅` verified, `❓` unresolved, `❌` unsupported, `⚠ +N` ambiguous child scopes (the parent still works), `📁` exact Local path required, and `⏭` ignored. |
+| Unknown values | `?` in a date or prompt count means unknown, not zero. |
+| `TURNS` | The count of user prompts. It also counts delegated child prompts and one delegation per child. It isn't a pair of request and reply. |
+| Export hint | The last lines show the export command with your `--user-data-root`. |
 
 “Why / source” opens a full-width panel directly below its session, with separate conversation identity, workspace/project, and files/locations cards. Panels remain attached to their session while sorting and hide with their session while filtering. Each has a close control that returns keyboard focus to its toggle. Without JavaScript, native disclosure controls below each row keep all details accessible.
 

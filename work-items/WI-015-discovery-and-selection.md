@@ -13,7 +13,7 @@ Canonical entry: [WI-015](../work-log.md#wi-015). Code links use commit `cba16b3
 - Another check found that unreadable stores can hide duplicates or disappear from inventory diagnostics. WI-045 blocks bare selection when discovery is incomplete. Accepted 261126.
 - WI-080 aligns Local lookup with inventory by requiring the `.jsonl` suffix. Accepted 261126.
 - WI-085 blocks only the chat a failed file can hide, adds a retry hint for a locked index and lists exact paths in Local errors. Accepted 261126.
-- Work tree: WI-086 (terminal listing usability) is open. Exact paths and verified qualified keys remain usable.
+- Work tree: WI-086 (terminal listing usability) is built and waits for acceptance. Exact paths and verified qualified keys remain usable.
 - [WI-003](WI-003-remaining-manual-acceptance.md) records later chooser acceptance. [WI-007](../work-log.md#wi-007) keeps separate inventory evidence questions.
 
 ## Original goal
@@ -32,7 +32,7 @@ These are the original criteria for the accepted work. The later findings below 
 
 ## Work tree
 
-Progress as of 261126: 3 of 3 implemented, awaiting developer acceptance.
+Progress as of 261126: 5 of 5 implemented. WI-086 awaits developer acceptance.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
@@ -41,6 +41,20 @@ Progress as of 261126: 3 of 3 implemented, awaiting developer acceptance.
 | 3 | [WI-045 Unreadable discovery sources](../work-log.md#wi-045) | [build] | M | - |
 | 4 | [WI-085 Selector-safety refinements](../work-log.md#wi-085) | [build] | S | WI-044, WI-045 |
 | 5 | [WI-086 Terminal listing usability](../work-log.md#wi-086) | [build] | M | - |
+
+## WI-086 implementation and review
+
+- The terminal table keeps the pipe layout and has no paging.
+- Agent chats show a copy-ready native UUID prefix. Full collisions use `see [n]` notes for exact paths or qualified keys.
+- Sub-agent rows are hidden by default. A parent title shows `(+N sub)`, and the count line says parent exports include children.
+- `--subagents` lists child rows. `--find` filters by title, session ID or selector.
+- Dates use compact differing offsets such as `0722-11:26-4h`. Titles cap at 90 characters. Unknown values use `?`.
+- The `TURNS` line says that the count includes user prompts, delegated child prompts and one delegation per child.
+- Copilot CLI uses `cli-agt`. Status symbols are explained below the table.
+- `⚠ +N` means `N` child scopes have ambiguous mappings. It doesn't invalidate the verified parent.
+- Repeated child rows came from four SDK backing folders for one chat, not a grouping defect.
+- Unresolved child index keys blocked 12 of 88 verified parent chats after d7faefb. The fix skips those child keys during parent selection.
+- Check by running `--list`, copying an agent selector, exporting it, then trying `--find` and `--subagents`.
 
 ## Current understanding
 

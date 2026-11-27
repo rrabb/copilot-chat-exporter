@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Terminal listings are easier to scan and copy from (WI-086). Agent chats show a usable selector, not a clipped `agent-hos…`. Sub-agents are hidden behind `--subagents`, with a count and `(+N sub)` on parents. New `--find <text>` filters rows.
+- Terminal listing dates now use compact offsets. Titles are capped at 90 characters. Copilot CLI rows use `cli-agt`. `TURNS` explains its prompt-count rules above the table. Status cells use explained symbols, and `?` means unknown. Long selectors move to notes. The footer shows an export command.
+- Bare-ID selection no longer refuses a verified agent chat when an unresolved sub-agent index key shares its UUID. This fixes a regression from the selector-safety change, found while working on WI-086.
+
 - Verification warnings and failures now delete the frozen source by default and print how much space that freed. The failed archive, failure log, diagnostic bundle and a `not-kept` receipt stay. New `--keep-source-on-problem` keeps the source only when a problem occurs, for export and live `--verify`. A failure-log write error no longer stops the receipt from being saved (WI-043). Diagnostic evidence files are capped at 4 MiB (WI-083).
 - `--cache` no longer stops with `ENOENT` when a registration points to a missing capture folder. It lists these stale registrations, and `--cache --clean` removes them after the usual preview and confirmation. Cleanup also finds abandoned captures, which are unkept captures whose owner process died, for example after a forced kill. A failed registration now removes the new capture folder. One failed removal at exit no longer skips the rest (WI-083).
 
