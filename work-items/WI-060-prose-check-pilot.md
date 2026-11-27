@@ -16,6 +16,8 @@
 - **Goal audit 261125:** you decided Q1-Q4. Under `--ai`, the model now judges word choice, and word-list hits print only when the AI call fails. See [Goal audit 261125](#goal-audit-261125).
 - **Model catalog 261126:** a typed catalog covers 34 documented models. It records token prices, context tiers, promotions and legacy premium multipliers.
 - **Model selection 261126:** `--model` accepts catalog IDs, documented names, words within names, short names and unknown custom IDs. It ignores case and normalizes spaces, `_` characters and hyphens. If several models match, it picks the cheapest documented default-rate sum and reports the choice.
+- **Style files 261126:** the AI review now gets the core rules and the reference file. Every run starts with a header that names both files and says the core wins on conflict.
+- **AI cost 261127:** batches are sized per model in tokens and calibrate at runtime. CLI tools are off. A compact prompt cut a 3-doc review from 3.54 to 1.21 credits. `--max-ai-credits` (default 10) caps a run. See [Facts to check before changing the AI call](#facts-to-check-before-changing-the-ai-call).
 - **Status 261125:** phases 1-4 and the goal-audit fixes are implemented. Focused tests, a real AI run and full verification pass. The work pauses for developer trials in real chat sessions.
 - **What to try:** use the checker once on changed files and chat replies. Check tone, file scope, severity, `--fail`, model selection and the usage footer.
 
@@ -63,6 +65,7 @@ The code has three causes:
 | Exit policy | Try a known finding with `--fail --ai` | Findings affect exit 1. Operational failures use exit 2 |
 | Multi-file AI | Review a few Markdown files together | One request runs, or large input gets bounded batches |
 | Repeated runs | Stop after the first useful AI run | The advisory notice prevents a review loop |
+| Style header | Run any check | The output starts with the project name and both style-file paths |
 
 Run these checks once, in this order.
 
@@ -116,6 +119,9 @@ Run one multi-file AI review. Confirm one request handles small files or bounded
 - Dirty-file scope and `--all` behave as described.
 - `--fail --ai` separates findings from operational failures.
 - The usage footer names reported fields and handles unavailable usage.
+- The header names both style files, and the larger AI prompt is an acceptable cost.
+- One large AI batch keeps the findings you find useful. On 261127 it found 16 items where 3 smaller batches found ~43.
+- `--max-ai-credits` stops a run before the next batch, and a malformed finding shows in `dropped=` instead of failing the review.
 
 
 
@@ -142,12 +148,19 @@ Run one multi-file AI review. Confirm one request handles small files or bounded
 | Hook guard | Defer to WI-061 | Turn-level state belongs in the hook layer |
 | Model catalog | Keep public facts in a typed snapshot | It gives editor completions without blocking enterprise or bring-your-own-key IDs |
 | Model catalog validation | Resolve known display names and keep unknown IDs | Copilot decides final account availability |
+| AI style rules (261126) | Send the core and reference files | The reference holds examples, naming rules and extra word choices |
+| Output header (261126) | Name the project and both style files | Agents see which rules apply. The header says "read both", not "high priority", because console text can't change instruction order |
 
 ## Proposed output contract
 
-Start with:
+Start with this header. It replaced the one-line advisory notice on 261126:
 
-> Advisory review. Not a pass/fail gate. Apply useful findings. Ignore preference-only advice. Don't rerun in this edit pass.
+```text
+Project writing rules (copilot-chat-exporter):
+  core:      .github/instructions/writing-style.instructions.md (wins on conflict)
+  reference: .github/instructions/writing-style-reference.md (examples, extra word choices)
+Read both before applying findings. Findings are advice, not a pass/fail gate. Ignore preference-only advice. Don't rerun in this edit pass.
+```
 
 Use prose findings in this order:
 
@@ -191,7 +204,14 @@ It can include unrelated dirty edits from another chat because Git sees the whol
 
 ### One model request
 
-The current loop calls Copilot CLI once per source. Replace it with one request for all selected passages when they fit the 60,000-character input budget. The script sets that budget in `AI_MAX_CHARS`.
+The current loop calls Copilot CLI once per source. Replace it with one request for all selected passages when they fit the input budget.
+
+Since 261127, the budget is set per model in tokens. It comes from `aiPromptTokenBudget` and the `AI_*` constants near the top of the script. Lower the constants for small or local models.
+
+- **Models with a long-context price line:** 80% of that line, minus 8,000 tokens of CLI overhead, capped at 100,000. Claude Haiku 5.5 gets 72,000 tokens, which is 198,000 characters at the starting 2.75 characters per token.
+- **Other and unknown models:** 60,000 tokens.
+- The CLI call uses `--context default`, `--available-tools ""` (no tools) and a 180 s timeout. The footer prints `budget=N tokens/batch`, `charsPerToken=start->final` and `requests=N`.
+- **Calibration:** after each batch, the checker divides the prompt characters by the reported input tokens per request. If that ratio is lower, the next batch uses it. The ratio never goes up and never drops below 1.5. Reported input tokens include the CLI overhead, so the estimate errs on the small side. A long passage is split once, at the first batch cap. A piece can still exceed a later, smaller cap.
 
 Each source block carries:
 
@@ -210,6 +230,146 @@ Example:
 ```
 
 If the combined input exceeds the budget, split into bounded source batches. Report each batch and sum usage across the run.
+
+Since 261126, each request also carries both style files, labeled with their paths. Their text uses about 27,100 characters of each batch.
+
+#### Large-batch test (261127)
+
+One `--ai --all` run on 4 docs failed. The docs held about 177,000 characters, a 235 KiB prompt. It went out as 1 batch under the earlier 100,000-token budget:
+
+| Finding | Evidence |
+| --- | --- |
+| ❌ Copilot CLI compacted the prompt at a 100,000-token limit | CLI session log: 112,375 tokens, including ~25,000 for system prompt and tools |
+| ❌ The summary kept 2 of 4 files and lost the passage IDs | The model cited `file:line` instead of `S1P1`, so the parser rejected the review |
+| ⚠️ The prompt ran at ~2.75 characters per token, not 4 | 235 KiB against ~87,500 conversation tokens |
+| ⚠️ Long-context pricing applied to part of the call | 8.11 credits against ~2 at the normal Haiku rate |
+
+The fix added the 80% margin and the per-model budget. The parser now names an unknown passage ID and suggests a smaller batch. The dev chose 4 characters per token as the conversion. At the measured ~2.75, a batch filled to Haiku's 200,000-character cap would use about 98,000 tokens with CLI overhead. That's at the compaction line.
+
+#### Rerun at 4 characters per token (261127)
+
+The rerun used 3 docs that filled 1 batch close to the cap: a 196 KiB prompt with 298 passages. It failed the same way:
+
+| Finding | Evidence |
+| --- | --- |
+| ❌ Copilot CLI compacted at 98,047 of 100,000 tokens | CLI session log `session.compaction_start`: 73,151 conversation, 9,674 system, 15,222 tool tokens |
+| ❌ All 12 findings cited `file:line`, so the parser rejected the review | `run.txt` review-error. The model's JSON listed `docs/HTML-REPORT-DESIGN.md:20` and similar |
+| ⚠️ The prompt again ran at ~2.75 characters per token | 196 KiB against 73,151 conversation tokens |
+| ⚠️ The run cost 6.34 credits | Long-context pricing applied after compaction |
+
+The 4:1 conversion fits only batches well under the cap. A full Haiku batch reaches the compaction line. Output: `temp-tool-output\261127-0040-prose-budget-rerun\run.txt`.
+
+That run stopped after batch 1 of 3. The 196 KiB prompt was the first batch, not the whole input.
+
+#### Tool flag bug (261127)
+
+The checker meant to turn off CLI tools, but the model still had all of them. It passed `--available-tools` with no value, and the CLI then exposes every tool.
+
+Haiku probes that spawn the CLI the same way the checker does:
+
+| Flag | Input tokens | Credits | Requests |
+| --- | --- | --- | --- |
+| ❌ `--available-tools` (no value) | 28,939 | 0.185 | 1 |
+| ✅ `--available-tools ""` | 4,691 | 0.059 | 1 |
+
+With the empty value, the probe asked the model to read `README.md`. The model wrote a tool call as plain text, in 1 request, and no tool ran. Adding `--excluded-tools` gave the same token count, and the model also invented a tool result. The fix passes the empty value. It removes ~24,000 tokens from every call, and the earlier "~25,000 tokens of CLI overhead" was mostly tool definitions. Probes: `temp-tool-output\261127-0040-prose-budget-rerun\probe-tools*.cjs`, output in `probe-tools2-output.txt`.
+
+#### Rerun with calibration (261127)
+
+The dev chose a 2.75 starting ratio with runtime calibration. The same 3 docs then passed:
+
+| Finding | Evidence |
+| --- | --- |
+| ✅ Exit 0 with 3 batches and 3 requests, so no compaction or tool loops | Footer `batches=3`, `requests=3` |
+| ✅ Calibration lowered the ratio from 2.75 to 2.37 | Footer `charsPerToken=2.75->2.37` |
+| ✅ 3.54 credits for the full input | The failed run spent 6.34 credits on batch 1 alone |
+| ⚠️ 452,688 prompt characters for 127,369 characters of passage text | Offline batch probe |
+
+The last row is the next cost lever. Each passage goes out as indented JSON, and `--all` sends the same text twice, as `text` and `reviewText`. The 3 rule copies add ~81,000 characters. Output: `temp-tool-output\261127-0052-prose-calibration-rerun\run.txt`.
+
+#### Payload analysis (261127)
+
+An offline probe with a fake CLI built the real prompts and cost no credits. Every prompt starts with ~28,400 fixed characters. The fixed part has 1,100 characters of instructions, 8,100 of core rules and 19,200 of reference rules.
+
+| Case | Passage text | Passage JSON | Whole prompt | Rules share |
+| --- | --- | --- | --- | --- |
+| Short stdin reply | 0.2k | 0.6k | 29.1k | 97% |
+| `WI-060`, changed lines | 14.3k | 31.6k | 60.1k | 45% |
+| `WI-060`, `--all` | 31.5k | 113.6k | 142.1k | 19% |
+| 3 docs, `--all`, 3 batches | 127.4k | 366.1k | 451.5k | 18% |
+
+The passage JSON grows from 2.2 to 3.6 times the passage text. It has 4 causes:
+
+- Indentation.
+- Repeated key names.
+- `reviewText` equal to `text`. That's every passage with `--all`, and 28 of 34 in the changed-lines case.
+- `reviewRanges` that cover the whole passage.
+
+ A lean format sends the same data in far fewer characters. It groups passages by file, writes lines as `12-18`, and drops the repeated fields. For the 3 docs, it cuts the passage JSON from 366.1k to 143.2k characters. A tagged-text format reaches 141.3k, so lean JSON gets nearly all of the gain.
+
+The real 3-doc run cost 3.5354 credits. The Haiku catalog prices give the same total:
+
+| Part | Tokens | Credits | Share |
+| --- | --- | --- | --- |
+| Cache writes (nearly all input) | 171,664 | 2.15 | 61% |
+| Reasoning output | 23,853 | 1.19 | 34% |
+| Other output | 3,845 | 0.19 | 5% |
+| Cache reads | 4,713 | <0.01 | 0% |
+
+Observed here: cache reads were ~1,571 tokens per batch, which is only the CLI's own system prompt. The rules sit inside each batch's user message, so later batches don't read them from cache. Inferred, not verified: the CLI marks the cache point at the end of the message. A shared start inside a message then isn't reused. Tables hold 31% of the 3-doc passage text, and code blocks hold 5%. Table cells are prose, so they stay in the review. Probes: `temp-tool-output\261127-0109-prose-payload-analysis\`.
+
+#### Token cuts and tests (261127)
+
+The dev approved 5 changes as one build:
+
+- A lean passage format that sends each passage once.
+- A `--max-ai-credits` cap, default 10.
+- A footer `dropped=` count for malformed findings, which are now skipped instead of failing the review.
+- Long passages split into `S1P1.N` pieces.
+- Findings from earlier batches print when a later batch fails.
+
+Copilot CLI 1.0.116 rejects `--max-ai-credits` below 30: `Use at least 30 AI credits.` Passing the flag made every call fail in ~0.5 s with `spawnSync copilot EOF`, at 0 credits. The checker now enforces the cap itself, between batches, and no longer passes the flag. Spawn errors now show the CLI's stderr first.
+
+Paid tests on the same 3 docs with `--all --ai`, Haiku 5.5:
+
+| Run | Batches | Credits | Input tokens | Reasoning tokens | AI findings | Elapsed |
+| --- | --- | --- | --- | --- | --- | --- |
+| Before (indented JSON) | 3 | 3.54 | 176,389 | 23,853 | ~43 | 116 s |
+| ✅ Lean, default effort | 1 | 1.21 | 66,660 | 6,497 | 16 | 41 s |
+| Lean, `--reasoning-effort low` | 1 | 1.07 | 66,662 | 4,103 | 10 | 25 s |
+
+- The lean format cut cost by 66%.
+- Low effort saved another 12% but found 6 fewer items. Keep the default effort.
+- ⚠️ AI findings fell from ~43 to 16. The ~43 is inferred from the total minus the 149 deterministic findings. One large batch may give each passage less attention than 3 smaller batches. Not yet measured: whether the 27 lost findings were useful.
+
+Cache probe: 2 back-to-back stdin runs each read 1,571 cached tokens and wrote ~13,180. The rules prefix isn't reused across runs. Inferred: the CLI's own per-session text comes before the rules, so an `AGENTS.md` route wouldn't help either. The `AGENTS.md` variant wasn't run.
+
+Output: `temp-tool-output\261127-0131-prose-effort-ab\`.
+
+#### Facts to check before changing the AI call
+
+Read this before you change how `check-prose.mjs` calls Copilot CLI. All rows were observed here with Copilot CLI 1.0.116 and Claude Haiku 5.5, unless the row says inferred. Recheck them after a CLI upgrade.
+
+| Fact | Evidence | What it means for changes |
+| --- | --- | --- |
+| `--max-ai-credits` rejects values under 30 | The CLI with `--max-ai-credits 10` printed "Use at least 30 AI credits." | The checker enforces its own cap between batches. Don't pass the CLI flag unless the cap is 30 or more. |
+| A rejected argument shows up as `spawnSync copilot EOF` in ~0.5 s, at 0 credits | Both A/B runs before the fix | The CLI exits before it reads stdin. The checker now prints stderr first. Check stderr before you suspect the prompt. |
+| `--available-tools` with no value gives the model every tool | [Tool flag bug](#tool-flag-bug-261127) | Always pass `--available-tools ""`. Tools cost ~24,000 input tokens per call. |
+| The CLI compacts near 100,000 tokens, even for a 200,000-token model | [Large-batch test](#large-batch-test-261127) | Compaction drops passage IDs and can switch to long-context pricing. Keep batches at 80% of the line or less. |
+| Prose runs at about 2 to 2.6 characters per token, not 4 | Footers: 1.96 (stdin), 2.14 (`WI-060`), 2.37 to 2.58 (3 docs) | Short prompts show a lower ratio because CLI overhead is a larger share. Keep runtime calibration. |
+| The prompt cache reads only ~1,571 tokens, the CLI's own text | Every batch and run in the [cache probe](#token-cuts-and-tests-261127) | The rules are written to cache again on every call. Moving rules to `AGENTS.md` is inferred not to help. |
+| Cache writes are most of the cost | 61% of the 3.54-credit run, see [Payload analysis](#payload-analysis-261127) | Fewer input characters is the main cost lever. |
+| Each AI call costs at least ~0.2 credits | Two short stdin runs: 0.2050 and 0.2064 | The ~13,000 tokens of rules set the floor. A short chat reply costs the same as a small doc. |
+| Reasoning is about a third of the cost | 34% of the 3.54-credit run | `--reasoning-effort low` cuts reasoning tokens by ~37% but found 6 fewer items. |
+| One large batch found fewer AI items than 3 small batches | 16 vs ~43 on the same docs | Inferred: attention per passage drops in a large batch. Not measured: whether the lost items were useful. Test this before raising batch sizes again. |
+| A compacted prompt made the model cite `file:line` instead of passage IDs | [Rerun at 4 characters per token](#rerun-at-4-characters-per-token-261127) | Invalid IDs are now dropped and counted in `dropped=`. A high `dropped=` count can mean compaction. |
+| Credits in the footer come from `--usage-output-file` | Every footer with `usage=reported` | Fields the CLI doesn't report print as `not reported`, never as 0. |
+
+Ideas this research points to, none approved:
+
+- Test 2 or 3 medium batches against 1 large batch for finding quality and cost.
+- Shorten the AI output fields, since output and reasoning are ~39% of the cost.
+- Send only the core rules for stdin replies, to lower the ~0.2-credit floor. This would drop the reference examples from short reviews.
 
 ### AI result format
 
@@ -355,6 +515,9 @@ Effort: S-M.
 - Automatic edits.
 - Local chat hooks.
 - CI-wide AI enforcement.
+- Shorter AI output fields. The 261127 token cuts didn't include this.
+- Check whether one large AI batch misses findings that smaller batches catch. See [Token cuts and tests](#token-cuts-and-tests-261127).
+- AI batch fixes: detect CLI compaction directly, and re-split long passages after calibration lowers the cap.
 
 These belong with WI-061 or a later proposal after the standalone checker works.
 
@@ -438,6 +601,20 @@ The 261126 catalog update adds types and runtime metadata to the checker:
 
 The catalog is a snapshot of public docs taken on a known date. It doesn't prove that a model is available to the current account or product. Copilot CLI still decides access and reports actual usage.
 
+### Validation 261126: style files
+
+| Check | Result |
+| --- | --- |
+| Focused checker tests | ✅ 22 of 22 pass. 3 new tests cover the two-file prompt, a missing style file and the header |
+| `pnpm run typecheck:test` | ✅ Pass, because the declaration file changed |
+| `git diff --check` | ✅ Clean for `scripts` and `test` |
+| Local run | ✅ The header names the project and both files |
+| AI run on the changed docs | ✅ Haiku 5.5, 1 batch, 54.0 KiB prompt, 48,400 input tokens, 0.8754 credits, 24.8 s. 3 recommendations about long sentences were applied |
+
+The 261125 run sent a 33.3 KiB prompt with 43,658 input tokens for 0.8614 credits. Prompt size grew about 21 KiB with the reference file. Input tokens grew only about 4,700. The selected prose differed between the runs, so the two numbers don't compare directly.
+
+Full `pnpm run verify` didn't run. The change touches only the checker script, its declarations, its tests and docs.
+
 ## Goal audit 261125
 
 You asked for a check against your goals: a compact core guide for AI, a reference with examples, and an advisory checker that doesn't cause rerun loops.
@@ -508,12 +685,15 @@ Acceptance checks:
 - The usage footer names the fields it knows and says `usage unavailable` when needed.
 - `--model` accepts a documented display name and resolves it to the catalog ID.
 - `--model` accepts words within model names, short names, case differences and space or hyphen variants.
+- `--max-ai-credits` stops before the next batch once the cap is spent. A malformed finding shows in `dropped=` and doesn't fail the review.
 - `--model luna` reports that two models matched and selects `gpt-6-luna`.
 - Bare `haiku` resolves to Claude Haiku 5.5, while `haiku 4.5` resolves to Claude Haiku 4.5.
 - `--model` keeps an unknown enterprise or bring-your-own-key ID unchanged.
+- The header names the project and both style files. The AI prompt grows by about 19 KiB.
 - The user decides whether the model's blocker and recommend severities are useful.
 - Under `--ai`, the model catches listed words often enough. If it misses too many, restore the local avoid-word rule under `--ai`.
 - Agents use `--ai` only in the Q1 cases.
+- Compare the 1-batch AI review with the 3-batch result in [Token cuts and tests](#token-cuts-and-tests-261127). The useful findings shouldn't drop.
 
 ## Decisions and limits
 
@@ -537,6 +717,10 @@ Acceptance checks:
 - The bare `haiku` alias means Claude Haiku 5.5. Use `haiku 4.5` for Claude Haiku 4.5.
 - "Cheapest" means the lowest sum of default input, cached input, cache-write and output rates. It is not an estimate for a real token mix.
 - AI review sends selected prose to the model service. Don't use it for text that must stay private.
+- Each AI batch now sends the reference file too, which adds about 5,000 input tokens. Large inputs split into more batches.
+- The credit cap is checked between batches. The batch that crosses the cap still finishes, so a run can spend a little more than the cap.
+- Every AI call costs at least ~0.2 credits, because the rules are written to the prompt cache each time.
+- The CLI facts in [Facts to check before changing the AI call](#facts-to-check-before-changing-the-ai-call) were observed on CLI 1.0.116. A CLI upgrade can change them.
 
 ## References
 
