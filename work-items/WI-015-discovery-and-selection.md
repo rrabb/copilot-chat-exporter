@@ -13,7 +13,7 @@ Canonical entry: [WI-015](../work-log.md#wi-015). Code links use commit `cba16b3
 - Another check found that unreadable stores can hide duplicates or disappear from inventory diagnostics. WI-045 blocks bare selection when discovery is incomplete. Accepted 261126.
 - WI-080 aligns Local lookup with inventory by requiring the `.jsonl` suffix. Accepted 261126.
 - WI-085 blocks only the chat a failed file can hide, adds a retry hint for a locked index and lists exact paths in Local errors. Accepted 261126.
-- Work tree: WI-086 (terminal listing usability) is built and waits for acceptance. Exact paths and verified qualified keys remain usable.
+- Status: WI-086 (terminal listing usability) is complete and accepted. Exact paths and verified qualified keys remain usable.
 - [WI-003](WI-003-remaining-manual-acceptance.md) records later chooser acceptance. [WI-007](../work-log.md#wi-007) keeps separate inventory evidence questions.
 
 ## Original goal
@@ -32,7 +32,7 @@ These are the original criteria for the accepted work. The later findings below 
 
 ## Work tree
 
-Progress as of 261126: 5 of 5 implemented. WI-086 awaits developer acceptance.
+As of 261126, all 5 WI-015 parts are implemented and accepted. WI-086 is committed as `137ab7d`.
 
 | # | Item | Type | Size | Do after |
 | --- | --- | --- | --- | --- |
